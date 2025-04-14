@@ -19,8 +19,30 @@ else
 endif
 # if certs do not exist, create them
 
+# Install dependencies
+deps:
+	go mod tidy
+
+# Install git hooks
+hooks:
+	@echo "Installing git hooks..."
+	@mkdir -p .git/hooks
+	@cp -f .githooks/pre-commit .git/hooks/pre-commit
+	@chmod +x .git/hooks/pre-commit
+	@echo "Git hooks installed successfully"
+
+# Run pre-commit checks on all files
+lint-all:
+	@echo "Running pre-commit checks on all files..."
+	@./.githooks/pre-commit --all
+
+# Run pre-commit checks on staged files only
+lint:
+	@echo "Running pre-commit checks on staged files..."
+	@./.githooks/pre-commit
+
 # run the server 
-run:
+run: deps
 	@echo "Running server..."
 	@echo "Using certs from $(CERT_PATH) and $(CERT_KEY_PATH)"
 	@echo "Starting server..."
@@ -41,9 +63,26 @@ test:
 	go test -race -v .
 
 test_coverage:
+	go test -race -coverprofile=coverage.out -v .
+	go tool cover -html=coverage.out
 
-build:
-	go build -v . 
+build: deps
+	go build -v -o guac cmd/guac/guac.go
+
+# Setup development environment
+setup: deps hooks
+	@echo "Development environment setup complete"
 
 help:
 	go run cmd/guac/guac.go -h
+	@echo ""
+	@echo "Additional Make targets:"
+	@echo "  deps         - Install dependencies"
+	@echo "  hooks        - Install git hooks"
+	@echo "  setup        - Set up development environment (deps + hooks)"
+	@echo "  lint         - Run pre-commit checks on staged files"
+	@echo "  lint-all     - Run pre-commit checks on all files"
+	@echo "  test         - Run tests"
+	@echo "  build        - Build the project"
+	@echo "  generate     - Generate self-signed certificates"
+	@echo "  generate_prod - Generate Let's Encrypt certificates"

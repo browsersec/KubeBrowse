@@ -3,7 +3,7 @@ FROM golang:1.23-alpine AS builder
 WORKDIR /app
 
 # Install dependencies
-RUN apk add --no-cache git make
+RUN apk add --no-cache git make bash
 
 # Copy go.mod and go.sum files
 COPY go.mod go.sum ./
@@ -33,9 +33,10 @@ COPY --from=builder /app/templates /root/templates
 COPY --from=builder /app/guac .
 COPY --from=builder /app/certs /root/certs
 
-# Set environment variables for certificates
+# Set environment variables
 ENV CERT_PATH=/root/certs/certificate.crt
 ENV CERT_KEY_PATH=/root/certs/private.key
+ENV GUACD_ADDRESS=guacd:4822
 
 # Expose the correct port (from guac.go)
 EXPOSE 4567

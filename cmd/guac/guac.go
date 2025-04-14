@@ -1,8 +1,6 @@
 package main
 
 import (
-	"crypto/tls"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -12,9 +10,10 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/gin-gonic/gin"
 	"github.com/sanjay7178/guac"
-	"github.com/sirupsen/logrus"
 	"github.com/sanjay7178/guac/utils"
+	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -22,6 +21,13 @@ var (
 	certKeyPath string
 	guacdAddr   = "127.0.0.1:4822"
 )
+
+// GinHandlerAdapter adapts http.Handler to gin.HandlerFunc
+func GinHandlerAdapter(h http.Handler) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		h.ServeHTTP(c.Writer, c.Request)
+	}
+}
 
 func main() {
 	// Parse command line flags
@@ -56,6 +62,13 @@ func main() {
 		guacdAddr = os.Getenv("GUACD_ADDRESS")
 	}
 
+	// Initialize Gin
+	gin.SetMode(gin.ReleaseMode)
+	router := gin.New()
+	router.Use(gin.Recovery())
+	router.Use(gin.Logger())
+
+	// Initialize Guacamole handlers
 	servlet := guac.NewServer(DemoDoConnect)
 	wsServer := guac.NewWebsocketServer(DemoDoConnect)
 
@@ -63,16 +76,19 @@ func main() {
 	wsServer.OnConnect = sessions.Add
 	wsServer.OnDisconnect = sessions.Delete
 
-	mux := http.NewServeMux()
-	mux.Handle("/tunnel", servlet)
-	mux.Handle("/tunnel/", servlet)
-	mux.Handle("/websocket-tunnel", wsServer)
+	// Setup routes using Gin
+	router.Any("/tunnel", GinHandlerAdapter(servlet))
+	router.Any("/tunnel/*path", GinHandlerAdapter(servlet))
+	router.Any("/websocket-tunnel", GinHandlerAdapter(wsServer))
 
 	// Add HTMX form handler
-	mux.HandleFunc("/connect", utils.ServeConnectionForm)
+	router.Any("/connect", func(c *gin.Context) {
+		utils.ServeConnectionForm(c.Writer, c.Request)
+	})
 
-	mux.HandleFunc("/sessions/", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
+	// Session management handler
+	router.GET("/sessions/", func(c *gin.Context) {
+		c.Header("Content-Type", "application/json")
 
 		sessions.RLock()
 		defer sessions.RUnlock()
@@ -90,49 +106,23 @@ func main() {
 				Uuid: id,
 				Num:  num,
 			}
+			i++
 		}
 
-		if err := json.NewEncoder(w).Encode(connIds); err != nil {
-			logrus.Error(err)
-		}
+		c.JSON(http.StatusOK, connIds)
 	})
 
-	tlsCfg := tls.Config{}
+	// Start server with appropriate TLS configuration
+	addr := "0.0.0.0:4567"
 	if certPath != "" {
-		cert, err := tls.LoadX509KeyPair(certPath, certKeyPath)
-		if err != nil {
-			logrus.Fatalf("Unable to load certificate keypair: %s\n", err)
-		}
-
-		tlsCfg.MinVersion = tls.VersionTLS13
-		tlsCfg.Certificates = []tls.Certificate{cert}
-		tlsCfg.CurvePreferences = []tls.CurveID{
-			tls.X25519,
-			tls.CurveP256,
-			tls.CurveP384,
-		}
-	}
-
-	s := &http.Server{
-		Addr:           "0.0.0.0:4567",
-		Handler:        mux,
-		ReadTimeout:    guac.SocketTimeout,
-		WriteTimeout:   guac.SocketTimeout,
-		MaxHeaderBytes: 1 << 20,
-		TLSConfig:      &tlsCfg,
-	}
-
-	if certPath != "" {
-		logrus.Println("Serving on https://0.0.0.0:4567")
-
-		err := s.ListenAndServeTLS("", "")
+		logrus.Println("Serving on https://", addr)
+		err := router.RunTLS(addr, certPath, certKeyPath)
 		if err != nil {
 			logrus.Fatal(err)
 		}
 	} else {
-		logrus.Println("Serving on http://0.0.0.0:4567")
-
-		err := s.ListenAndServe()
+		logrus.Println("Serving on http://", addr)
+		err := router.Run(addr)
 		if err != nil {
 			logrus.Fatal(err)
 		}
