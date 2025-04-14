@@ -36,3 +36,14 @@ generate_prod:
 	@echo "Copying certs to certs directory..."
 	sudo cp /etc/letsencrypt/live/$(DOMAIN)/fullchain.pem certs/prod/certificate.crt
 	sudo cp /etc/letsencrypt/live/$(DOMAIN)/privkey.pem certs/prod/private.key
+
+test:
+	go test -race -v .
+
+test_coverage:
+
+build:
+	go build -v . 
+
+help:
+	go run cmd/guac/guac.go -h

@@ -3,6 +3,8 @@ package main
 import (
 	"crypto/tls"
 	"encoding/json"
+	"flag"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -10,8 +12,9 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/sanjay7178/guac"
 	"github.com/sirupsen/logrus"
-	"github.com/wwt/guac"
+	"github.com/sanjay7178/guac/utils"
 )
 
 var (
@@ -21,6 +24,16 @@ var (
 )
 
 func main() {
+	// Parse command line flags
+	helpFlag := flag.Bool("h", false, "Display help information")
+	flag.Parse()
+
+	// Check if help flag was provided
+	if *helpFlag {
+		displayHelp()
+		return
+	}
+
 	logrus.SetLevel(logrus.DebugLevel)
 
 	if os.Getenv("CERT_PATH") != "" {
@@ -54,6 +67,10 @@ func main() {
 	mux.Handle("/tunnel", servlet)
 	mux.Handle("/tunnel/", servlet)
 	mux.Handle("/websocket-tunnel", wsServer)
+
+	// Add HTMX form handler
+	mux.HandleFunc("/connect", utils.ServeConnectionForm)
+
 	mux.HandleFunc("/sessions/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 
@@ -198,4 +215,16 @@ func DemoDoConnect(request *http.Request) (guac.Tunnel, error) {
 	}
 	logrus.Debug("Socket configured")
 	return guac.NewSimpleTunnel(stream), nil
+}
+
+// Add a help command to display CLI usage information
+func displayHelp() {
+	fmt.Println("Usage: guac [command] [options]")
+	fmt.Println("Commands:")
+	fmt.Println("  run             Start the GUAC server")
+	fmt.Println("  generate        Generate self-signed certificates")
+	fmt.Println("  generate_prod   Generate Let's Encrypt certificates")
+	fmt.Println("  test            Run tests")
+	fmt.Println("  build           Build the project")
+	fmt.Println("  help            Display this help message")
 }
