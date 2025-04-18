@@ -1,4 +1,4 @@
-### KubeBrowse
+### KubeBrowse [WIP] 
 ---
 
 Secure browser-in-browser isolation platform powered by Kubernetes. KubeBrowse provides ephemeral sandboxed browsing environments accessed through your browser with no additional software. Each session runs in an isolated container with real-time threat analysis for uploaded files and automatic cleanup after timeout.
