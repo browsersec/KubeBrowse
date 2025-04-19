@@ -2,7 +2,7 @@ module github.com/sanjay7178/guac
 
 go 1.23.0
 
-toolchain go1.23.7
+toolchain go1.24.2
 
 replace github.com/Sirupsen/logrus v1.4.2 => github.com/sirupsen/logrus v1.4.2
 
