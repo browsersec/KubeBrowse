@@ -1,10 +1,16 @@
+---
+label: Contributing to KubeBrowse
+icon:  book
+order: 800
+---
+
 # Contributing to KubeBrowse
 
 Thank you for your interest in contributing to GUAC! This document provides guidelines and instructions for contributing to this project.
 
 ## Table of Contents
 
-- [Contributing to KubeBrowse](#contributing-to-guac)
+- [Contributing to KubeBrowse](#contributing-to-kubebrowse)
   - [Table of Contents](#table-of-contents)
   - [Code of Conduct](#code-of-conduct)
   - [Getting Started](#getting-started)

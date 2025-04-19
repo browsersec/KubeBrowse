@@ -1,3 +1,9 @@
+---
+label: Future Plan 
+icon: rocket
+order: 900
+---
+
 #### Future Plan
 
 - Keycloak for web auth via LDAP or RADIUS or OAUTH Provider
