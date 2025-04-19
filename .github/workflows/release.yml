@@ -1,69 +1,61 @@
-name: Go
+name: Release
 
 on:
   push:
-    branches: [ master ]
     tags:
       - 'v*'
-  pull_request:
-    branches: [ master ]
-
-env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  build:
-    name: Build and Test
+  goreleaser:
+    name: Release Go Binary
     runs-on: ubuntu-latest
     steps:
-    - name: Set up Go 1.x
-      uses: actions/setup-go@v2
-      with:
-        go-version: ^1.13
-
-    - name: Check out code into the Go module directory
-      uses: actions/checkout@v3
-
-    - name: Get dependencies
-      run: |
-        go get -v -t -d ./...
-        if [ -f Gopkg.toml ]; then
-            curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
-            dep ensure
-        fi
-
-    - name: Build
-      run: go build -v .
-
-    - name: Test
-      run: go test -race -v .
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
       
-  docker-build-push:
-    name: Build and Push Docker Image
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.20'
+          check-latest: true
+      
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v4
+        with:
+          version: latest
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  
+  docker:
+    name: Release Docker Image
     runs-on: ubuntu-latest
-    needs: build
-    # Only run on pushes to master or on tag pushes
-    if: github.event_name == 'push'
+    needs: goreleaser
     permissions:
       contents: read
       packages: write
     
+    env:
+      REGISTRY: ghcr.io
+      IMAGE_NAME: ${{ github.repository }}
+    
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
-
+      
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
-        
-      - name: Log in to the Container registry
+      
+      - name: Log in to GitHub Container Registry
         uses: docker/login-action@v2
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-          
-      - name: Extract metadata (tags, labels) for Docker
+      
+      - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v4
         with:
@@ -71,9 +63,7 @@ jobs:
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-            type=ref,event=branch
-            type=sha,format=short
-          
+      
       - name: Build and push Docker image
         uses: docker/build-push-action@v4
         with:
