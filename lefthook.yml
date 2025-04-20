@@ -1,0 +1,49 @@
+# lefthook.yml
+# See https://github.com/evilmartians/lefthook for more information
+
+pre-commit:
+  parallel: true
+  commands:
+    gofmt:
+      glob: "*.go"
+      exclude: "vendor/**"
+      run: gofmt -w -s {staged_files} && git add {staged_files}
+      stage_fixed: true
+    
+    go-vet:
+      tags: golang
+      glob: "*.go"
+      exclude: "vendor/**"
+      run: go vet ./...
+    
+    golangci-lint:
+      tags: golang
+      glob: "*.go"
+      exclude: "vendor/**"
+      run: |
+        if command -v golangci-lint &> /dev/null; then
+          golangci-lint run
+        else
+          echo "golangci-lint not found. Skipping linting."
+          echo "Consider installing: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest"
+          exit 0
+        fi
+
+    go-tests:
+      tags: golang
+      glob: "*.go"
+      exclude: "vendor/**"
+      run: go test -short ./...
+
+commit-msg:
+  commands:
+    lint-commit-msg:
+      run: |
+        message="$(cat $1)"
+        if ! echo "$message" | grep -qE '^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\(.+\))?: .+'; then
+          echo "Commit message format error!"
+          echo "Please use conventional commits format: type(scope): description"
+          echo "Examples: feat(api): add new endpoint, fix: resolve memory leak"
+          echo "More info: https://www.conventionalcommits.org/"
+          exit 1
+        fi

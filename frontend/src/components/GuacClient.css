@@ -1,0 +1,15 @@
+.display {
+  overflow: hidden;
+  width: 100%;
+  height: 100%;
+}
+
+.display.focus {
+  /* Optional: Add any styling for focused state */
+}
+
+.viewport {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}

@@ -15,7 +15,7 @@ RUN go mod download
 COPY . .
 
 # Build the application from the correct path
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o guac cmd/guac/guac.go
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o guac cmd/guac/main.go
 
 # Use a small image for the final container
 FROM alpine:3.17
@@ -38,7 +38,7 @@ ENV CERT_PATH=/root/certs/certificate.crt
 ENV CERT_KEY_PATH=/root/certs/private.key
 ENV GUACD_ADDRESS=guacd:4822
 
-# Expose the correct port (from guac.go)
+# Expose the correct port (from main.go)
 EXPOSE 4567
 
 # Command to run the correct binary
