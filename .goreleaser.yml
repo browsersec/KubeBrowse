@@ -9,7 +9,7 @@ before:
     - go mod tidy
 
 builds:
-  - main: ./cmd/guac/guac.go
+  - main: ./cmd/guac/main.go
     id: "guac"
     binary: guac
     env:

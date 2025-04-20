@@ -59,7 +59,6 @@ func (f *fakeTunnel) AcquireReader() InstructionReader {
 }
 
 func (f *fakeTunnel) ReleaseReader() {
-	return
 }
 
 func (f *fakeTunnel) HasQueuedReaderThreads() bool {
@@ -71,7 +70,7 @@ func (f *fakeTunnel) AcquireWriter() io.Writer {
 }
 
 func (f *fakeTunnel) ReleaseWriter() {
-	return
+
 }
 
 func (f *fakeTunnel) HasQueuedWriterThreads() bool {

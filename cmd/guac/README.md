@@ -13,7 +13,7 @@ This is a Go implementation of a web client for Apache Guacamole.
 ### Running the Server
 
 ```bash
-go run cmd/guac/guac.go
+go run cmd/guac/main.go
 ```
 
 ### Environment Variables

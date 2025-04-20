@@ -17,36 +17,38 @@ else
 	CERT_KEY_PATH := "$(shell pwd)/certs/private.key"
 	bash ./certs/generate.sh
 endif
-# if certs do not exist, create them
 
 # Install dependencies
 deps:
 	go mod tidy
 
-# Install git hooks
+# Install git hooks using lefthook
 hooks:
-	@echo "Installing git hooks..."
-	@mkdir -p .git/hooks
-	@cp -f .githooks/pre-commit .git/hooks/pre-commit
-	@chmod +x .git/hooks/pre-commit
-	@echo "Git hooks installed successfully"
+	@echo "Installing git hooks using lefthook..."
+	@if ! command -v lefthook &> /dev/null; then \
+		echo "lefthook command not found. Please install lefthook: https://github.com/evilmartians/lefthook"; \
+		exit 1; \
+	fi
+	@lefthook install
+	@echo "Lefthook Git hooks installed successfully"
 
-# Run pre-commit checks on all files
+# Run pre-commit checks on all files using lefthook
 lint-all:
-	@echo "Running pre-commit checks on all files..."
-	@./.githooks/pre-commit --all
+	@echo "Running pre-commit checks on all files using lefthook..."
+	@lefthook run pre-commit --all-files
+	@echo "Pre-commit checks completed"
 
-# Run pre-commit checks on staged files only
+# Run pre-commit checks on staged files only using lefthook
 lint:
-	@echo "Running pre-commit checks on staged files..."
-	@./.githooks/pre-commit
+	@echo "Running pre-commit checks on staged files using lefthook..."
+	@lefthook run pre-commit --files $(git diff --name-only --cached)
 
 # run the server 
 run: deps
 	@echo "Running server..."
 	@echo "Using certs from $(CERT_PATH) and $(CERT_KEY_PATH)"
 	@echo "Starting server..."
-	CERT_PATH=./certs/certificate.crt CERT_KEY_PATH=./certs/private.key go run cmd/guac/guac.go
+	CERT_PATH=./certs/certificate.crt CERT_KEY_PATH=./certs/private.key go run cmd/guac/main.go
 
 generate:
 	bash ./certs/generate.sh
@@ -67,21 +69,21 @@ test_coverage:
 	go tool cover -html=coverage.out
 
 build: deps
-	go build -v -o guac cmd/guac/guac.go
+	go build -v -o guac cmd/guac/main.go
 
 # Setup development environment
 setup: deps hooks
 	@echo "Development environment setup complete"
 
 help:
-	go run cmd/guac/guac.go -h
+	go run cmd/guac/main.go -h
 	@echo ""
 	@echo "Additional Make targets:"
 	@echo "  deps         - Install dependencies"
-	@echo "  hooks        - Install git hooks"
+	@echo "  hooks        - Install lefthook git hooks"
 	@echo "  setup        - Set up development environment (deps + hooks)"
-	@echo "  lint         - Run pre-commit checks on staged files"
-	@echo "  lint-all     - Run pre-commit checks on all files"
+	@echo "  lint         - Run lefthook pre-commit checks on staged files"
+	@echo "  lint-all     - Run lefthook pre-commit checks on all files"
 	@echo "  test         - Run tests"
 	@echo "  build        - Build the project"
 	@echo "  generate     - Generate self-signed certificates"

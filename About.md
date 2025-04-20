@@ -19,7 +19,7 @@ docker run --name guacd -d -p 4822:4822 guacamole/guacd
 Next run the example main:
 
 ```sh
-go run cmd/guac/guac.go
+go run cmd/guac/main.go
 ```
 
 Now you can connect with [the example Vue app](https://github.com/wwt/guac-vue).  By default, guac will try to connect to a guacd instance at `127.0.0.1:4822`.  If you need to configure something different, you can do so by configuring environment variables; see the configurable parameters below.

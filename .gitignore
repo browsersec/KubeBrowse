@@ -39,3 +39,8 @@ certs/prod/
 
 # Build directory
 dist/
+
+
+# remove openssl certs
+certs/*.key
+certs/*.crt
