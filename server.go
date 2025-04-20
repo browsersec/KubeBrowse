@@ -147,7 +147,9 @@ func (s *Server) doRead(response http.ResponseWriter, request *http.Request, tun
 	// Send end-of-stream marker and close tunnel if connection is closed
 	case ErrConnectionClosed:
 		s.deregisterTunnel(tunnel)
-		tunnel.Close()
+		if closeErr := tunnel.Close(); closeErr != nil {
+			logger.Debug("Error closing tunnel:", closeErr)
+		}
 
 		// End-of-instructions marker
 		_, _ = response.Write([]byte("0.;"))
@@ -157,7 +159,9 @@ func (s *Server) doRead(response http.ResponseWriter, request *http.Request, tun
 	default:
 		logger.Debugln("Error writing to output", err)
 		s.deregisterTunnel(tunnel)
-		tunnel.Close()
+		if closeErr := tunnel.Close(); closeErr != nil {
+			logger.Debug("Error closing tunnel:", closeErr)
+		}
 	}
 
 	return err
@@ -171,7 +175,9 @@ func (s *Server) writeSome(response http.ResponseWriter, guacd InstructionReader
 		message, err = guacd.ReadSome()
 		if err != nil {
 			s.deregisterTunnel(tunnel)
-			tunnel.Close()
+			if closeErr := tunnel.Close(); closeErr != nil {
+				logger.Debug("Error closing tunnel:", closeErr)
+			}
 			return
 		}
 
