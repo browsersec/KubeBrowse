@@ -35,6 +35,11 @@ pre-commit:
       exclude: "vendor/**"
       run: go test -short ./...
 
+    gosec:
+      glob: "*.{go}"
+      run: gosec -quiet {staged_files}
+      stage_fixed: true
+    
 commit-msg:
   commands:
     lint-commit-msg:

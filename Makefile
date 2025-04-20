@@ -17,7 +17,6 @@ else
 	CERT_KEY_PATH := "$(shell pwd)/certs/private.key"
 	bash ./certs/generate.sh
 endif
-# if certs do not exist, create them
 
 # Install dependencies
 deps:
