@@ -131,13 +131,12 @@ func (s *Stream) ReadSome() (instruction []byte, err error) {
 
 		n, err = s.conn.Read(buffer)
 		if err != nil && n == 0 {
-			switch err.(type) {
+			switch e := err.(type) {
 			case net.Error:
-				ex := err.(net.Error)
-				if ex.Timeout() {
-					err = ErrUpstreamTimeout.NewError("Connection to guacd timed out.", err.Error())
+				if e.Timeout() {
+					err = ErrUpstreamTimeout.NewError("Connection to guacd timed out.", e.Error())
 				} else {
-					err = ErrConnectionClosed.NewError("Connection to guacd is closed.", err.Error())
+					err = ErrConnectionClosed.NewError("Connection to guacd is closed.", e.Error())
 				}
 			default:
 				err = ErrServer.NewError(err.Error())

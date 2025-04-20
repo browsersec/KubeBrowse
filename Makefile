@@ -35,7 +35,8 @@ hooks:
 # Run pre-commit checks on all files using lefthook
 lint-all:
 	@echo "Running pre-commit checks on all files using lefthook..."
-	@lefthook run pre-commit
+	@lefthook run pre-commit --all-files
+	@echo "Pre-commit checks completed"
 
 # Run pre-commit checks on staged files only using lefthook
 lint:

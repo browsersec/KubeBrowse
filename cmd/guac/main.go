@@ -12,7 +12,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/sanjay7178/guac"
-	"github.com/sanjay7178/guac/utils"
 	"github.com/sirupsen/logrus"
 )
 
@@ -80,11 +79,6 @@ func main() {
 	router.Any("/tunnel", GinHandlerAdapter(servlet))
 	router.Any("/tunnel/*path", GinHandlerAdapter(servlet))
 	router.Any("/websocket-tunnel", GinHandlerAdapter(wsServer))
-
-	// Add HTMX form handler
-	router.Any("/connect", func(c *gin.Context) {
-		utils.ServeConnectionForm(c.Writer, c.Request)
-	})
 
 	// Session management handler
 	router.GET("/sessions/", func(c *gin.Context) {

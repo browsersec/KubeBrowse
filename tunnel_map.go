@@ -116,7 +116,6 @@ func (m *TunnelMap) tunnelTimeoutTaskRun() {
 		}
 	}
 	m.Unlock()
-	return
 }
 
 // Get returns the Tunnel having the given UUID, wrapped within a LastAccessedTunnel.

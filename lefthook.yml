@@ -37,7 +37,7 @@ pre-commit:
 
     gosec:
       glob: "*.{go}"
-      run: gosec -quiet {staged_files}
+      run: gosec  ./..
       stage_fixed: true
     
 commit-msg:
