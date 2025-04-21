@@ -15,3 +15,10 @@ Secure browser-in-browser isolation platform powered by Kubernetes. KubeBrowse p
 
 
 #### Architecture
+
+---
+### Acknowledgements
+<!--- We would like to thank the following organizations and individuals for their support and contributions to this project: --> 
+We would like to thank the following organizations and individuals for their support and contributions to this project:
+
+[AIR VIT-AP University](https://air.vitap.ac.in) – for providing technical mentorship, funding and resources.
