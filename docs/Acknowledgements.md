@@ -1,12 +1,13 @@
 ---
 label: Acknowledgements
-icon:  🙏
-order: 700
+icon:  megaphone
+order: 600
 ---
 
 # Acknowledgements
 
-We would like to extend our heartfelt thanks to the following organizations and individuals for their invaluable contributions and support throughout this project:
 
+This research is carried out in [Centre of Excellence, Artificial Intelligence and Robotics (AIR)](https://air.vitap.ac.in). A kind mention for providing mentorship, computational resources, and infrastructure support critical to the successful development of the project.
 
-[AIR VIT-AP University](https://air.vitap.ac.in) – for providing mentorship, computational resources, and infrastructure support critical to the successful development of the project.
+![digitalfortress](../attachments/df.png)
+
