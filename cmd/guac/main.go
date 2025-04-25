@@ -8,17 +8,25 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strconv"
 
-	"github.com/browsersec/KubeBrowse"
+	guac "github.com/browsersec/KubeBrowse"
+	"github.com/browsersec/KubeBrowse/k8s"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 var (
-	certPath    string
-	certKeyPath string
-	guacdAddr   = "127.0.0.1:4822"
+	certPath     string
+	certKeyPath  string
+	guacdAddr    = "127.0.0.1:4822"
+	k8sClient    *kubernetes.Clientset
+	k8sNamespace = "browser-sandbox"
 )
 
 // GinHandlerAdapter adapts http.Handler to gin.HandlerFunc
@@ -41,6 +49,7 @@ func main() {
 
 	logrus.SetLevel(logrus.DebugLevel)
 
+	// Get environment variables
 	if os.Getenv("CERT_PATH") != "" {
 		certPath = os.Getenv("CERT_PATH")
 	}
@@ -59,6 +68,50 @@ func main() {
 
 	if os.Getenv("GUACD_ADDRESS") != "" {
 		guacdAddr = os.Getenv("GUACD_ADDRESS")
+	}
+
+	if os.Getenv("KUBERNETES_NAMESPACE") != "" {
+		k8sNamespace = os.Getenv("KUBERNETES_NAMESPACE")
+	}
+
+	// Initialize Kubernetes client with fallback for local development
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		logrus.Warnf("Failed to create in-cluster config: %v", err)
+		logrus.Info("Attempting to use local kubeconfig file")
+
+		// Try to use the kubeconfig file instead
+		kubeconfigPath := os.Getenv("KUBECONFIG")
+		if kubeconfigPath == "" {
+			// Default kubeconfig location if not specified
+			homeDir, err := os.UserHomeDir()
+			if err == nil {
+				kubeconfigPath = filepath.Join(homeDir, ".kube", "config")
+			}
+		}
+
+		if kubeconfigPath != "" {
+			// Import clientcmd at the top of the file
+			config, err = clientcmd.BuildConfigFromFlags("", kubeconfigPath)
+			if err != nil {
+				logrus.Errorf("Failed to create kubernetes client config from kubeconfig: %v", err)
+				logrus.Warn("Continuing without Kubernetes client - pod creation functions will not work")
+			} else {
+				logrus.Infof("Using kubeconfig from: %s", kubeconfigPath)
+			}
+		} else {
+			logrus.Warn("No kubeconfig file found. Continuing without Kubernetes client")
+		}
+	}
+
+	if config != nil {
+		k8sClient, err = kubernetes.NewForConfig(config)
+		if err != nil {
+			logrus.Errorf("Failed to create Kubernetes client: %v", err)
+			logrus.Warn("Continuing without Kubernetes client - pod creation functions will not work")
+		} else {
+			logrus.Info("Successfully connected to Kubernetes")
+		}
 	}
 
 	// Initialize Gin
@@ -105,6 +158,78 @@ func main() {
 
 		c.JSON(http.StatusOK, connIds)
 	})
+
+	// Add test routes for pod creation
+	testRoutes := router.Group("/test")
+	{
+		// Test route to create a browser sandbox pod
+		testRoutes.POST("/browser-pod", func(c *gin.Context) {
+			if k8sClient == nil {
+				c.JSON(http.StatusServiceUnavailable, gin.H{
+					"error": "Kubernetes client not initialized",
+				})
+				return
+			}
+
+			// Generate a dummy user ID for testing
+			userID := "test-" + uuid.New().String()[0:8]
+
+			// Create a browser sandbox pod
+			pod, err := k8s.CreateBrowserSandboxPod(k8sClient, k8sNamespace, userID+"-browser")
+			if err != nil {
+				logrus.Errorf("Failed to create browser pod: %v", err)
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"error": fmt.Sprintf("Failed to create browser pod: %v", err),
+				})
+				return
+			}
+
+			// Connection URI for the pod (simplified version)
+			connectionURI := fmt.Sprintf("/guac/?id=%s&type=browser", pod.Name)
+
+			c.JSON(http.StatusCreated, gin.H{
+				"podName":       pod.Name,
+				"namespace":     pod.Namespace,
+				"status":        "creating",
+				"connectionURI": connectionURI,
+				"message":       "Browser sandbox pod created successfully",
+			})
+		})
+
+		// Test route to create an office sandbox pod
+		testRoutes.POST("/office-pod", func(c *gin.Context) {
+			if k8sClient == nil {
+				c.JSON(http.StatusServiceUnavailable, gin.H{
+					"error": "Kubernetes client not initialized",
+				})
+				return
+			}
+
+			// Generate a dummy user ID for testing
+			userID := "test-" + uuid.New().String()[0:8]
+
+			// Create an office sandbox pod
+			pod, err := k8s.CreateOfficeSandboxPod(k8sClient, k8sNamespace, userID+"-office")
+			if err != nil {
+				logrus.Errorf("Failed to create office pod: %v", err)
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"error": fmt.Sprintf("Failed to create office pod: %v", err),
+				})
+				return
+			}
+
+			// Connection URI for the pod (simplified version)
+			connectionURI := fmt.Sprintf("/guac/?id=%s&type=office", pod.Name)
+
+			c.JSON(http.StatusCreated, gin.H{
+				"podName":       pod.Name,
+				"namespace":     pod.Namespace,
+				"status":        "creating",
+				"connectionURI": connectionURI,
+				"message":       "Office sandbox pod created successfully",
+			})
+		})
+	}
 
 	// Start server with appropriate TLS configuration
 	addr := "0.0.0.0:4567"

@@ -1,0 +1,87 @@
+version: '3.8'
+
+services:
+  # API service
+  # api:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #   ports:
+  #     - "8080:8080"
+  #   environment:
+  #     - POSTGRES_HOST=postgres
+  #     - POSTGRES_PORT=5432
+  #     - POSTGRES_USER=postgres
+  #     - POSTGRES_PASSWORD=postgres
+  #     - POSTGRES_DB=sandbox_db
+  #     - REDIS_HOST=redis
+  #     - REDIS_PORT=6379
+  #     - GUACD_HOST=guacd
+  #     - GUACD_PORT=4822
+  #     - MINIO_ENDPOINT=minio:9000
+  #     - MINIO_ACCESS_KEY=minioadmin
+  #     - MINIO_SECRET_KEY=minioadmin
+  #     - SESSION_TIMEOUT=10m
+  #     - K8S_IN_CLUSTER=false # For local development
+  #   volumes:
+  #     - .:/app
+  #     - ~/.kube:/root/.kube # For local Kubernetes access
+  #   depends_on:
+  #     - postgres
+  #     - redis
+  #     - guacd
+  #     - minio
+
+  # PostgreSQL database
+  postgres:
+    image: postgres:14
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=sandbox_db
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  # Redis for caching and session management
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+
+  # Guacamole server (guacd)
+  guacd:
+    image: guacamole/guacd:latest
+    ports:
+      - "4822:4822"
+
+  # MinIO for S3-compatible object storage
+  # minio:
+  #   image: minio/minio:latest
+  #   ports:
+  #     - "9000:9000"
+  #     - "9001:9001"  # Web UI
+  #   environment:
+  #     - MINIO_ROOT_USER=minioadmin
+  #     - MINIO_ROOT_PASSWORD=minioadmin
+  #   command: server /data --console-address ":9001"
+  #   volumes:
+  #     - minio-data:/data
+
+  # # MinIO setup service - creates required buckets
+  # minio-setup:
+  #   image: minio/mc:latest
+  #   depends_on:
+  #     - minio
+  #   entrypoint: >
+  #     /bin/sh -c "
+  #     /usr/bin/mc alias set myminio http://minio:9000 minioadmin minioadmin;
+  #     /usr/bin/mc mb myminio/sandbox-files --ignore-existing;
+  #     /usr/bin/mc mb myminio/sandbox-uploads --ignore-existing; # Create additional bucket for uploads
+  #     exit 0;
+  #     "
+
+volumes:
+  postgres-data:
+  # minio-data:

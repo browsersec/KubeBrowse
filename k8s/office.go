@@ -24,11 +24,37 @@ func CreateOfficeSandboxPod(clientset *kubernetes.Clientset, namespace, userID s
 				"user": userID,
 			},
 		},
+
 		Spec: corev1.PodSpec{
+			Volumes: []corev1.Volume{
+				{
+					Name: "log-volume",
+					VolumeSource: corev1.VolumeSource{
+						EmptyDir: &corev1.EmptyDirVolumeSource{},
+					},
+				},
+			},
+			InitContainers: []corev1.Container{
+				{
+					Name:  "init-log-dirs",
+					Image: "busybox:1.36",
+					Command: []string{
+						"sh",
+						"-c",
+						"mkdir -p /var/log/supervisor && chmod 755 /var/log/supervisor && chown -R 1000:1000 /var/log/supervisor",
+					},
+					VolumeMounts: []corev1.VolumeMount{
+						{
+							Name:      "log-volume",
+							MountPath: "/var/log",
+						},
+					},
+				},
+			},
 			Containers: []corev1.Container{
 				{
-					Name:  "vnc-container",
-					Image: "your-registry/vnc-lightweight:latest",
+					Name:  "rdp-onlyoffice",
+					Image: "ghcr.io/browsersec/rdp-onlyoffice:latest",
 					Ports: []corev1.ContainerPort{
 						{
 							Name:          "vnc",
@@ -37,8 +63,8 @@ func CreateOfficeSandboxPod(clientset *kubernetes.Clientset, namespace, userID s
 					},
 					Resources: corev1.ResourceRequirements{
 						Limits: corev1.ResourceList{
-							corev1.ResourceCPU:    resource.MustParse("500m"),
-							corev1.ResourceMemory: resource.MustParse("512Mi"),
+							corev1.ResourceCPU:    resource.MustParse("1000m"),
+							corev1.ResourceMemory: resource.MustParse("1000Mi"),
 						},
 						Requests: corev1.ResourceList{
 							corev1.ResourceCPU:    resource.MustParse("250m"),
@@ -50,6 +76,12 @@ func CreateOfficeSandboxPod(clientset *kubernetes.Clientset, namespace, userID s
 						RunAsUser:    ptr.To(int64(1000)),
 						Capabilities: &corev1.Capabilities{
 							Drop: []corev1.Capability{"ALL"},
+						},
+					},
+					VolumeMounts: []corev1.VolumeMount{
+						{
+							Name:      "log-volume",
+							MountPath: "/var/log",
 						},
 					},
 				},

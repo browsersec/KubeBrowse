@@ -9,6 +9,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+
 	// "k8s.io/client-go/rest"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/utils/ptr"
@@ -24,11 +25,37 @@ func CreateBrowserSandboxPod(clientset *kubernetes.Clientset, namespace, userID 
 				"user": userID,
 			},
 		},
+
 		Spec: corev1.PodSpec{
+			Volumes: []corev1.Volume{
+				{
+					Name: "log-volume",
+					VolumeSource: corev1.VolumeSource{
+						EmptyDir: &corev1.EmptyDirVolumeSource{},
+					},
+				},
+			},
+			InitContainers: []corev1.Container{
+				{
+					Name:  "init-log-dirs",
+					Image: "busybox:1.36",
+					Command: []string{
+						"sh",
+						"-c",
+						"mkdir -p /var/log/supervisor && chmod 755 /var/log/supervisor && chown -R 1000:1000 /var/log/supervisor",
+					},
+					VolumeMounts: []corev1.VolumeMount{
+						{
+							Name:      "log-volume",
+							MountPath: "/var/log",
+						},
+					},
+				},
+			},
 			Containers: []corev1.Container{
 				{
-					Name:  "vnc-container",
-					Image: "your-registry/vnc-lightweight:latest",
+					Name:  "rdp-chromium",
+					Image: "ghcr.io/browsersec/rdp-chromium:latest",
 					Ports: []corev1.ContainerPort{
 						{
 							Name:          "vnc",
@@ -37,8 +64,8 @@ func CreateBrowserSandboxPod(clientset *kubernetes.Clientset, namespace, userID 
 					},
 					Resources: corev1.ResourceRequirements{
 						Limits: corev1.ResourceList{
-							corev1.ResourceCPU:    resource.MustParse("500m"),
-							corev1.ResourceMemory: resource.MustParse("512Mi"),
+							corev1.ResourceCPU:    resource.MustParse("1000m"),
+							corev1.ResourceMemory: resource.MustParse("1000Mi"),
 						},
 						Requests: corev1.ResourceList{
 							corev1.ResourceCPU:    resource.MustParse("250m"),
@@ -50,6 +77,12 @@ func CreateBrowserSandboxPod(clientset *kubernetes.Clientset, namespace, userID 
 						RunAsUser:    ptr.To(int64(1000)),
 						Capabilities: &corev1.Capabilities{
 							Drop: []corev1.Capability{"ALL"},
+						},
+					},
+					VolumeMounts: []corev1.VolumeMount{
+						{
+							Name:      "log-volume",
+							MountPath: "/var/log",
 						},
 					},
 				},
