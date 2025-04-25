@@ -10,8 +10,8 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/browsersec/KubeBrowse"
 	"github.com/gin-gonic/gin"
-	"github.com/sanjay7178/guac"
 	"github.com/sirupsen/logrus"
 )
 
