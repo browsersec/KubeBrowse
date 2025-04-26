@@ -1,4 +1,4 @@
-*---
+---
 label: Contributing to KubeBrowse
 icon:  book
 order: 800
