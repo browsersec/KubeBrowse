@@ -224,7 +224,7 @@ spec:
       serviceAccountName: browser-sandbox-sa
       containers:
         - name: api
-          image: your-registry/browser-sandbox-api:latest
+          image:  ghcr.io/browsersec/kubebrowse:main
           ports:
             - containerPort: 8080
           env:
