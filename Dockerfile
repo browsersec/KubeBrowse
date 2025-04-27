@@ -26,30 +26,30 @@ FROM alpine:3.20
 # Install ca-certificates and OpenSSL for HTTPS requests and certificate generation
 RUN apk --no-cache add ca-certificates openssl
 
-WORKDIR /root/
+WORKDIR /app
 
 # Create certificates directory
-RUN mkdir -p /root/certs
+RUN mkdir -p /app/certs
 
 # Copy the binary and supporting files from the builder stage
-COPY --from=builder /app/templates /root/templates
+COPY --from=builder /app/templates /app/templates
 COPY --from=builder /app/guac .
 
 # Copy the certificate directory - this is safer than using wildcards with shell redirects
-COPY --from=builder /app/certs/ /root/certs/
+COPY --from=builder /app/certs/ /app/certs/
 
 # Always generate self-signed certificates in the Dockerfile
 # This ensures we have valid certificates regardless of what's copied
 RUN echo "Generating self-signed certificates..." && \
     openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-      -keyout /root/certs/private.key \
-      -out /root/certs/certificate.crt \
+      -keyout /app/certs/private.key \
+      -out /app/certs/certificate.crt \
       -subj "/C=US/ST=California/L=San Francisco/O=My Company/CN=mydomain.com"
 
 # Set environment variables
 # Note: For production, consider using Docker secrets or environment variables at runtime
-ENV CERT_PATH=/root/certs/certificate.crt 
-ENV CERT_KEY_PATH=/root/certs/private.key
+ENV CERT_PATH=/app/certs/certificate.crt 
+ENV CERT_KEY_PATH=/app/certs/private.key
 ENV GUACD_ADDRESS=guacd:4822
 
 # Expose the correct port (from main.go)
