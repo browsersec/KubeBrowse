@@ -61,6 +61,10 @@ func main() {
 	if os.Getenv("GUACD_ADDRESS") != "" {
 		guacdAddr = os.Getenv("GUACD_ADDRESS")
 		log.Default().Println("Using guacd address from environment variable:", guacdAddr)
+		if guacdTest(guacdAddr) != nil {
+			logrus.Fatal("Failed to connect to guacd at", guacdAddr)
+		}
+
 	}
 
 	// Initialize Gin
@@ -213,4 +217,16 @@ func displayHelp() {
 	fmt.Println("  test            Run tests")
 	fmt.Println("  build           Build the project")
 	fmt.Println("  help            Display this help message")
+}
+
+func guacdTest(address string) error {
+	conn, err := net.Dial("tcp", address)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "❌ Failed to connect to guacd at %s: %v\n", address, err)
+		return err
+	}
+	defer conn.Close()
+
+	fmt.Printf("✅ Successfully connected to guacd at %s\n", address)
+	return nil
 }
