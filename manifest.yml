@@ -402,6 +402,11 @@ spec:
             host: browser-sandbox-api
             port:
               number: 8080
+    - route:  # Default route for frontend
+        - destination:
+            host: browser-sandbox-frontend
+            port:
+              number: 8000
 ---
 # Cron Job to cleanup idle sessions
 # apiVersion: batch/v1
@@ -460,3 +465,48 @@ type: Opaque
 data:
   access-key: bWluaW9hY2Nlc3NrZXk= # base64 encoded "minioaccesskey"
   secret-key: bWluaW9zZWNyZXRrZXk= # base64 encoded "miniosecretkey"
+---
+# Frontend Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: browser-sandbox-frontend
+  namespace: browser-sandbox
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: browser-sandbox-frontend
+  template:
+    metadata:
+      labels:
+        app: browser-sandbox-frontend
+    spec:
+      containers:
+        - name: frontend
+          image: ghcr.io/browsersec/kubebrowse-frontend:latest
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"
+          env:
+            - name: GUAC_CLIENT_URL
+              value: "https://browser-sandbox-api.svc.cluster.local:8080"
+---
+# Frontend Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: browser-sandbox-frontend
+  namespace: browser-sandbox
+spec:
+  ports:
+    - port: 8000
+      targetPort: 80
+  selector:
+    app: browser-sandbox-frontend
