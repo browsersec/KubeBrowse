@@ -24,7 +24,7 @@ spec:
     spec:
       containers:
         - name: postgres
-          image: postgres:14
+          image: postgres:15
           ports:
             - containerPort: 5432
               name: postgres
@@ -154,6 +154,7 @@ spec:
   ports:
     - port: 4822
       targetPort: 4822
+  type: ClusterIP
   selector:
     app: guacd
 ---
@@ -252,7 +253,7 @@ spec:
       serviceAccountName: browser-sandbox-sa
       containers:
         - name: api
-          image:  ghcr.io/browsersec/kubebrowse:sha-ae76f52
+          image:  ghcr.io/browsersec/kubebrowse:sha-a5a9990
           ports:
             - containerPort: 4567
           resources:
@@ -313,20 +314,6 @@ spec:
   type: ClusterIP
   selector:
     app: browser-sandbox-api
----
-# GUACD Service
-apiVersion: v1
-kind: Service
-metadata:
-  name: guacd
-  namespace: browser-sandbox
-spec:
-  ports:
-    - port: 4822
-      targetPort: 4822
-  type: ClusterIP
-  selector:
-    app: guacd
 ---
 # ServiceAccount for API to access Kubernetes
 apiVersion: v1
