@@ -35,21 +35,20 @@ RUN mkdir -p /root/certs
 COPY --from=builder /app/templates /root/templates
 COPY --from=builder /app/guac .
 
-# Copy certificate generation script to generate certs if needed
-COPY certs/generate.sh /root/
-RUN chmod +x /root/generate.sh
-
-# Copy existing certificates if available
+# Copy the certificate directory - this is safer than using wildcards with shell redirects
 COPY --from=builder /app/certs/ /root/certs/
 
-# Generate self-signed certificates if they don't exist
-RUN if [ ! -f "/root/certs/certificate.crt" ] || [ ! -f "/root/certs/private.key" ]; then \
-      echo "Generating self-signed certificates..."; \
-      cd /root && ./generate.sh; \
-    fi
+# Always generate self-signed certificates in the Dockerfile
+# This ensures we have valid certificates regardless of what's copied
+RUN echo "Generating self-signed certificates..." && \
+    openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+      -keyout /root/certs/private.key \
+      -out /root/certs/certificate.crt \
+      -subj "/C=US/ST=California/L=San Francisco/O=My Company/CN=mydomain.com"
 
 # Set environment variables
-ENV CERT_PATH=/root/certs/certificate.crt
+# Note: For production, consider using Docker secrets or environment variables at runtime
+ENV CERT_PATH=/root/certs/certificate.crt 
 ENV CERT_KEY_PATH=/root/certs/private.key
 ENV GUACD_ADDRESS=guacd:4822
 

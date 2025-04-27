@@ -254,7 +254,7 @@ spec:
         - name: api
           image:  ghcr.io/browsersec/kubebrowse:main
           ports:
-            - containerPort: 8080
+            - containerPort: 4567
           resources:
             requests:
               memory: "256Mi"
@@ -309,7 +309,8 @@ metadata:
 spec:
   ports:
     - port: 8080
-      targetPort: 8080
+      targetPort: 4567
+  type: ClusterIP
   selector:
     app: browser-sandbox-api
 ---
@@ -323,6 +324,7 @@ spec:
   ports:
     - port: 4822
       targetPort: 4822
+  type: ClusterIP
   selector:
     app: guacd
 ---
