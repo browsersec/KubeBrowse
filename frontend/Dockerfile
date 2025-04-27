@@ -1,11 +1,12 @@
 # Build stage
-FROM node:20-alpine as build
+FROM node:lts-slim AS build
 
 WORKDIR /app
 
-# Copy package.json and package-lock.json for efficient caching
-COPY package*.json ./
-RUN npm ci
+# Copy package.json first
+COPY package.json ./
+# Use npm install instead of npm ci since there's no package-lock.json
+RUN npm install
 
 # Copy the rest of the application code
 COPY . .
