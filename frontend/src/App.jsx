@@ -81,115 +81,108 @@ function App() {
   };
 
   return (
-    <div className="container">
-      <a style={{ position: 'fixed' }} href="https://github.com/wwt/guac-vue">
-        <img 
-          width="149" 
-          height="149"
-          src="https://github.blog/wp-content/uploads/2008/12/forkme_left_red_aa0000.png?resize=149%2C149"
-          alt="Fork me on GitHub" 
-        />
-      </a>
-      
+    <div className={!connect ? "container" : "container-fullscreen"}>
       {!connect ? (
-        <div id="app">
-          <h1>React Guacamole client example</h1>
-          <p>Enter connection information to connect</p>
+        <>
+          <div id="app">
+            <h1>React Guacamole client example</h1>
+            <p>Enter connection information to connect</p>
 
-          <div className="field">
-            <label htmlFor="scheme">Scheme/Protocol</label>
-            <input 
-              type="text" 
-              id="scheme" 
-              value={formData.scheme} 
-              onChange={handleInputChange} 
-            />
-          </div>
-
-          <div className="field">
-            <label htmlFor="hostname">Hostname or IP Address</label>
-            <input 
-              type="text" 
-              id="hostname" 
-              value={formData.hostname} 
-              onChange={handleInputChange} 
-            />
-          </div>
-
-          <div className="field">
-            <label htmlFor="port">Port (if not default)</label>
-            <input 
-              type="text" 
-              id="port" 
-              value={formData.port} 
-              onChange={handleInputChange} 
-            />
-          </div>
-
-          <div className="field">
-            <label htmlFor="user">User name</label>
-            <input 
-              type="text" 
-              id="user" 
-              value={formData.user} 
-              onChange={handleInputChange} 
-            />
-          </div>
-
-          <div className="field">
-            <label htmlFor="pass">Password</label>
-            <input 
-              type="password" 
-              id="pass" 
-              value={formData.pass} 
-              onChange={handleInputChange} 
-            />
-          </div>
-
-          <div className="field">
-            <label htmlFor="ignoreCert">Ignore Certificate</label>
-            <span>
+            <div className="field">
+              <label htmlFor="scheme">Scheme/Protocol</label>
               <input 
-                type="checkbox" 
-                id="ignoreCert" 
-                checked={formData.ignoreCert} 
+                type="text" 
+                id="scheme" 
+                value={formData.scheme} 
                 onChange={handleInputChange} 
               />
-            </span>
-          </div>
+            </div>
 
-          <div className="field">
-            <label htmlFor="security">Security</label>
-            <input 
-              type="text" 
-              id="security" 
-              value={formData.security} 
-              onChange={handleInputChange} 
-              placeholder="type nla here for Network Level Authentication" 
-            />
-          </div>
-
-          <div className="field">
-            <label>Query string</label>
-            <span className="pl-1">{getScrubbedQuery()}</span>
-          </div>
-
-          <div className="field">
-            <label htmlFor="forceHttp">Force HTTP Tunnel</label>
-            <span>
+            <div className="field">
+              <label htmlFor="hostname">Hostname or IP Address</label>
               <input 
-                type="checkbox" 
-                id="forceHttp" 
-                checked={formData.forceHttp} 
+                type="text" 
+                id="hostname" 
+                value={formData.hostname} 
                 onChange={handleInputChange} 
               />
-            </span>
-          </div>
+            </div>
 
-          <div className="center">
-            <button className="connect" onClick={handleConnect}>Connect</button>
+            <div className="field">
+              <label htmlFor="port">Port (if not default)</label>
+              <input 
+                type="text" 
+                id="port" 
+                value={formData.port} 
+                onChange={handleInputChange} 
+              />
+            </div>
+
+            <div className="field">
+              <label htmlFor="user">User name</label>
+              <input 
+                type="text" 
+                id="user" 
+                value={formData.user} 
+                onChange={handleInputChange} 
+              />
+            </div>
+
+            <div className="field">
+              <label htmlFor="pass">Password</label>
+              <input 
+                type="password" 
+                id="pass" 
+                value={formData.pass} 
+                onChange={handleInputChange} 
+              />
+            </div>
+
+            <div className="field">
+              <label htmlFor="ignoreCert">Ignore Certificate</label>
+              <span>
+                <input 
+                  type="checkbox" 
+                  id="ignoreCert" 
+                  checked={formData.ignoreCert} 
+                  onChange={handleInputChange} 
+                />
+              </span>
+            </div>
+
+            <div className="field">
+              <label htmlFor="security">Security</label>
+              <input 
+                type="text" 
+                id="security" 
+                value={formData.security} 
+                onChange={handleInputChange} 
+                placeholder="type nla here for Network Level Authentication" 
+              />
+            </div>
+
+            <div className="field">
+              <label>Query string</label>
+              <span className="pl-1">{getScrubbedQuery()}</span>
+            </div>
+
+            <div className="field">
+              <label htmlFor="forceHttp">Force HTTP Tunnel</label>
+              <span>
+                <input 
+                  type="checkbox" 
+                  id="forceHttp" 
+                  checked={formData.forceHttp} 
+                  onChange={handleInputChange} 
+                />
+              </span>
+            </div>
+
+            <div className="center">
+              <button className="connect" onClick={handleConnect}>Connect</button>
+            </div>
           </div>
-        </div>
+        </>
       ) : (
         <GuacClient query={buildQueryString()} forceHttp={formData.forceHttp} />
       )}
