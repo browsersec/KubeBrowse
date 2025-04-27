@@ -8,6 +8,9 @@ RUN apk add --no-cache git make bash
 # Copy go.mod and go.sum files
 COPY go.mod go.sum ./
 
+# Remove any tool directive referencing lefthook
+RUN sed -i '/^tool github.com\/evilmartians\/lefthook/d' go.mod
+
 # Download dependencies
 RUN go mod download
 
