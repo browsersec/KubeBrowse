@@ -28,6 +28,13 @@ spec:
           ports:
             - containerPort: 5432
               name: postgres
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "1Gi"
+              cpu: "500m"
           env:
             - name: POSTGRES_USER
               valueFrom:
@@ -87,6 +94,13 @@ spec:
           image: redis:alpine
           ports:
             - containerPort: 6379
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"
 ---
 # Redis Service
 apiVersion: v1
@@ -122,6 +136,13 @@ spec:
           image: guacamole/guacd:latest
           ports:
             - containerPort: 4822
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
 ---
 # Guacamole Server Service
 apiVersion: v1
@@ -160,6 +181,13 @@ spec:
             - /data
           ports:
             - containerPort: 9000
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "300m"
           env:
             - name: MINIO_ACCESS_KEY
               valueFrom:
@@ -227,7 +255,16 @@ spec:
           image:  ghcr.io/browsersec/kubebrowse:main
           ports:
             - containerPort: 8080
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
           env:
+            - name: GUACD_ADDRESS
+              value: "guacd.browser-sandbox.svc.cluster.local:4822"
             - name: POSTGRES_HOST
               value: "postgres"
             - name: POSTGRES_PORT
@@ -248,10 +285,6 @@ spec:
               value: "redis"
             - name: REDIS_PORT
               value: "6379"
-            - name: GUACD_HOST
-              value: "guacd"
-            - name: GUACD_PORT
-              value: "4822"
             - name: MINIO_ENDPOINT
               value: "minio:9000"
             - name: MINIO_ACCESS_KEY
@@ -279,6 +312,19 @@ spec:
       targetPort: 8080
   selector:
     app: browser-sandbox-api
+---
+# GUACD Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: guacd
+  namespace: browser-sandbox
+spec:
+  ports:
+    - port: 4822
+      targetPort: 4822
+  selector:
+    app: guacd
 ---
 # ServiceAccount for API to access Kubernetes
 apiVersion: v1
@@ -369,41 +415,41 @@ spec:
               number: 8080
 ---
 # Cron Job to cleanup idle sessions
-apiVersion: batch/v1
-kind: CronJob
-metadata:
-  name: cleanup-idle-sessions
-  namespace: browser-sandbox
-spec:
-  schedule: "*/5 * * * *" # Run every 5 minutes
-  jobTemplate:
-    spec:
-      template:
-        spec:
-          serviceAccountName: browser-sandbox-sa
-          containers:
-            - name: cleanup
-              image: your-registry/browser-sandbox-cleanup:latest
-              env:
-                - name: POSTGRES_HOST
-                  value: "postgres"
-                - name: POSTGRES_PORT
-                  value: "5432"
-                - name: POSTGRES_USER
-                  valueFrom:
-                    secretKeyRef:
-                      name: postgres-secret
-                      key: username
-                - name: POSTGRES_PASSWORD
-                  valueFrom:
-                    secretKeyRef:
-                      name: postgres-secret
-                      key: password
-                - name: POSTGRES_DB
-                  value: "sandbox_db"
-                - name: KUBERNETES_NAMESPACE
-                  value: "browser-sandbox"
-          restartPolicy: OnFailure
+# apiVersion: batch/v1
+# kind: CronJob
+# metadata:
+#   name: cleanup-idle-sessions
+#   namespace: browser-sandbox
+# spec:
+#   schedule: "*/5 * * * *" # Run every 5 minutes
+#   jobTemplate:
+#     spec:
+#       template:
+#         spec:
+#           serviceAccountName: browser-sandbox-sa
+#           containers:
+#             - name: cleanup
+#               image: your-registry/browser-sandbox-cleanup:latest
+#               env:
+#                 - name: POSTGRES_HOST
+#                   value: "postgres"
+#                 - name: POSTGRES_PORT
+#                   value: "5432"
+#                 - name: POSTGRES_USER
+#                   valueFrom:
+#                     secretKeyRef:
+#                       name: postgres-secret
+#                       key: username
+#                 - name: POSTGRES_PASSWORD
+#                   valueFrom:
+#                     secretKeyRef:
+#                       name: postgres-secret
+#                       key: password
+#                 - name: POSTGRES_DB
+#                   value: "sandbox_db"
+#                 - name: KUBERNETES_NAMESPACE
+#                   value: "browser-sandbox"
+#           restartPolicy: OnFailure
 ---
 # Secrets (in practice, use a proper secret management solution)
 apiVersion: v1

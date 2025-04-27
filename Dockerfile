@@ -23,18 +23,30 @@ RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o guac cmd/guac/mai
 # Use a small image for the final container
 FROM alpine:3.20
 
-# Install ca-certificates for HTTPS requests
-RUN apk --no-cache add ca-certificates
+# Install ca-certificates and OpenSSL for HTTPS requests and certificate generation
+RUN apk --no-cache add ca-certificates openssl
 
 WORKDIR /root/
 
 # Create certificates directory
 RUN mkdir -p /root/certs
 
-# Copy the binary from the builder stage
+# Copy the binary and supporting files from the builder stage
 COPY --from=builder /app/templates /root/templates
 COPY --from=builder /app/guac .
-COPY --from=builder /app/certs /root/certs
+
+# Copy certificate generation script to generate certs if needed
+COPY certs/generate.sh /root/
+RUN chmod +x /root/generate.sh
+
+# Copy existing certificates if available
+COPY --from=builder /app/certs/ /root/certs/
+
+# Generate self-signed certificates if they don't exist
+RUN if [ ! -f "/root/certs/certificate.crt" ] || [ ! -f "/root/certs/private.key" ]; then \
+      echo "Generating self-signed certificates..."; \
+      cd /root && ./generate.sh; \
+    fi
 
 # Set environment variables
 ENV CERT_PATH=/root/certs/certificate.crt

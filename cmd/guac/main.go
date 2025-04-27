@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"net/http"
 	"net/url"
@@ -59,6 +60,7 @@ func main() {
 
 	if os.Getenv("GUACD_ADDRESS") != "" {
 		guacdAddr = os.Getenv("GUACD_ADDRESS")
+		log.Default().Println("Using guacd address from environment variable:", guacdAddr)
 	}
 
 	// Initialize Gin
