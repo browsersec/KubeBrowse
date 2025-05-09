@@ -1,10 +1,10 @@
-import { useState, useEffect, useRef } from 'react';
 import Guacamole from 'guacamole-common-js';
+import { useEffect, useRef, useState } from 'react';
+import clipboard from '../lib/clipboard';
 import GuacMouse from '../lib/GuacMouse';
 import states from '../lib/states';
-import clipboard from '../lib/clipboard';
-import Modal from './Modal';
 import './GuacClient.css';
+import Modal from './Modal';
 
 // Set custom Mouse implementation
 Guacamole.Mouse = GuacMouse.mouse;
@@ -82,30 +82,49 @@ function GuacClient({ query, forceHttp = false }) {
   };
 
   const resize = () => {
-    if (!viewportRef.current || !viewportRef.current.offsetWidth || !displayObjRef.current || !clientRef.current) {
-      // resize is being called on the hidden window
+    if (!viewportRef.current || !displayObjRef.current || !clientRef.current) return;
+  
+    // Get the current viewport dimensions (Chrome window size)
+    const viewportWidth = viewportRef.current.clientWidth;
+    const viewportHeight = viewportRef.current.clientHeight;
+  
+    const remoteWidth = displayObjRef.current.getWidth();
+    const remoteHeight = displayObjRef.current.getHeight();
+  
+    if (remoteWidth === 0 || remoteHeight === 0) {
+      // If remote dimensions aren't available yet, try again shortly
+      setTimeout(resize, 100);
       return;
     }
-
-    let pixelDensity = window.devicePixelRatio || 1;
-    const width = viewportRef.current.clientWidth * pixelDensity;
-    const height = viewportRef.current.clientHeight * pixelDensity;
+  
+    // Use scaleX to fill the entire width of the viewport
+    // This ensures no black areas on the left and right
+    const scale = viewportWidth / remoteWidth;
+  
+    // Apply scale
+    displayObjRef.current.scale(scale);
+  
+    // Send updated size to server
+    const pixelDensity = window.devicePixelRatio || 1;
+    clientRef.current.sendSize(viewportWidth * pixelDensity, viewportHeight * pixelDensity);
     
-    if (displayObjRef.current.getWidth() !== width || displayObjRef.current.getHeight() !== height) {
-      clientRef.current.sendSize(width, height);
-    }
-    
-    // setting timeout so display has time to get the correct size
-    setTimeout(() => {
-      if (!viewportRef.current || !displayObjRef.current) return;
+    // Center vertically if needed
+    if (displayRef.current) {
+      const scaledHeight = remoteHeight * scale;
       
-      const scale = Math.min(
-        viewportRef.current.clientWidth / Math.max(displayObjRef.current.getWidth(), 1),
-        viewportRef.current.clientHeight / Math.max(displayObjRef.current.getHeight(), 1)
-      );
-      displayObjRef.current.scale(scale);
-    }, 100);
+      // Always set marginLeft to 0 to ensure full width
+      displayRef.current.style.marginLeft = '0';
+      
+      // Center vertically if the scaled height is less than viewport height
+      if (scaledHeight < viewportHeight) {
+        displayRef.current.style.marginTop = `${(viewportHeight - scaledHeight) / 2}px`;
+      } else {
+        displayRef.current.style.marginTop = '0';
+      }
+    }
   };
+  
+  
 
   const installKeyboard = () => {
     if (!keyboardRef.current || !clientRef.current) return;
@@ -187,9 +206,22 @@ function GuacClient({ query, forceHttp = false }) {
           break;
         case 3:
           setConnectionState(states.CONNECTED);
+          
+          // Add event listeners for responsive resizing
           window.addEventListener('resize', resize);
           if (viewportRef.current) {
             viewportRef.current.addEventListener('mouseenter', resize);
+          }
+          
+          // Call resize immediately when connected
+          resize();
+          
+          // Set up a resize observer to handle any changes to the viewport
+          if (window.ResizeObserver && viewportRef.current) {
+            const resizeObserver = new ResizeObserver(() => {
+              resize();
+            });
+            resizeObserver.observe(viewportRef.current);
           }
 
           clipboard.setRemoteClipboard(client);
@@ -244,7 +276,13 @@ function GuacClient({ query, forceHttp = false }) {
     displayObjRef.current = display;
     
     if (displayRef.current) {
-      displayRef.current.appendChild(display.getElement());
+      const displayElement = display.getElement();
+      
+      // Set the display element to fill the width
+      displayElement.style.width = '100%';
+      displayElement.style.maxWidth = '100vw';
+      
+      displayRef.current.appendChild(displayElement);
       displayRef.current.addEventListener('contextmenu', (e) => {
         e.stopPropagation();
         if (e.preventDefault) {
@@ -286,10 +324,16 @@ function GuacClient({ query, forceHttp = false }) {
       installKeyboard();
       mouse.onmousedown = mouse.onmouseup = mouse.onmousemove = handleMouseState;
       
-      setTimeout(() => {
-        resize();
-        displayRef.current.focus();
-      }, 1000);
+      // Call resize immediately and then again after a short delay to ensure proper sizing
+      resize();
+      
+      // Focus the display element
+      displayRef.current.focus();
+      
+      // Set up additional resize calls to handle any delayed rendering
+      setTimeout(resize, 100);
+      setTimeout(resize, 500);
+      setTimeout(resize, 1000);
     }
   };
 
@@ -297,11 +341,40 @@ function GuacClient({ query, forceHttp = false }) {
     connect(query);
   };
 
+  // Add a resize handler for when the component mounts
+  useEffect(() => {
+    const handleWindowResize = () => {
+      if (resize) {
+        resize();
+      }
+    };
+    
+    // Add event listener for window resize
+    window.addEventListener('resize', handleWindowResize);
+    
+    // Initial resize
+    setTimeout(handleWindowResize, 100);
+    
+    // Cleanup
+    return () => {
+      window.removeEventListener('resize', handleWindowResize);
+    };
+  }, []);
+  
   return (
     <div className="viewport" ref={viewportRef}>
       <Modal ref={modalRef} onReconnect={handleReconnect} />
       {/* tabindex allows for div to be focused */}
-      <div ref={displayRef} className="display" tabIndex="0"></div>
+      <div 
+        ref={displayRef} 
+        className="display" 
+        tabIndex="0"
+        style={{
+          width: '100%',
+          maxWidth: '100vw',
+          boxSizing: 'border-box'
+        }}
+      ></div>
     </div>
   );
 }
