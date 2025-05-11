@@ -2,7 +2,7 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-const guacClient = process.env.GUAC_CLIENT_URL || 'https://0.0.0.0:8080'
+const guacClient = process.env.GUAC_CLIENT_URL || 'https://0.0.0.0:4567'
 console.log(`Using Guacamole client URL: ${guacClient}`)
 
 export default defineConfig({

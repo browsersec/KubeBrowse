@@ -2,7 +2,7 @@ module github.com/browsersec/KubeBrowse
 
 go 1.24
 
-toolchain go1.24.2
+toolchain go1.24.3
 
 replace github.com/Sirupsen/logrus v1.4.2 => github.com/sirupsen/logrus v1.4.2
 

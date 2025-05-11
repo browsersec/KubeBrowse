@@ -1,15 +1,32 @@
-.display {
+.viewport {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
   overflow: hidden;
-  width: 100%;
-  height: 100%;
+  background: black; /* Avoid white borders */
+  display: flex;
+  justify-content: center; /* Center horizontally */
+  align-items: center; /* Center vertically */
+}
+
+.display {
+  width: auto; /* Allow width to be determined by scaling */
+  height: auto; /* Allow height to be determined by scaling */
+  display: block;
+  outline: none;
+  overflow: hidden;
+  position: relative;
+  margin: 0 auto; /* Center horizontally */
+  transition: all 0.1s ease-in-out; /* Smooth scaling and positioning transitions */
 }
 
 .display.focus {
-  /* Optional: Add any styling for focused state */
+  outline: none;
 }
 
-.viewport {
-  position: relative;
-  width: 100%;
-  height: 100%;
+/* Ensure Guacamole canvas properly scales */
+.display canvas {
+  display: block;
 }

@@ -50,6 +50,11 @@ run: deps
 	@echo "Starting server..."
 	CERT_PATH=./certs/certificate.crt CERT_KEY_PATH=./certs/private.key go run cmd/guac/main.go
 
+run_frontend:
+	@echo "Running frontend..."
+	@echo "Starting frontend..."
+	pnpm --dir frontend run dev 
+	
 generate:
 	bash ./certs/generate.sh
 

@@ -5,14 +5,16 @@ import './App.css';
 function App() {
   const [connect, setConnect] = useState(false);
   const [formData, setFormData] = useState({
-    scheme: 'telnet',
-    hostname: 'towel.blinkenlights.nl',
+    scheme: 'rdo',
+    hostname: '0.0.0.0',
     port: '',
     user: '',
     pass: '',
     ignoreCert: true,
     security: '',
-    forceHttp: false
+    forceHttp: false,
+    width: window.innerWidth,
+    height: window.innerHeight
   });
 
   useEffect(() => {
@@ -21,19 +23,33 @@ function App() {
       try {
         const query = JSON.parse(window.localStorage.getItem('query'));
         setFormData({
-          scheme: query.scheme || 'telnet',
-          hostname: query.hostname || 'towel.blinkenlights.nl',
+          scheme: query.scheme || 'rdp',
+          hostname: query.hostname || '0.0.0.0',
           port: query.port || '',
           user: query.username || '',
           pass: query.password || '',
           ignoreCert: query['ignore-cert'] !== false,
           security: query.security || '',
-          forceHttp: query.forceHttp || false
+          forceHttp: query.forceHttp || false,
+          width: window.innerWidth,
+          height: window.innerHeight
         });
       } catch (e) {
         window.localStorage.setItem('query', '{}');
       }
     }
+
+    // Update dimensions if window is resized before connection
+    const handleResize = () => {
+      setFormData(prevData => ({
+        ...prevData,
+        width: window.innerWidth,
+        height: window.innerHeight
+      }));
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   const handleInputChange = (e) => {
@@ -52,7 +68,9 @@ function App() {
       'ignore-cert': formData.ignoreCert,
       security: formData.security,
       username: formData.user,
-      password: formData.pass
+      password: formData.pass,
+      width: Math.round(formData.width * (window.devicePixelRatio || 1)),
+      height: Math.round(formData.height * (window.devicePixelRatio || 1))
     };
   };
 
@@ -82,14 +100,14 @@ function App() {
 
   return (
     <div className="container">
-      <a style={{ position: 'fixed' }} href="https://github.com/wwt/guac-vue">
+      {/* <a style={{ position: 'fixed' }} href="https://github.com/wwt/guac-vue">
         <img 
           width="149" 
           height="149"
           src="https://github.blog/wp-content/uploads/2008/12/forkme_left_red_aa0000.png?resize=149%2C149"
           alt="Fork me on GitHub" 
         />
-      </a>
+      </a> */}
       
       {!connect ? (
         <div id="app">
