@@ -98,21 +98,16 @@ function App() {
     setConnect(true);
   };
 
+  const handleDisconnect = () => {
+    setConnect(false);
+  };
+
   return (
-    <div className="container">
-      {/* <a style={{ position: 'fixed' }} href="https://github.com/wwt/guac-vue">
-        <img 
-          width="149" 
-          height="149"
-          src="https://github.blog/wp-content/uploads/2008/12/forkme_left_red_aa0000.png?resize=149%2C149"
-          alt="Fork me on GitHub" 
-        />
-      </a> */}
-      
+    <div className="min-h-screen bg-gray-50 p-4">
       {!connect ? (
-        <div id="app">
-          <h1>React Guacamole client example</h1>
-          <p>Enter connection information to connect</p>
+        <div id="app" className="max-w-md mx-auto bg-white rounded shadow p-6">
+          <h1 className="text-2xl font-bold mb-4">React Guacamole client example</h1>
+          <p className="text-gray-600 mb-4">Enter connection information to connect</p>
 
           <div className="field">
             <label htmlFor="scheme">Scheme/Protocol</label>
@@ -204,12 +199,21 @@ function App() {
             </span>
           </div>
 
-          <div className="center">
-            <button className="connect" onClick={handleConnect}>Connect</button>
+          <div className="center mt-4">
+            <button 
+              className="connect bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+              onClick={handleConnect}
+            >
+              Connect
+            </button>
           </div>
         </div>
       ) : (
-        <GuacClient query={buildQueryString()} forceHttp={formData.forceHttp} />
+        <GuacClient 
+          query={buildQueryString()} 
+          forceHttp={formData.forceHttp} 
+          onDisconnect={handleDisconnect} 
+        />
       )}
     </div>
   );

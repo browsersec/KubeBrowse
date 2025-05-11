@@ -6,6 +6,7 @@ import GuacMouse from '../lib/GuacMouse';
 import states from '../lib/states';
 import './GuacClient.css';
 import Modal from './Modal';
+import DisconnectButton from './DisconnectButton';
 
 // Set custom Mouse implementation
 Guacamole.Mouse = GuacMouse.mouse;
@@ -346,6 +347,13 @@ function GuacClient({ query, forceHttp = false }) {
     connect(query);
   };
 
+  const handleDisconnect = () => {
+    if (clientRef.current) {
+      clientRef.current.disconnect();
+    }
+    window.location.reload();
+  };
+
   useEffect(() => {
     const handleWindowResize = () => {
       if (resize) {
@@ -370,11 +378,12 @@ function GuacClient({ query, forceHttp = false }) {
   }, [resize]);
   
   return (
-    <div className="viewport" ref={viewportRef}>
+    <div className="viewport w-full h-full flex justify-center items-center bg-gray-100" ref={viewportRef}>
       <Modal ref={modalRef} onReconnect={handleReconnect} />
+      <DisconnectButton onDisconnect={handleDisconnect} />
       <div 
         ref={displayRef} 
-        className="display" 
+        className="display border border-gray-300 bg-white focus:outline-none"
         tabIndex="0"
         style={{
           width: '100%',
