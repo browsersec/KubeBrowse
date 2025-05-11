@@ -9,8 +9,6 @@ import Modal from './Modal';
 // Set custom Mouse implementation
 Guacamole.Mouse = GuacMouse.mouse;
 
-
-
 // Define websocket and HTTP tunnel URLs
 const wsUrl = `ws://${location.host}/websocket-tunnel`;
 const httpUrl = `http://${location.host}/tunnel`;
@@ -83,48 +81,55 @@ function GuacClient({ query, forceHttp = false }) {
 
   const resize = () => {
     if (!viewportRef.current || !displayObjRef.current || !clientRef.current) return;
-  
-    // Get the current viewport dimensions (Chrome window size)
+
+    // Get the current viewport dimensions
     const viewportWidth = viewportRef.current.clientWidth;
     const viewportHeight = viewportRef.current.clientHeight;
-  
+
     const remoteWidth = displayObjRef.current.getWidth();
     const remoteHeight = displayObjRef.current.getHeight();
-  
+
     if (remoteWidth === 0 || remoteHeight === 0) {
       // If remote dimensions aren't available yet, try again shortly
       setTimeout(resize, 100);
       return;
     }
-  
-    // Use scaleX to fill the entire width of the viewport
-    // This ensures no black areas on the left and right
-    const scale = viewportWidth / remoteWidth;
-  
+
+    // Calculate both horizontal and vertical scale factors
+    const scaleX = viewportWidth / remoteWidth;
+    const scaleY = viewportHeight / remoteHeight;
+    
+    // Use the smaller scale to ensure everything fits within the viewport
+    const scale = Math.min(scaleX, scaleY);
+
     // Apply scale
     displayObjRef.current.scale(scale);
-  
-    // Send updated size to server
+
+    // Get the actual pixel density for accurate resolution
     const pixelDensity = window.devicePixelRatio || 1;
-    clientRef.current.sendSize(viewportWidth * pixelDensity, viewportHeight * pixelDensity);
     
-    // Center vertically if needed
+    // Calculate the optimal resolution to send to the server
+    // This ensures we're requesting a resolution that matches our viewport
+    const optimalWidth = Math.round(viewportWidth * pixelDensity);
+    const optimalHeight = Math.round(viewportHeight * pixelDensity);
+    
+    // Send updated size to server
+    clientRef.current.sendSize(optimalWidth, optimalHeight);
+    
+    // Center both horizontally and vertically
     if (displayRef.current) {
+      const scaledWidth = remoteWidth * scale;
       const scaledHeight = remoteHeight * scale;
       
-      // Always set marginLeft to 0 to ensure full width
-      displayRef.current.style.marginLeft = '0';
+      // Center horizontally
+      displayRef.current.style.marginLeft = scaledWidth < viewportWidth ? 
+        `${(viewportWidth - scaledWidth) / 2}px` : '0';
       
-      // Center vertically if the scaled height is less than viewport height
-      if (scaledHeight < viewportHeight) {
-        displayRef.current.style.marginTop = `${(viewportHeight - scaledHeight) / 2}px`;
-      } else {
-        displayRef.current.style.marginTop = '0';
-      }
+      // Center vertically 
+      displayRef.current.style.marginTop = scaledHeight < viewportHeight ? 
+        `${(viewportHeight - scaledHeight) / 2}px` : '0';
     }
   };
-  
-  
 
   const installKeyboard = () => {
     if (!keyboardRef.current || !clientRef.current) return;
@@ -157,6 +162,17 @@ function GuacClient({ query, forceHttp = false }) {
         displayObjRef.current.scale(0);
       }
       uninstallKeyboard();
+    }
+
+    // Add viewport dimensions to the query string if they're not already there
+    if (!queryString.includes('width=') || !queryString.includes('height=')) {
+      const pixelDensity = window.devicePixelRatio || 1;
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      
+      // Append width and height parameters
+      const separator = queryString.includes('?') ? '&' : '?';
+      queryString += `${separator}width=${Math.round(viewportWidth * pixelDensity)}&height=${Math.round(viewportHeight * pixelDensity)}`;
     }
 
     const client = new Guacamole.Client(tunnel);
@@ -352,14 +368,22 @@ function GuacClient({ query, forceHttp = false }) {
     // Add event listener for window resize
     window.addEventListener('resize', handleWindowResize);
     
-    // Initial resize
-    setTimeout(handleWindowResize, 100);
+    // Call resize immediately and then again after short delays
+    // This helps ensure proper sizing after the DOM has fully rendered
+    handleWindowResize();
+    const timeouts = [
+      setTimeout(handleWindowResize, 100),
+      setTimeout(handleWindowResize, 300),
+      setTimeout(handleWindowResize, 500),
+      setTimeout(handleWindowResize, 1000)
+    ];
     
     // Cleanup
     return () => {
       window.removeEventListener('resize', handleWindowResize);
+      timeouts.forEach(timeout => clearTimeout(timeout));
     };
-  }, []);
+  }, [resize]); // Add resize to dependency array
   
   return (
     <div className="viewport" ref={viewportRef}>

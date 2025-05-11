@@ -7,23 +7,26 @@
   overflow: hidden;
   background: black; /* Avoid white borders */
   display: flex;
-  flex-direction: column; /* Stack children vertically */
-  justify-content: center; /* Center vertically */
-  align-items: stretch; /* Stretch children horizontally */
+  justify-content: center; /* Center horizontally */
+  align-items: center; /* Center vertically */
 }
 
 .display {
-  width: 100%;
-  height: auto; /* Allow height to adjust based on content */
-  min-height: 0; /* Allow flex container to shrink this item */
-  flex: 1; /* Take up available space */
+  width: auto; /* Allow width to be determined by scaling */
+  height: auto; /* Allow height to be determined by scaling */
   display: block;
   outline: none;
   overflow: hidden;
   position: relative;
-  transition: transform 0.1s ease-in-out; /* Smooth scaling transitions */
+  margin: 0 auto; /* Center horizontally */
+  transition: all 0.1s ease-in-out; /* Smooth scaling and positioning transitions */
 }
 
 .display.focus {
   outline: none;
+}
+
+/* Ensure Guacamole canvas properly scales */
+.display canvas {
+  display: block;
 }

@@ -10,8 +10,9 @@ import (
 	"net/url"
 	"os"
 	"strconv"
+	"time"
 
-	"github.com/browsersec/KubeBrowse"
+	guac "github.com/browsersec/KubeBrowse"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 )
@@ -19,7 +20,7 @@ import (
 var (
 	certPath    string
 	certKeyPath string
-	guacdAddr   = "127.0.0.1:4822"
+	guacdAddr   = "0.0.0.0:4822"
 )
 
 // GinHandlerAdapter adapts http.Handler to gin.HandlerFunc
@@ -44,10 +45,18 @@ func main() {
 
 	if os.Getenv("CERT_PATH") != "" {
 		certPath = os.Getenv("CERT_PATH")
+		// Check if certificate file exists
+		if _, err := os.Stat(certPath); os.IsNotExist(err) {
+			logrus.Warnf("Certificate file %s does not exist", certPath)
+		}
 	}
 
 	if os.Getenv("CERT_KEY_PATH") != "" {
 		certKeyPath = os.Getenv("CERT_KEY_PATH")
+		// Check if key file exists
+		if _, err := os.Stat(certKeyPath); os.IsNotExist(err) {
+			logrus.Warnf("Certificate key file %s does not exist", certKeyPath)
+		}
 	}
 
 	if certPath != "" && certKeyPath == "" {
@@ -183,7 +192,11 @@ func DemoDoConnect(request *http.Request) (guac.Tunnel, error) {
 		return nil, err
 	}
 
-	conn, err := net.DialTCP("tcp", nil, addr)
+	// Set connection timeout
+	dialer := net.Dialer{
+		Timeout: 10 * time.Second,
+	}
+	conn, err := dialer.Dial("tcp", addr.String())
 	if err != nil {
 		logrus.Errorln("error while connecting to guacd", err)
 		return nil, err
@@ -225,7 +238,11 @@ func guacdTest(address string) error {
 		fmt.Fprintf(os.Stderr, "❌ Failed to connect to guacd at %s: %v\n", address, err)
 		return err
 	}
-	defer conn.Close()
+	defer func() {
+		if cerr := conn.Close(); cerr != nil {
+			fmt.Fprintf(os.Stderr, "Failed to close connection: %v\n", cerr)
+		}
+	}()
 
 	fmt.Printf("✅ Successfully connected to guacd at %s\n", address)
 	return nil

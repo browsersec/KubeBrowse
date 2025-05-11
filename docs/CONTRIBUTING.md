@@ -15,6 +15,7 @@ Thank you for your interest in contributing to GUAC! This document provides guid
   - [Code of Conduct](#code-of-conduct)
   - [Getting Started](#getting-started)
     - [Development Environment Setup](#development-environment-setup)
+    - [Troubleshooting Common Issues](#troubleshooting-common-issues)
     - [Project Structure](#project-structure)
   - [Development Workflow](#development-workflow)
     - [Branching Strategy](#branching-strategy)
@@ -60,6 +61,71 @@ We are committed to fostering a welcoming community. Please read and adhere to o
 4. **Access the application**
 
    - Open a browser and navigate to `http://localhost:4567/connect`
+
+### Troubleshooting Common Issues
+
+#### Go Version Mismatch
+
+If you encounter errors like `compile: version "go1.24.0" does not match go tool version "go1.24.3"`, follow these steps:
+
+1. **Check your Go version**
+
+   ```bash
+   go version
+   ```
+
+2. **Clean the Go module cache**
+
+   ```bash
+   go clean -modcache
+   ```
+
+3. **Clean the Go build cache**
+
+   ```bash
+   go clean -cache
+   ```
+
+4. **Reset the build system**
+
+   ```bash
+   rm -rf $GOPATH/pkg/mod/cache/build
+   ```
+
+5. **Install or update to a consistent Go version**
+   
+   Using Go's official installation:
+   ```bash
+   # Download the latest version
+   wget https://go.dev/dl/go1.24.3.linux-amd64.tar.gz
+   
+   # Remove old installation (if needed)
+   sudo rm -rf /usr/local/go
+   
+   # Install the new version
+   sudo tar -C /usr/local -xzf go1.24.3.linux-amd64.tar.gz
+   ```
+   
+   Or using a version manager like `asdf`:
+   ```bash
+   asdf install golang 1.24.3
+   asdf global golang 1.24.3
+   ```
+
+6. **Check your environment variables**
+   
+   Ensure your PATH and GOROOT are set correctly:
+   ```bash
+   # Add to your shell profile (.bashrc, .zshrc, etc.)
+   export GOROOT=/usr/local/go
+   export PATH=$GOROOT/bin:$PATH
+   ```
+
+7. **Regenerate the Go modules**
+
+   ```bash
+   go mod tidy
+   ```
 
 ### Project Structure
 
