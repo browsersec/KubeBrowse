@@ -3,8 +3,8 @@ import { useEffect, useRef, useState } from 'react';
 import clipboard from '../lib/clipboard';
 import GuacMouse from '../lib/GuacMouse';
 import states from '../lib/states';
-import './GuacClient.css';
 import Modal from './Modal';
+import WebSocketControl from './WebSocketControl';
 import useGuacWebSocket from '../hooks/useGuacWebSocket';
 
 // Set custom Mouse implementation
@@ -14,7 +14,7 @@ Guacamole.Mouse = GuacMouse.mouse;
 const wsUrl = `ws://${location.host}/websocket-tunnel`;
 const httpUrl = `http://${location.host}/tunnel`;
 
-function GuacClient({ query, forceHttp = false }) {
+function GuacClient({ query, forceHttp = false, onDisconnected }) {
   const [connected, setConnected] = useState(false);
   
   // Use our custom WebSocket hook for Guacamole
@@ -63,6 +63,19 @@ function GuacClient({ query, forceHttp = false }) {
       }
     };
   }, [query, connected]);
+
+  // Track connection state changes and notify parent component when disconnected
+  useEffect(() => {
+    if (connectionState === states.DISCONNECTED || connectionState === states.CLIENT_ERROR || connectionState === states.TUNNEL_ERROR) {
+      if (connected && onDisconnected) {
+        // Delay to allow potential reconnect attempts to happen first
+        const timeout = setTimeout(() => {
+          onDisconnected();
+        }, 1000);
+        return () => clearTimeout(timeout);
+      }
+    }
+  }, [connectionState, connected, onDisconnected]);
 
   // Update modal when connection state changes
   useEffect(() => {
@@ -154,11 +167,11 @@ function GuacClient({ query, forceHttp = false }) {
     };
     
     displayRef.current.onfocus = () => {
-      displayRef.current.className = 'display focus';
+      displayRef.current.className = 'guac-display focus';
     };
     
     displayRef.current.onblur = () => {
-      displayRef.current.className = 'display';
+      displayRef.current.className = 'guac-display';
     };
 
     // Set up keyboard
@@ -288,6 +301,36 @@ function GuacClient({ query, forceHttp = false }) {
     setTimeout(() => setConnected(true), 500);
   };
 
+  const handleDisconnect = () => {
+    if (clientRef.current) {
+      // Properly clean up resources
+      uninstallKeyboard();
+      
+      // Clear the display area
+      if (displayRef.current) {
+        while (displayRef.current.firstChild) {
+          displayRef.current.removeChild(displayRef.current.firstChild);
+        }
+      }
+      
+      // Reset necessary state
+      displayObjRef.current = null;
+      
+      // Actually disconnect from the client
+      clientRef.current.disconnect();
+      
+      // Update connection state 
+      setTimeout(() => {
+        setConnected(false);
+        
+        // Notify parent component that we've disconnected
+        if (onDisconnected) {
+          onDisconnected();
+        }
+      }, 100);
+    }
+  };
+
   // Add a resize handler for when the component mounts
   useEffect(() => {
     const handleWindowResize = () => {
@@ -314,19 +357,19 @@ function GuacClient({ query, forceHttp = false }) {
   }, []); 
   
   return (
-    <div className="viewport" ref={viewportRef}>
-      <Modal ref={modalRef} onReconnect={handleReconnect} />
-      {/* tabindex allows for div to be focused */}
-      <div 
-        ref={displayRef} 
-        className="display" 
-        tabIndex="0"
-        style={{
-          width: '100%',
-          maxWidth: '100vw',
-          boxSizing: 'border-box'
-        }}
-      ></div>
+    <div className="relative w-full h-full">
+      <div className="fixed top-0 left-0 w-screen h-screen overflow-hidden bg-black flex justify-center items-center" ref={viewportRef}>
+        <div className="guac-display outline-none w-auto h-auto mx-auto" ref={displayRef} tabIndex="0">
+          {/* The Guacamole display will be inserted here */}
+        </div>
+      </div>
+      
+      <Modal ref={modalRef} onRetry={handleReconnect} />
+      
+      <WebSocketControl 
+        connectionState={connectionState} 
+        onDisconnect={handleDisconnect} 
+      />
     </div>
   );
 }
