@@ -14,15 +14,33 @@ Guacamole.Mouse = GuacMouse.mouse;
 const wsUrl = `ws://${location.host}/websocket-tunnel`;
 const httpUrl = `http://${location.host}/tunnel`;
 
-function GuacClient({ query, forceHttp = false, onDisconnected }) {
+// Convert query object to query string
+const buildQueryString = (queryObj) => {
+  if (!queryObj || typeof queryObj !== 'object') return '';
+  
+  const params = new URLSearchParams();
+  
+  for (const [key, value] of Object.entries(queryObj)) {
+    if (value !== undefined && value !== null) {
+      params.append(key, value.toString());
+    }
+  }
+  
+  return params.toString();
+};
+
+function GuacClient({ query, forceHttp = false, onDisconnect }) {
   const [connected, setConnected] = useState(false);
+  
+  // Convert query object to proper query string
+  const queryString = buildQueryString(query);
   
   // Use our custom WebSocket hook for Guacamole
   const { client, connectionState, errorMessage } = useGuacWebSocket(
     wsUrl, 
     httpUrl, 
     forceHttp, 
-    connected ? query : ''
+    connected ? queryString : ''
   );
   
   const displayRef = useRef(null);
@@ -53,7 +71,7 @@ function GuacClient({ query, forceHttp = false, onDisconnected }) {
 
   // Connect to the Guacamole server when query changes
   useEffect(() => {
-    if (query && !connected) {
+    if (queryString && !connected) {
       setConnected(true);
     }
     
@@ -62,20 +80,20 @@ function GuacClient({ query, forceHttp = false, onDisconnected }) {
         clientRef.current.disconnect();
       }
     };
-  }, [query, connected]);
+  }, [queryString, connected]);
 
   // Track connection state changes and notify parent component when disconnected
   useEffect(() => {
     if (connectionState === states.DISCONNECTED || connectionState === states.CLIENT_ERROR || connectionState === states.TUNNEL_ERROR) {
-      if (connected && onDisconnected) {
+      if (connected && onDisconnect) {
         // Delay to allow potential reconnect attempts to happen first
         const timeout = setTimeout(() => {
-          onDisconnected();
+          onDisconnect();
         }, 1000);
         return () => clearTimeout(timeout);
       }
     }
-  }, [connectionState, connected, onDisconnected]);
+  }, [connectionState, connected, onDisconnect]);
 
   // Update modal when connection state changes
   useEffect(() => {
@@ -324,8 +342,8 @@ function GuacClient({ query, forceHttp = false, onDisconnected }) {
         setConnected(false);
         
         // Notify parent component that we've disconnected
-        if (onDisconnected) {
-          onDisconnected();
+        if (onDisconnect) {
+          onDisconnect();
         }
       }, 100);
     }
