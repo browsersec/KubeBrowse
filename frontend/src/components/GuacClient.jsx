@@ -5,6 +5,7 @@ import GuacMouse from '../lib/GuacMouse';
 import states from '../lib/states';
 import './GuacClient.css';
 import Modal from './Modal';
+import useGuacWebSocket from '../hooks/useGuacWebSocket';
 
 // Set custom Mouse implementation
 Guacamole.Mouse = GuacMouse.mouse;
@@ -15,26 +16,47 @@ const httpUrl = `http://${location.host}/tunnel`;
 
 function GuacClient({ query, forceHttp = false }) {
   const [connected, setConnected] = useState(false);
-  const [connectionState, setConnectionState] = useState(states.IDLE);
-  const [errorMessage, setErrorMessage] = useState('');
+  
+  // Use our custom WebSocket hook for Guacamole
+  const { client, connectionState, errorMessage } = useGuacWebSocket(
+    wsUrl, 
+    httpUrl, 
+    forceHttp, 
+    connected ? query : ''
+  );
   
   const displayRef = useRef(null);
   const viewportRef = useRef(null);
   const modalRef = useRef(null);
   
-  const clientRef = useRef(null);
+  const clientRef = useRef(client); // Store client ref for access in other effects
   const displayObjRef = useRef(null);
   const keyboardRef = useRef(null);
   const mouseRef = useRef(null);
   const argumentsRef = useRef({});
 
+  // Update client reference when it changes
+  useEffect(() => {
+    clientRef.current = client;
+    if (client && connected) {
+      // Set up display and clipboard when client becomes available
+      setupClientDisplay();
+      clipboard.install(client);
+      
+      // Set up clipboard events
+      client.onclipboard = clipboard.onClipboard;
+      
+      // Test for argument mutability
+      client.onargv = handleArgv;
+    }
+  }, [client, connected]);
+
+  // Connect to the Guacamole server when query changes
   useEffect(() => {
     if (query && !connected) {
       setConnected(true);
-      connect(query);
     }
     
-    // Cleanup function
     return () => {
       if (clientRef.current) {
         clientRef.current.disconnect();
@@ -42,11 +64,112 @@ function GuacClient({ query, forceHttp = false }) {
     };
   }, [query, connected]);
 
+  // Update modal when connection state changes
   useEffect(() => {
     if (modalRef.current) {
       modalRef.current.show(connectionState, errorMessage);
     }
   }, [connectionState, errorMessage]);
+
+  // Handle argument value stream
+  const handleArgv = (stream, mimetype, name) => {
+    if (mimetype !== 'text/plain')
+      return;
+
+    const reader = new Guacamole.StringReader(stream);
+
+    // Assemble received data into a single string
+    let value = '';
+    reader.ontext = (text) => {
+      value += text;
+    };
+
+    // Test mutability once stream is finished
+    reader.onend = () => {
+      if (!clientRef.current) return;
+      
+      const stream = clientRef.current.createArgumentValueStream('text/plain', name);
+      stream.onack = (status) => {
+        if (status.isError()) {
+          return;
+        }
+        argumentsRef.current[name] = value;
+      };
+    };
+  };
+
+  // Set up the display element
+  const setupClientDisplay = () => {
+    if (!clientRef.current || !displayRef.current) return;
+    
+    const display = clientRef.current.getDisplay();
+    displayObjRef.current = display;
+    
+    const displayElement = display.getElement();
+    
+    // Set the display element to fill the width
+    displayElement.style.width = '100%';
+    displayElement.style.maxWidth = '100vw';
+    
+    displayRef.current.appendChild(displayElement);
+    displayRef.current.addEventListener('contextmenu', (e) => {
+      e.stopPropagation();
+      if (e.preventDefault) {
+        e.preventDefault();
+      }
+      e.returnValue = false;
+    });
+    
+    // Set up mouse and keyboard
+    setupMouseAndKeyboard();
+    
+    // Call resize immediately
+    resize();
+    
+    // Focus the display element
+    displayRef.current.focus();
+    
+    // Additional resize calls to handle delayed rendering
+    setTimeout(resize, 100);
+    setTimeout(resize, 500);
+    setTimeout(resize, 1000);
+  };
+
+  // Set up mouse and keyboard handlers
+  const setupMouseAndKeyboard = () => {
+    if (!displayRef.current || !clientRef.current) return;
+    
+    const mouse = new Guacamole.Mouse(displayRef.current);
+    mouseRef.current = mouse;
+    
+    // Hide software cursor when mouse leaves display
+    mouse.onmouseout = () => {
+      if (!displayObjRef.current) return;
+      displayObjRef.current.showCursor(false);
+    };
+
+    // Focus handling
+    displayRef.current.onclick = () => {
+      displayRef.current.focus();
+    };
+    
+    displayRef.current.onfocus = () => {
+      displayRef.current.className = 'display focus';
+    };
+    
+    displayRef.current.onblur = () => {
+      displayRef.current.className = 'display';
+    };
+
+    // Set up keyboard
+    const keyboard = new Guacamole.Keyboard(displayRef.current);
+    keyboardRef.current = keyboard;
+    
+    installKeyboard();
+    
+    // Set up mouse event handlers
+    mouse.onmousedown = mouse.onmouseup = mouse.onmousemove = handleMouseState;
+  };
 
   const send = (cmd) => {
     if (!clientRef.current) {
@@ -109,7 +232,6 @@ function GuacClient({ query, forceHttp = false }) {
     const pixelDensity = window.devicePixelRatio || 1;
     
     // Calculate the optimal resolution to send to the server
-    // This ensures we're requesting a resolution that matches our viewport
     const optimalWidth = Math.round(viewportWidth * pixelDensity);
     const optimalHeight = Math.round(viewportHeight * pixelDensity);
     
@@ -148,228 +270,34 @@ function GuacClient({ query, forceHttp = false }) {
     keyboardRef.current.onkeydown = keyboardRef.current.onkeyup = () => {};
   };
 
-  const connect = (queryString) => {
-    let tunnel;
-
-    if (window.WebSocket && !forceHttp) {
-      tunnel = new Guacamole.WebSocketTunnel(wsUrl);
-    } else {
-      tunnel = new Guacamole.HTTPTunnel(httpUrl, true);
-    }
-
-    if (clientRef.current) {
-      if (displayObjRef.current) {
-        displayObjRef.current.scale(0);
-      }
-      uninstallKeyboard();
-    }
-
-    // Add viewport dimensions to the query string if they're not already there
-    if (!queryString.includes('width=') || !queryString.includes('height=')) {
-      const pixelDensity = window.devicePixelRatio || 1;
-      const viewportWidth = window.innerWidth;
-      const viewportHeight = window.innerHeight;
-      
-      // Append width and height parameters
-      const separator = queryString.includes('?') ? '&' : '?';
-      queryString += `${separator}width=${Math.round(viewportWidth * pixelDensity)}&height=${Math.round(viewportHeight * pixelDensity)}`;
-    }
-
-    const client = new Guacamole.Client(tunnel);
-    clientRef.current = client;
-    
-    clipboard.install(client);
-
-    tunnel.onerror = (status) => {
-      console.error(`Tunnel failed ${JSON.stringify(status)}`);
-      setConnectionState(states.TUNNEL_ERROR);
-    };
-
-    tunnel.onstatechange = (state) => {
-      switch (state) {
-        // Connection is being established
-        case Guacamole.Tunnel.State.CONNECTING:
-          setConnectionState(states.CONNECTING);
-          break;
-
-        // Connection is established / no longer unstable
-        case Guacamole.Tunnel.State.OPEN:
-          setConnectionState(states.CONNECTED);
-          break;
-
-        // Connection is established but misbehaving
-        case Guacamole.Tunnel.State.UNSTABLE:
-          // TODO
-          break;
-
-        // Connection has closed
-        case Guacamole.Tunnel.State.CLOSED:
-          setConnectionState(states.DISCONNECTED);
-          break;
-      }
-    };
-
-    client.onstatechange = (clientState) => {
-      switch (clientState) {
-        case 0:
-          setConnectionState(states.IDLE);
-          break;
-        case 1:
-          // connecting ignored for some reason?
-          break;
-        case 2:
-          setConnectionState(states.WAITING);
-          break;
-        case 3:
-          setConnectionState(states.CONNECTED);
-          
-          // Add event listeners for responsive resizing
-          window.addEventListener('resize', resize);
-          if (viewportRef.current) {
-            viewportRef.current.addEventListener('mouseenter', resize);
-          }
-          
-          // Call resize immediately when connected
-          resize();
-          
-          // Set up a resize observer to handle any changes to the viewport
-          if (window.ResizeObserver && viewportRef.current) {
-            const resizeObserver = new ResizeObserver(() => {
-              resize();
-            });
-            resizeObserver.observe(viewportRef.current);
-          }
-
-          clipboard.setRemoteClipboard(client);
-          break;
-        case 4:
-        case 5:
-          // disconnected, disconnecting
-          break;
-      }
-    };
-
-    client.onerror = (error) => {
-      client.disconnect();
-      console.error(`Client error ${JSON.stringify(error)}`);
-      setErrorMessage(error.message);
-      setConnectionState(states.CLIENT_ERROR);
-    };
-
-    client.onsync = () => {
-      // Handle sync event
-    };
-
-    // Test for argument mutability whenever an argument value is received
-    client.onargv = (stream, mimetype, name) => {
-      if (mimetype !== 'text/plain')
-        return;
-
-      const reader = new Guacamole.StringReader(stream);
-
-      // Assemble received data into a single string
-      let value = '';
-      reader.ontext = (text) => {
-        value += text;
-      };
-
-      // Test mutability once stream is finished, storing the current value for the argument only if it is mutable
-      reader.onend = () => {
-        const stream = client.createArgumentValueStream('text/plain', name);
-        stream.onack = (status) => {
-          if (status.isError()) {
-            // ignore reject
-            return;
-          }
-          argumentsRef.current[name] = value;
-        };
-      };
-    };
-
-    client.onclipboard = clipboard.onClipboard;
-    
-    const display = client.getDisplay();
-    displayObjRef.current = display;
-    
-    if (displayRef.current) {
-      const displayElement = display.getElement();
-      
-      // Set the display element to fill the width
-      displayElement.style.width = '100%';
-      displayElement.style.maxWidth = '100vw';
-      
-      displayRef.current.appendChild(displayElement);
-      displayRef.current.addEventListener('contextmenu', (e) => {
-        e.stopPropagation();
-        if (e.preventDefault) {
-          e.preventDefault();
-        }
-        e.returnValue = false;
-      });
-    }
-    
-    client.connect(queryString);
-    window.onunload = () => client.disconnect();
-
-    if (displayRef.current) {
-      const mouse = new Guacamole.Mouse(displayRef.current);
-      mouseRef.current = mouse;
-      
-      // Hide software cursor when mouse leaves display
-      mouse.onmouseout = () => {
-        if (!display) return;
-        display.showCursor(false);
-      };
-
-      // allows focusing on the display div so that keyboard doesn't always go to session
-      displayRef.current.onclick = () => {
-        displayRef.current.focus();
-      };
-      
-      displayRef.current.onfocus = () => {
-        displayRef.current.className = 'display focus';
-      };
-      
-      displayRef.current.onblur = () => {
-        displayRef.current.className = 'display';
-      };
-
-      const keyboard = new Guacamole.Keyboard(displayRef.current);
-      keyboardRef.current = keyboard;
-      
-      installKeyboard();
-      mouse.onmousedown = mouse.onmouseup = mouse.onmousemove = handleMouseState;
-      
-      // Call resize immediately and then again after a short delay to ensure proper sizing
-      resize();
-      
-      // Focus the display element
-      displayRef.current.focus();
-      
-      // Set up additional resize calls to handle any delayed rendering
-      setTimeout(resize, 100);
-      setTimeout(resize, 500);
-      setTimeout(resize, 1000);
-    }
-  };
-
   const handleReconnect = () => {
-    connect(query);
+    // Reset connection state and reconnect
+    setConnected(false);
+    
+    // Clean up any existing display elements
+    if (displayRef.current) {
+      while (displayRef.current.firstChild) {
+        displayRef.current.removeChild(displayRef.current.firstChild);
+      }
+    }
+    
+    // Reset references
+    displayObjRef.current = null;
+    
+    // Reconnect after a small delay
+    setTimeout(() => setConnected(true), 500);
   };
 
   // Add a resize handler for when the component mounts
   useEffect(() => {
     const handleWindowResize = () => {
-      if (resize) {
-        resize();
-      }
+      resize();
     };
     
     // Add event listener for window resize
     window.addEventListener('resize', handleWindowResize);
     
     // Call resize immediately and then again after short delays
-    // This helps ensure proper sizing after the DOM has fully rendered
     handleWindowResize();
     const timeouts = [
       setTimeout(handleWindowResize, 100),
@@ -383,7 +311,7 @@ function GuacClient({ query, forceHttp = false }) {
       window.removeEventListener('resize', handleWindowResize);
       timeouts.forEach(timeout => clearTimeout(timeout));
     };
-  }, [resize]); // Add resize to dependency array
+  }, []); 
   
   return (
     <div className="viewport" ref={viewportRef}>
