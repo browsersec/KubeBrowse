@@ -7,6 +7,10 @@ on:
     branches:
       - main  # Also run when main is updated to detect new conflicts in open PRs
 
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   check_conflicts:
     name: Check for merge conflicts
@@ -37,7 +41,9 @@ jobs:
           else
             echo "✅ No merge conflicts detected with main branch!"
             # Abort the merge to clean up
-            git merge --abort
+            if [ -d ".git/MERGE_HEAD" ]; then
+              git merge --abort
+            fi
           fi
 
       - name: Add comment to PR if conflict detected
@@ -55,5 +61,5 @@ jobs:
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: `## ⚠️ Merge Conflict Detected\n\nThis PR has conflicts with the main branch that need to be resolved before it can be merged.\n\n### Conflicting files:\n${conflictingFiles.map(file => `- \`${file}\``).join('\n')}`
+              body: `## ⚠️ Merge Conflict Detected\n\nThis PR has conflicts with the main branch that need to be resolved before it can be merged.\n\n### Conflicting files:\n${conflictingFiles.join('\n')}`
             });
