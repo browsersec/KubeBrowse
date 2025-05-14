@@ -157,6 +157,7 @@ export default function NewConnectionRoute() {
           </div>
 
           <div className="flex justify-end space-x-3">
+            {error && <div className="text-red-500 mb-4">{error}</div>}
             <button
               type="button"
               onClick={() => navigate('/')}
@@ -164,7 +165,6 @@ export default function NewConnectionRoute() {
             >
               Cancel
             </button>
-            {error && <div className="text-red-500 mb-4">{error}</div>}``
             <button
               type="submit"
               disabled={isSubmitting}
