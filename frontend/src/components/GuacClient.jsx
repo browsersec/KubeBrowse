@@ -11,8 +11,9 @@ import useGuacWebSocket from '../hooks/useGuacWebSocket';
 Guacamole.Mouse = GuacMouse.mouse;
 
 // Define websocket and HTTP tunnel URLs
-const wsUrl = `ws://${location.host}/websocket-tunnel`;
-const httpUrl = `http://${location.host}/tunnel`;
+const isSecure = window.location.protocol === 'https:';
+const wsUrl   = `${isSecure ? 'wss' : 'ws'}://${location.host}/websocket-tunnel`;
+const httpUrl = `${isSecure ? 'https' : 'http'}://${location.host}/tunnel`;
 
 // Convert query object to query string
 const buildQueryString = (queryObj) => {

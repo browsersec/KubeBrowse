@@ -5,7 +5,7 @@ function App() {
   const [connect, setConnect] = useState(false);
   const [transitioning, setTransitioning] = useState(false);
   const [formData, setFormData] = useState({
-    scheme: 'rdo',
+    scheme: 'rdp',
     hostname: '0.0.0.0',
     port: '',
     user: '',

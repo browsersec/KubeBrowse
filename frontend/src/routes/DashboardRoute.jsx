@@ -7,8 +7,13 @@ export default function DashboardRoute() {
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
 
   const handleDelete = (id) => {
-    deleteConnection(id);
-    setDeleteConfirmId(null);
+    try {
+      
+      deleteConnection(id);
+      setDeleteConfirmId(null);
+    } catch (error) {
+      console.error('Error deleting connection:', error);
+    }
   };
 
   return (

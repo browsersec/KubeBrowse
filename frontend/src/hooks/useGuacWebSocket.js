@@ -17,23 +17,32 @@ const useGuacWebSocket = (wsUrl, httpUrl, forceHttp = false, queryString = '') =
   const [errorMessage, setErrorMessage] = useState('');
   const clientRef = useRef(null);
   const tunnelRef = useRef(null);
-  
+
   // Custom WebSocketTunnel implementation that integrates with react-use-websocket
   class ReactWebSocketTunnel extends Guacamole.WebSocketTunnel {
     constructor(url) {
       super(url);
       this.receiveCallback = null;
-      this.webSocketRef = null;
+      /* prevent parent from opening its own socket */
+      this.websocket = null;
     }
-
+    /* override connect so no extra socket is created */
+    connect(data) {
+      this._setState(Guacamole.Tunnel.State.CONNECTING);
+      // react-use-websocket will now drive OPEN/CLOSED events
+    }
+    /* outgoing traffic must use react-use-websocket’s sendMessage */
+    sendMessage(msg) {
+      if (this.webSocketRef && this.webSocketRef.sendMessage) {
+        this.webSocketRef.sendMessage(msg);
+      }
+    }
     setWebSocketRef(ref) {
       this.webSocketRef = ref;
     }
-
     setReceiveCallback(callback) {
       this.receiveCallback = callback;
     }
-
     handleMessage(event) {
       if (this.receiveCallback) {
         this.receiveCallback(event.data);
