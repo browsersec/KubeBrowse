@@ -68,8 +68,8 @@ export default function Sidebar({ connections = [] }) {
             <div className="space-y-1">
               {connections.map((connection, index) => (
                 <NavLink
-                  key={connection.id || index}
-                  to={`/connections/${connection.id || index}`}
+                key={connection.id}
+                to={`/connections/${connection.id}`}
                   className={({ isActive }) => 
                     `flex items-center py-3 px-4 rounded-lg transition-colors ${isActive ? 'bg-blue-700' : 'hover:bg-gray-800'}`
                   }

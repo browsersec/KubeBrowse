@@ -8,7 +8,7 @@ export default function ConnectionRoute() {
   const { id } = useParams();
   const { connections } = useOutletContext();
   const navigate = useNavigate();
-  
+
   const [connection, setConnection] = useState(null);
   const [connectionState, setConnectionState] = useState('connecting'); // connecting, connected, disconnected
   const [error, setError] = useState(null);
@@ -16,31 +16,37 @@ export default function ConnectionRoute() {
   useEffect(() => {
     // Find the connection with the given ID
     const foundConnection = connections.find(conn => conn.id === id);
-    
+
     if (!foundConnection) {
       setError('Connection not found');
       setConnectionState('disconnected');
       return;
     }
-    
+
     setConnection(foundConnection);
     setConnectionState('connecting');
-    
-    // Simulate connection process - in a real app, this would be handled by GuacClient
+
+    // Attempt to establish connection
     const timeout = setTimeout(() => {
-      setConnectionState('connected');
+      try {
+        // Real connection logic would go here
+        setConnectionState('connected');
+      } catch (err) {
+        setError(`Connection failed: ${err.message}`);
+        setConnectionState('disconnected');
+      }
     }, 2000);
-    
+
     return () => clearTimeout(timeout);
   }, [id, connections]);
-  
+
   const handleDisconnect = () => {
     setConnectionState('disconnected');
   };
 
   const buildQueryObj = () => {
     if (!connection) return {};
-    
+
     // Properly format the connection parameters as individual properties
     // instead of passing the entire object
     return {
@@ -85,7 +91,7 @@ export default function ConnectionRoute() {
 
   return (
     <div className="h-screen w-full">
-      <GuacClient 
+      <GuacClient
         query={buildQueryObj()}
         onDisconnect={handleDisconnect}
       />

@@ -1,6 +1,27 @@
 import { motion } from 'framer-motion';
+import { useState, useEffect, useMemo } from 'react';
 
 export default function ConnectingAnimation() {
+  const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+  
+  useEffect(() => {
+    const updateDimensions = () => {
+      setDimensions({
+        width: window.innerWidth,
+        height: window.innerHeight
+      });
+    };
+    
+    // Initial dimensions
+    updateDimensions();
+    
+    // Listen for resize events
+    window.addEventListener('resize', updateDimensions);
+    
+    // Cleanup
+    return () => window.removeEventListener('resize', updateDimensions);
+  }, []);
+  
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-gradient-to-r from-blue-600 to-indigo-800 overflow-hidden">
       <div className="absolute w-full h-full">
