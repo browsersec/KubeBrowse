@@ -16,7 +16,7 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-// CreateSandboxPod creates a new pod with the VNC container
+// CreateSandboxPod creates a new pod with the rdp container
 func CreateBrowserSandboxPod(clientset *kubernetes.Clientset, namespace, userID string) (*corev1.Pod, error) {
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -59,8 +59,8 @@ func CreateBrowserSandboxPod(clientset *kubernetes.Clientset, namespace, userID 
 					Image: "ghcr.io/browsersec/rdp-chromium:latest",
 					Ports: []corev1.ContainerPort{
 						{
-							Name:          "vnc",
-							ContainerPort: 5900,
+							Name:          "rdp",
+							ContainerPort: 3389,
 						},
 					},
 					Resources: corev1.ResourceRequirements{
