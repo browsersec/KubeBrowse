@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -91,5 +92,10 @@ func CreateBrowserSandboxPod(clientset *kubernetes.Clientset, namespace, userID 
 		},
 	}
 
-	return clientset.CoreV1().Pods(namespace).Create(context.Background(), pod, metav1.CreateOptions{})
+	result, err := clientset.CoreV1().Pods(namespace).Create(context.Background(), pod, metav1.CreateOptions{})
+	if err != nil {
+		logrus.Errorf("Error creating pod: %v", err)
+		return nil, err
+	}
+	return result, nil
 }

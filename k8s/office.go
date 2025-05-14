@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+
 	// "k8s.io/client-go/rest"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/utils/ptr"
@@ -90,5 +92,10 @@ func CreateOfficeSandboxPod(clientset *kubernetes.Clientset, namespace, userID s
 		},
 	}
 
-	return clientset.CoreV1().Pods(namespace).Create(context.Background(), pod, metav1.CreateOptions{})
+	result, err := clientset.CoreV1().Pods(namespace).Create(context.Background(), pod, metav1.CreateOptions{})
+	if err != nil {
+		logrus.Errorf("Error creating pod: %v", err)
+		return nil, err
+	}
+	return result, nil
 }

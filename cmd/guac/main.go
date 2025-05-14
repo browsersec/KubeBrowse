@@ -30,6 +30,8 @@ var (
 	k8sNamespace = "browser-sandbox"
 )
 
+var activeTunnels *guac.ActiveTunnelStore
+
 // GinHandlerAdapter adapts http.Handler to gin.HandlerFunc
 func GinHandlerAdapter(h http.Handler) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -83,6 +85,8 @@ func main() {
 		k8sNamespace = os.Getenv("KUBERNETES_NAMESPACE")
 	}
 
+	activeTunnels = guac.NewActiveTunnelStore()
+
 	// Initialize Kubernetes client with fallback for local development
 	config, err := rest.InClusterConfig()
 	if err != nil {
@@ -130,12 +134,27 @@ func main() {
 	router.Use(gin.Logger())
 
 	// Initialize Guacamole handlers
-	servlet := guac.NewServer(DemoDoConnect)
-	wsServer := guac.NewWebsocketServer(DemoDoConnect)
+	// servlet := guac.NewServer(DemoDoConnect) // We'll adjust this if DemoDoConnect's signature changes, or use a wrapper
+	// wsServer := guac.NewWebsocketServer(DemoDoConnect) // Same here
 
-	sessions := guac.NewMemorySessionStore()
-	wsServer.OnConnect = sessions.Add
-	wsServer.OnDisconnect = sessions.Delete
+	// Pass activeTunnels to DemoDoConnect by wrapping it
+	doConnectWrapper := func(request *http.Request) (guac.Tunnel, error) {
+		return DemoDoConnect(request, activeTunnels)
+	}
+
+	servlet := guac.NewServer(doConnectWrapper)
+	wsServer := guac.NewWebsocketServer(doConnectWrapper)
+
+	// sessions := guac.NewMemorySessionStore() // Old store
+	// wsServer.OnConnect = sessions.Add // Old OnConnect
+	// wsServer.OnDisconnect = sessions.Delete // Old OnDisconnect
+
+	// OnConnect is implicitly handled by DemoDoConnect now adding to activeTunnels.
+	// We still need OnDisconnect to remove from the store when a tunnel closes for any reason.
+	wsServer.OnDisconnect = func(connectionID string, req *http.Request, tunnel guac.Tunnel) {
+		logrus.Debugf("Websocket disconnected, removing tunnel: %s", connectionID)
+		activeTunnels.Delete(connectionID, req, tunnel)
+	}
 
 	// Setup routes using Gin
 	router.Any("/tunnel", GinHandlerAdapter(servlet))
@@ -146,26 +165,35 @@ func main() {
 	router.GET("/sessions/", func(c *gin.Context) {
 		c.Header("Content-Type", "application/json")
 
-		sessions.RLock()
-		defer sessions.RUnlock()
+		// sessions.RLock() // Old store lock
+		// defer sessions.RUnlock() // Old store unlock
 
-		type ConnIds struct {
+		type ConnInfo struct {
 			Uuid string `json:"uuid"`
-			Num  int    `json:"num"`
+			// Num  int    `json:"num"` // We don't have a 'Num' equivalent directly, can show count if needed
 		}
 
-		connIds := make([]*ConnIds, len(sessions.ConnIds))
+		// connIds := make([]*ConnIds, len(sessions.ConnIds)) // Old way
+		allIDs := activeTunnels.GetAllIDs()
+		connInfos := make([]*ConnInfo, len(allIDs))
 
-		i := 0
-		for id, num := range sessions.ConnIds {
-			connIds[i] = &ConnIds{
-				Uuid: id,
-				Num:  num,
-			}
-			i++
+		// i := 0 // Old way
+		// for id, num := range sessions.ConnIds { // Old way
+		// 	connIds[i] = &ConnIds{ // Old way
+		// 		Uuid: id, // Old way
+		// 		Num:  num, // Old way
+		// 	}
+		// 	i++ // Old way
+		// }
+		for i, id := range allIDs {
+			connInfos[i] = &ConnInfo{Uuid: id}
 		}
 
-		c.JSON(http.StatusOK, connIds)
+		// c.JSON(http.StatusOK, connIds) // Old way
+		c.JSON(http.StatusOK, gin.H{
+			"active_sessions": len(connInfos),
+			"connection_ids":  connInfos,
+		})
 	})
 
 	// Add test routes for pod creation
@@ -240,6 +268,36 @@ func main() {
 		})
 	}
 
+	// Endpoint to stop a specific WebSocket session
+	router.DELETE("/sessions/:connectionID/stop", func(c *gin.Context) {
+		connectionID := c.Param("connectionID")
+		if connectionID == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Connection ID is required"})
+			return
+		}
+
+		tunnel, found := activeTunnels.Get(connectionID)
+		if !found {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Session not found"})
+			return
+		}
+
+		logrus.Infof("Attempting to stop session: %s", connectionID)
+		err := tunnel.Close() // This should trigger OnDisconnect which will call activeTunnels.Delete
+		if err != nil {
+			// Log error, but the tunnel might be already closing or closed.
+			// The client might still perceive this as success if the connection drops.
+			logrus.Errorf("Error closing tunnel for session %s: %v", connectionID, err)
+			// We don't delete from activeTunnels here, let OnDisconnect handle it
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error trying to close session, it might already be closed or unresponsive."})
+			return
+		}
+
+		// OnDisconnect will handle removal from activeTunnels.
+		// If tunnel.Close() was successful, the connection will be terminated.
+		c.JSON(http.StatusOK, gin.H{"message": fmt.Sprintf("Session %s stop initiated.", connectionID)})
+	})
+
 	// Start server with appropriate TLS configuration
 	addr := "0.0.0.0:4567"
 	if certPath != "" {
@@ -258,7 +316,8 @@ func main() {
 }
 
 // DemoDoConnect creates the tunnel to the remote machine (via guacd)
-func DemoDoConnect(request *http.Request) (guac.Tunnel, error) {
+// Now accepts ActiveTunnelStore to register the tunnel
+func DemoDoConnect(request *http.Request, tunnelStore *guac.ActiveTunnelStore) (guac.Tunnel, error) {
 	config := guac.NewGuacamoleConfiguration()
 
 	var query url.Values
@@ -336,7 +395,21 @@ func DemoDoConnect(request *http.Request) (guac.Tunnel, error) {
 		return nil, err
 	}
 	logrus.Debug("Socket configured")
-	return guac.NewSimpleTunnel(stream), nil
+
+	tunnel := guac.NewSimpleTunnel(stream)
+
+	// Register the tunnel with its ConnectionID after handshake
+	if tunnel != nil && tunnel.ConnectionID() != "" {
+		// The request object 'req' for Add method is 'nil' here.
+		// If it's crucial, it needs to be passed down or handled differently.
+		// For now, passing nil as it's not used by the current Add implementation.
+		tunnelStore.Add(tunnel.ConnectionID(), tunnel, nil)
+		logrus.Debugf("Tunnel %s added to active store", tunnel.ConnectionID())
+	} else if tunnel != nil {
+		logrus.Warnf("Tunnel created but ConnectionID is empty. Not adding to store. UUID: %s", tunnel.GetUUID())
+	}
+
+	return tunnel, nil
 }
 
 // Add a help command to display CLI usage information

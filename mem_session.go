@@ -5,51 +5,62 @@ import (
 	"sync"
 )
 
-// MemorySessionStore is a simple in-memory store of connected sessions that is used by
-// the WebsocketServer to store active sessions.
-type MemorySessionStore struct {
+// ActiveTunnelStore is an in-memory store of active Guacamole tunnels.
+type ActiveTunnelStore struct {
 	sync.RWMutex
-	ConnIds map[string]int
+	// activeTunnels maps ConnectionID to the active Tunnel.
+	activeTunnels map[string]Tunnel
 }
 
-// NewMemorySessionStore creates a new store
-func NewMemorySessionStore() *MemorySessionStore {
-	return &MemorySessionStore{
-		ConnIds: map[string]int{},
+// NewActiveTunnelStore creates a new store for active tunnels.
+func NewActiveTunnelStore() *ActiveTunnelStore {
+	return &ActiveTunnelStore{
+		activeTunnels: make(map[string]Tunnel),
 	}
 }
 
-// Get returns a connection by uuid
-func (s *MemorySessionStore) Get(id string) int {
+// Get returns a tunnel by its ConnectionID.
+func (s *ActiveTunnelStore) Get(id string) (Tunnel, bool) {
 	s.RLock()
 	defer s.RUnlock()
-	return s.ConnIds[id]
+	tunnel, found := s.activeTunnels[id]
+	return tunnel, found
 }
 
-// Add inserts a new connection by uuid
-func (s *MemorySessionStore) Add(id string, req *http.Request) {
+// Add inserts a new tunnel into the store.
+// The 'req' argument is kept for compatibility with existing callback signatures if needed,
+// but might not be used directly in this version.
+func (s *ActiveTunnelStore) Add(id string, tunnel Tunnel, req *http.Request) {
 	s.Lock()
 	defer s.Unlock()
-	n, ok := s.ConnIds[id]
-	if !ok {
-		s.ConnIds[id] = 1
-		return
-	}
-	n++
-	s.ConnIds[id] = n
+	s.activeTunnels[id] = tunnel
 }
 
-// Delete removes a connection by uuid
-func (s *MemorySessionStore) Delete(id string, req *http.Request, tunnel Tunnel) {
+// Delete removes a tunnel by its ConnectionID.
+// The 'req' and 'tunnel' arguments are kept for compatibility with existing callback signatures,
+// primarily the 'tunnel' parameter in OnDisconnect.
+func (s *ActiveTunnelStore) Delete(id string, req *http.Request, closedTunnel Tunnel) {
 	s.Lock()
 	defer s.Unlock()
-	n, ok := s.ConnIds[id]
-	if !ok {
-		return
+	// We could optionally verify if closedTunnel matches s.activeTunnels[id] before deleting
+	// For now, just delete by id.
+	delete(s.activeTunnels, id)
+}
+
+// GetAllIDs returns a slice of all active ConnectionIDs.
+func (s *ActiveTunnelStore) GetAllIDs() []string {
+	s.RLock()
+	defer s.RUnlock()
+	ids := make([]string, 0, len(s.activeTunnels))
+	for id := range s.activeTunnels {
+		ids = append(ids, id)
 	}
-	if n == 1 {
-		delete(s.ConnIds, id)
-		return
-	}
-	s.ConnIds[id]--
+	return ids
+}
+
+// Count returns the number of active tunnels.
+func (s *ActiveTunnelStore) Count() int {
+	s.RLock()
+	defer s.RUnlock()
+	return len(s.activeTunnels)
 }
