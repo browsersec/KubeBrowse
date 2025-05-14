@@ -1,9 +1,10 @@
 package guac
 
 import (
-	"github.com/sirupsen/logrus"
 	"sync"
 	"time"
+
+	"github.com/sirupsen/logrus"
 )
 
 /*
@@ -99,9 +100,14 @@ func (m *TunnelMap) tunnelTimeoutTaskRun() {
 	for uuid, tunnel := range m.tunnelMap {
 		if tunnel.GetLastAccessedTime().Before(timeLine) {
 			removeIDs = append(removeIDs, pair{uuid: uuid, tunnel: tunnel})
+			logrus.Debugf("Marking HTTP tunnel \"%v\" for timeout removal.", uuid)
 		}
 	}
 	m.RUnlock()
+
+	if len(removeIDs) == 0 {
+		return
+	}
 
 	m.Lock()
 	for _, double := range removeIDs {
@@ -111,7 +117,7 @@ func (m *TunnelMap) tunnelTimeoutTaskRun() {
 		if double.tunnel != nil {
 			err := double.tunnel.Close()
 			if err != nil {
-				logrus.Debug("Unable to close expired HTTP tunnel.", err)
+				logrus.Debugf("Unable to close expired HTTP tunnel %v: %v", double.uuid, err)
 			}
 		}
 	}

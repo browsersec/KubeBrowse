@@ -15,9 +15,7 @@ Thank you for your interest in contributing to GUAC! This document provides guid
   - [Code of Conduct](#code-of-conduct)
   - [Getting Started](#getting-started)
     - [Development Environment Setup](#development-environment-setup)
-  - [Working with Database Migrations](#working-with-database-migrations)
-    - [Creating a New Migration](#creating-a-new-migration)
-    - [Applying Migrations](#applying-migrations)
+    - [Troubleshooting Common Issues](#troubleshooting-common-issues)
     - [Project Structure](#project-structure)
   - [Development Workflow](#development-workflow)
     - [Branching Strategy](#branching-strategy)
@@ -64,53 +62,70 @@ We are committed to fostering a welcoming community. Please read and adhere to o
 
    - Open a browser and navigate to `http://localhost:4567/connect`
 
+### Troubleshooting Common Issues
 
-5. **Install required tools:**
+#### Go Version Mismatch
 
-   ```bash
-   # Install golang-migrate
-   go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
+If you encounter errors like `compile: version "go1.24.0" does not match go tool version "go1.24.3"`, follow these steps:
 
-   # Install sqlc
-   go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
-
-   # Install lefthook (for Git hooks)
-   go install github.com/evilmartians/lefthook/v1/cmd/lefthook@latest
-   ```
-
-6. **Set up your local database:**
+1. **Check your Go version**
 
    ```bash
-   docker compose up -d
+   go version
    ```
 
-## Working with Database Migrations
+2. **Clean the Go module cache**
 
-We use [golang-migrate](https://github.com/golang-migrate/migrate) to manage database schema changes.
+   ```bash
+   go clean -modcache
+   ```
 
-### Creating a New Migration
+3. **Clean the Go build cache**
 
-```bash
-migrate create -ext sql -dir db/migrations -seq migration_name
-```
+   ```bash
+   go clean -cache
+   ```
 
-This will create two files:
-- `db/migrations/NNNNNN_migration_name.up.sql` - Contains the changes to apply
-- `db/migrations/NNNNNN_migration_name.down.sql` - Contains the SQL to revert the changes
-- `db/migrations/NNNNNN_migration_name.sql` - Contains the SQL to apply and revert the changes
+4. **Reset the build system**
 
-### Applying Migrations
+   ```bash
+   rm -rf $GOPATH/pkg/mod/cache/build
+   ```
 
-```bash
-# Apply all pending migrations
-migrate -path db/migrations -database "postgresql://username:password@localhost:5432/database_name?sslmode=disable" up
+5. **Install or update to a consistent Go version**
+   
+   Using Go's official installation:
+   ```bash
+   # Download the latest version
+   wget https://go.dev/dl/go1.24.3.linux-amd64.tar.gz
+   
+   # Remove old installation (if needed)
+   sudo rm -rf /usr/local/go
+   
+   # Install the new version
+   sudo tar -C /usr/local -xzf go1.24.3.linux-amd64.tar.gz
+   ```
+   
+   Or using a version manager like `asdf`:
+   ```bash
+   asdf install golang 1.24.3
+   asdf global golang 1.24.3
+   ```
 
-# Revert last migration
-migrate -path db/migrations -database "postgresql://username:password@localhost:5432/database_name?sslmode=disable" down 1
+6. **Check your environment variables**
+   
+   Ensure your PATH and GOROOT are set correctly:
+   ```bash
+   # Add to your shell profile (.bashrc, .zshrc, etc.)
+   export GOROOT=/usr/local/go
+   export PATH=$GOROOT/bin:$PATH
+   ```
 
-# Revert all migrations
-migrate -path db/migrations -database "postgresql://username:password@localhost:5432/database_name?sslmode=disable" down
-```
+7. **Regenerate the Go modules**
+
+   ```bash
+   go mod tidy
+   ```
 
 ### Project Structure
 

@@ -4,14 +4,16 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
+	"time"
 
-	guac "github.com/browsersec/KubeBrowse"
+	guac guac "github.com/browsersec/KubeBrowse"
 	"github.com/browsersec/KubeBrowse/k8s"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -24,7 +26,7 @@ import (
 var (
 	certPath     string
 	certKeyPath  string
-	guacdAddr    = "127.0.0.1:4822"
+	guacdAddr    = "0.0.0.0:4822"
 	k8sClient    *kubernetes.Clientset
 	k8sNamespace = "browser-sandbox"
 )
@@ -52,10 +54,18 @@ func main() {
 	// Get environment variables
 	if os.Getenv("CERT_PATH") != "" {
 		certPath = os.Getenv("CERT_PATH")
+		// Check if certificate file exists
+		if _, err := os.Stat(certPath); os.IsNotExist(err) {
+			logrus.Warnf("Certificate file %s does not exist", certPath)
+		}
 	}
 
 	if os.Getenv("CERT_KEY_PATH") != "" {
 		certKeyPath = os.Getenv("CERT_KEY_PATH")
+		// Check if key file exists
+		if _, err := os.Stat(certKeyPath); os.IsNotExist(err) {
+			logrus.Warnf("Certificate key file %s does not exist", certKeyPath)
+		}
 	}
 
 	if certPath != "" && certKeyPath == "" {
@@ -302,7 +312,11 @@ func DemoDoConnect(request *http.Request) (guac.Tunnel, error) {
 		return nil, err
 	}
 
-	conn, err := net.DialTCP("tcp", nil, addr)
+	// Set connection timeout
+	dialer := net.Dialer{
+		Timeout: 10 * time.Second,
+	}
+	conn, err := dialer.Dial("tcp", addr.String())
 	if err != nil {
 		logrus.Errorln("error while connecting to guacd", err)
 		return nil, err
@@ -336,4 +350,20 @@ func displayHelp() {
 	fmt.Println("  test            Run tests")
 	fmt.Println("  build           Build the project")
 	fmt.Println("  help            Display this help message")
+}
+
+func guacdTest(address string) error {
+	conn, err := net.Dial("tcp", address)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "❌ Failed to connect to guacd at %s: %v\n", address, err)
+		return err
+	}
+	defer func() {
+		if cerr := conn.Close(); cerr != nil {
+			fmt.Fprintf(os.Stderr, "Failed to close connection: %v\n", cerr)
+		}
+	}()
+
+	fmt.Printf("✅ Successfully connected to guacd at %s\n", address)
+	return nil
 }

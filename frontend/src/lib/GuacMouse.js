@@ -104,13 +104,20 @@ this.onmouseout = null;
       cancelEvent(e);
   }, false);
 
+  // Mouse handling with proper scaling
   element.addEventListener("mousemove", function(e) {
-
       // If ignoring events, decrement counter
       if (ignore_mouse) {
           ignore_mouse--;
           return;
       }
+
+      // Get the element rect to account for any scaling or positioning
+      const rect = element.getBoundingClientRect();
+      
+      // Calculate the position within the element
+      const elementX = e.clientX - rect.left;
+      const elementY = e.clientY - rect.top;
 
       guac_mouse.currentState.fromClientPosition(element, e.clientX, e.clientY);
 
