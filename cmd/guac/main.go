@@ -4,7 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"net/http"
 	"net/url"
@@ -13,7 +12,7 @@ import (
 	"strconv"
 	"time"
 
-	guac guac "github.com/browsersec/KubeBrowse"
+	guac "github.com/browsersec/KubeBrowse"
 	"github.com/browsersec/KubeBrowse/k8s"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -352,7 +351,7 @@ func displayHelp() {
 	fmt.Println("  help            Display this help message")
 }
 
-func guacdTest(address string) error {
+func GuacdTest(address string) error {
 	conn, err := net.Dial("tcp", address)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "❌ Failed to connect to guacd at %s: %v\n", address, err)
