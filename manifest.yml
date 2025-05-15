@@ -497,6 +497,8 @@ spec:
           env:
             - name: GUAC_CLIENT_URL
               value: "https://browser-sandbox-api.browser-sandbox.svc.cluster.local:4567"
+            - name: CADDY_GUAC_CLIENT_URL
+              value: "CADDY_GUAC_CLIENT_URL=${CADDY_GUAC_CLIENT_URL:-https://browser-sandbox-api.browser-sandbox.svc.cluster.local:4567}"
 ---
 # Frontend Service
 apiVersion: v1
