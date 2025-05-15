@@ -36,7 +36,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        GUAC_CLIENT_URL: https://localhost:4567 # Assumes backend is accessible via localhost from host for browser
+        GUAC_CLIENT_URL: https://backend:4567 # Assumes backend is accessible via localhost from host for browser
                                                # Or if running fully containerized, https://backend:4567
                                                # The backend Dockerfile creates self-signed certs.
                                                # The browser will show a warning for self-signed certs.
