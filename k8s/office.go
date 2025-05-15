@@ -22,7 +22,7 @@ func CreateOfficeSandboxPod(clientset *kubernetes.Clientset, namespace, userID s
 		ObjectMeta: metav1.ObjectMeta{
 			Name: fmt.Sprintf("browser-sandbox-%s-%s", userID, time.Now().Format("20060102150405")),
 			Labels: map[string]string{
-				"app":  "browser-sandbox",
+				"app":  "browser-sandbox-test",
 				"user": userID,
 			},
 		},
