@@ -254,6 +254,7 @@ spec:
       containers:
         - name: api
           image:  ghcr.io/browsersec/kubebrowse:chore-improve-back
+          imagePullPolicy: Always
           ports:
             - containerPort: 4567
           resources:
@@ -407,7 +408,8 @@ spec:
             host: browser-sandbox-frontend
             port:
               number: 8000
----
+
+# ---
 # Cron Job to cleanup idle sessions
 # apiVersion: batch/v1
 # kind: CronJob
@@ -476,15 +478,16 @@ spec:
   replicas: 2
   selector:
     matchLabels:
-      app: browser-sandbox-frontend
+      app: "browser-sandbox-frontend"
   template:
     metadata:
       labels:
-        app: browser-sandbox-frontend
+        app: "browser-sandbox-frontend"
     spec:
       containers:
         - name: frontend
           image: ghcr.io/browsersec/kubebrowse-frontend:chore-improve-back
+          imagePullPolicy: Always
           ports:
             - containerPort: 80
           resources:
@@ -498,7 +501,7 @@ spec:
             - name: GUAC_CLIENT_URL
               value: "https://browser-sandbox-api.browser-sandbox.svc.cluster.local:4567"
             - name: CADDY_GUAC_CLIENT_URL
-              value: "CADDY_GUAC_CLIENT_URL=${CADDY_GUAC_CLIENT_URL:-https://browser-sandbox-api.browser-sandbox.svc.cluster.local:4567}"
+              value: "https://browser-sandbox-api.browser-sandbox.svc.cluster.local:4567"
 ---
 # Frontend Service
 apiVersion: v1
@@ -511,7 +514,7 @@ spec:
     - port: 8000
       targetPort: 80
   selector:
-    app: browser-sandbox-frontend
+    app: "browser-sandbox-frontend"
 ---
 # Headless Service for individual sandbox pod discovery (browser and office)
 apiVersion: v1

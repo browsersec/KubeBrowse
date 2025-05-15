@@ -18,9 +18,10 @@ import (
 
 // CreateSandboxPod creates a new pod with the rdp container
 func CreateBrowserSandboxPod(clientset *kubernetes.Clientset, namespace, userID string) (*corev1.Pod, error) {
+	podName := fmt.Sprintf("browser-sandbox-%s-%s", userID, time.Now().Format("20060102150405"))
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: fmt.Sprintf("browser-sandbox-%s-%s", userID, time.Now().Format("20060102150405")),
+			Name: podName,
 			Labels: map[string]string{
 				"app":  "browser-sandbox-test",
 				"user": userID,
@@ -28,6 +29,8 @@ func CreateBrowserSandboxPod(clientset *kubernetes.Clientset, namespace, userID 
 		},
 
 		Spec: corev1.PodSpec{
+			Hostname:  podName,
+			Subdomain: "sandbox-instances",
 			Volumes: []corev1.Volume{
 				{
 					Name: "log-volume",
