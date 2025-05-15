@@ -14,6 +14,7 @@ import (
 
 	guac "github.com/browsersec/KubeBrowse"
 	"github.com/browsersec/KubeBrowse/k8s"
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
@@ -130,6 +131,7 @@ func main() {
 	// Initialize Gin
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
+	router.Use(cors.Default())
 	router.Use(gin.Recovery())
 	router.Use(gin.Logger())
 
@@ -199,6 +201,83 @@ func main() {
 	// Add test routes for pod creation
 	testRoutes := router.Group("/test")
 	{
+		// New route for deploying and connecting to office pod with RDP credentials
+		testRoutes.POST("/deploy-office", func(c *gin.Context) {
+			if k8sClient == nil {
+				c.JSON(http.StatusServiceUnavailable, gin.H{
+					"error": "Kubernetes client not initialized",
+				})
+				return
+			}
+
+			// Generate a unique pod name
+			podName := "office-" + uuid.New().String()[0:8]
+
+			// Create an office sandbox pod
+			pod, err := k8s.CreateOfficeSandboxPod(k8sClient, k8sNamespace, podName)
+			if err != nil {
+				logrus.Errorf("Failed to create office pod: %v", err)
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"error": fmt.Sprintf("Failed to create office pod: %v", err),
+				})
+				return
+			}
+
+			// Construct the FQDN
+			fqdn := fmt.Sprintf("%s.sandbox-instances.browser-sandbox.svc.cluster.local", pod.Name)
+
+			// Generate a unique connection ID
+			connectionID := uuid.New().String()
+
+			// Store connection parameters in memory (in a real implementation, use a secure storage)
+			params := url.Values{}
+			params.Set("scheme", "rdp")
+			params.Set("hostname", fqdn)
+			params.Set("username", "rdpuser")
+			params.Set("password", "money4band")
+			params.Set("width", "1920")
+			params.Set("height", "1080")
+			params.Set("ignore-cert", "true")
+			params.Set("uuid", connectionID)
+
+			// Store the parameters in the activeTunnels store
+			activeTunnels.StoreConnectionParams(connectionID, params)
+
+			// Return only the connection ID to the client
+			c.JSON(http.StatusCreated, gin.H{
+				"podName":       pod.Name,
+				"fqdn":          fqdn,
+				"connection_id": connectionID,
+				"status":        "creating",
+				"message":       "Office pod deployed and connection parameters generated",
+			})
+		})
+
+		// New endpoint to handle websocket connections using stored parameters
+		testRoutes.GET("/connect/:connectionID", func(c *gin.Context) {
+			connectionID := c.Param("connectionID")
+			if connectionID == "" {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Connection ID is required"})
+				return
+			}
+
+			// Get stored parameters
+			_, exists := activeTunnels.GetConnectionParams(connectionID)
+			if !exists {
+				c.JSON(http.StatusNotFound, gin.H{"error": "Connection parameters not found"})
+				return
+			}
+
+			// Construct the websocket URL with only the connection ID
+			wsURL := fmt.Sprintf("/websocket-tunnel?uuid=%s", connectionID)
+
+			c.JSON(http.StatusOK, gin.H{
+				"websocket_url": wsURL,
+				"status":        "ready",
+				"message":       "Connection parameters retrieved successfully",
+			})
+		})
+
 		// Test route to create a browser sandbox pod
 		testRoutes.POST("/browser-pod", func(c *gin.Context) {
 			if k8sClient == nil {
@@ -338,6 +417,14 @@ func DemoDoConnect(request *http.Request, tunnelStore *guac.ActiveTunnelStore) (
 		logrus.Debugln("body:", queryString, query)
 	} else {
 		query = request.URL.Query()
+	}
+
+	// Check if we have stored parameters for this connection
+	if uuid := query.Get("uuid"); uuid != "" {
+		if storedParams, exists := tunnelStore.GetConnectionParams(uuid); exists {
+			// Use stored parameters instead of query parameters
+			query = storedParams
+		}
 	}
 
 	config.Protocol = query.Get("scheme")

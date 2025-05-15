@@ -2,6 +2,7 @@ package guac
 
 import (
 	"net/http"
+	"net/url"
 	"sync"
 )
 
@@ -10,12 +11,15 @@ type ActiveTunnelStore struct {
 	sync.RWMutex
 	// activeTunnels maps ConnectionID to the active Tunnel.
 	activeTunnels map[string]Tunnel
+	// connectionParams stores connection parameters for each tunnel
+	connectionParams map[string]url.Values
 }
 
 // NewActiveTunnelStore creates a new store for active tunnels.
 func NewActiveTunnelStore() *ActiveTunnelStore {
 	return &ActiveTunnelStore{
-		activeTunnels: make(map[string]Tunnel),
+		activeTunnels:    make(map[string]Tunnel),
+		connectionParams: make(map[string]url.Values),
 	}
 }
 
@@ -45,6 +49,7 @@ func (s *ActiveTunnelStore) Delete(id string, req *http.Request, closedTunnel Tu
 	// We could optionally verify if closedTunnel matches s.activeTunnels[id] before deleting
 	// For now, just delete by id.
 	delete(s.activeTunnels, id)
+	delete(s.connectionParams, id)
 }
 
 // GetAllIDs returns a slice of all active ConnectionIDs.
@@ -63,4 +68,19 @@ func (s *ActiveTunnelStore) Count() int {
 	s.RLock()
 	defer s.RUnlock()
 	return len(s.activeTunnels)
+}
+
+// StoreConnectionParams stores connection parameters for a tunnel
+func (s *ActiveTunnelStore) StoreConnectionParams(id string, params url.Values) {
+	s.Lock()
+	defer s.Unlock()
+	s.connectionParams[id] = params
+}
+
+// GetConnectionParams retrieves connection parameters for a tunnel
+func (s *ActiveTunnelStore) GetConnectionParams(id string) (url.Values, bool) {
+	s.RLock()
+	defer s.RUnlock()
+	params, found := s.connectionParams[id]
+	return params, found
 }

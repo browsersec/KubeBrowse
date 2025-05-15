@@ -55,6 +55,18 @@ export default function Sidebar({ connections = [] }) {
             </svg>
             {expanded && <span className="ml-3">New Connection</span>}
           </NavLink>
+
+          <NavLink 
+            to="/office-session"
+            className={({ isActive }) => 
+              `flex items-center py-3 px-4 rounded-lg transition-colors mt-2 ${isActive ? 'bg-blue-700' : 'hover:bg-gray-800'}`
+            }
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-3-3v6m9-6a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            {expanded && <span className="ml-3">New Office Session</span>}
+          </NavLink>
         </div>
 
         {connections.length > 0 && (

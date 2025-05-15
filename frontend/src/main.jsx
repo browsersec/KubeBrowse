@@ -16,6 +16,7 @@ import EditConnectionRoute from './routes/EditConnectionRoute'
 import ConnectionRoute from './routes/ConnectionRoute'
 import SettingsRoute from './routes/SettingsRoute'
 import NotFoundRoute from './routes/NotFoundRoute'
+import OfficeSessionRoute from './routes/OfficeSessionRoute'
 
 const router = createBrowserRouter([
   {
@@ -41,6 +42,10 @@ const router = createBrowserRouter([
       {
         path: 'settings',
         element: <SettingsRoute />
+      },
+      {
+        path: 'office-session',
+        element: <OfficeSessionRoute />
       }
     ]
   },
