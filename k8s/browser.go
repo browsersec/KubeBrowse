@@ -77,8 +77,9 @@ func CreateBrowserSandboxPod(clientset *kubernetes.Clientset, namespace, userID 
 						},
 					},
 					SecurityContext: &corev1.SecurityContext{
-						RunAsNonRoot: ptr.To(true),
-						RunAsUser:    ptr.To(int64(1000)),
+						// RunAsNonRoot: ptr.To(true),
+						// RunAsUser:    ptr.To(int64(1000)),
+						RunAsUser: ptr.To(int64(0)), // root
 						Capabilities: &corev1.Capabilities{
 							Drop: []corev1.Capability{"ALL"},
 						},
