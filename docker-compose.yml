@@ -1,87 +1,86 @@
 version: '3.8'
 
 services:
-  # API service
-  # api:
-  #   build:
-  #     context: .
-  #     dockerfile: Dockerfile
-  #   ports:
-  #     - "8080:8080"
-  #   environment:
-  #     - POSTGRES_HOST=postgres
-  #     - POSTGRES_PORT=5432
-  #     - POSTGRES_USER=postgres
-  #     - POSTGRES_PASSWORD=postgres
-  #     - POSTGRES_DB=sandbox_db
-  #     - REDIS_HOST=redis
-  #     - REDIS_PORT=6379
-  #     - GUACD_HOST=guacd
-  #     - GUACD_PORT=4822
-  #     - MINIO_ENDPOINT=minio:9000
-  #     - MINIO_ACCESS_KEY=minioadmin
-  #     - MINIO_SECRET_KEY=minioadmin
-  #     - SESSION_TIMEOUT=10m
-  #     - K8S_IN_CLUSTER=false # For local development
-  #   volumes:
-  #     - .:/app
-  #     - ~/.kube:/root/.kube # For local Kubernetes access
-  #   depends_on:
-  #     - postgres
-  #     - redis
-  #     - guacd
-  #     - minio
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "4567:4567"
+    environment:
+      - GUACD_ADDRESS=guacd:4822
+      - CERT_PATH=/app/certs/certificate.crt
+      - CERT_KEY_PATH=/app/certs/private.key
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=postgresuser
+      - POSTGRES_PASSWORD=postgrespassword
+      - POSTGRES_DB=sandbox_db
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - MINIO_ENDPOINT=http://minio:9000 # Minio SDKs usually default to http unless specified
+      - MINIO_ACCESS_KEY=minioaccesskey
+      - MINIO_SECRET_KEY=miniosecretkey
+      # If your app specifically needs these for MinIO, use MINIO_ROOT_USER/PASSWORD
+      # - MINIO_ROOT_USER=minioaccesskey
+      # - MINIO_ROOT_PASSWORD=miniosecretkey
+    depends_on:
+      - guacd
+      - postgres
+      - redis
+      - minio
+    restart: unless-stopped
 
-  # PostgreSQL database
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        GUAC_CLIENT_URL: https://localhost:4567 # Assumes backend is accessible via localhost from host for browser
+                                               # Or if running fully containerized, https://backend:4567
+                                               # The backend Dockerfile creates self-signed certs.
+                                               # The browser will show a warning for self-signed certs.
+    ports:
+      - "8000:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  guacd:
+    image: guacamole/guacd:latest
+    restart: unless-stopped
+
   postgres:
-    image: postgres:14
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgresuser
+      POSTGRES_PASSWORD: postgrespassword
+      POSTGRES_DB: sandbox_db
     ports:
       - "5432:5432"
-    environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=sandbox_db
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
 
-  # Redis for caching and session management
   redis:
     image: redis:alpine
     ports:
       - "6379:6379"
+    restart: unless-stopped
 
-  # Guacamole server (guacd)
-  guacd:
-    image: guacamole/guacd:latest
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioaccesskey       # Changed from MINIO_ACCESS_KEY
+      MINIO_ROOT_PASSWORD: miniosecretkey   # Changed from MINIO_SECRET_KEY
     ports:
-      - "4822:4822"
-
-  # MinIO for S3-compatible object storage
-  # minio:
-  #   image: minio/minio:latest
-  #   ports:
-  #     - "9000:9000"
-  #     - "9001:9001"  # Web UI
-  #   environment:
-  #     - MINIO_ROOT_USER=minioadmin
-  #     - MINIO_ROOT_PASSWORD=minioadmin
-  #   command: server /data --console-address ":9001"
-  #   volumes:
-  #     - minio-data:/data
-
-  # # MinIO setup service - creates required buckets
-  # minio-setup:
-  #   image: minio/mc:latest
-  #   depends_on:
-  #     - minio
-  #   entrypoint: >
-  #     /bin/sh -c "
-  #     /usr/bin/mc alias set myminio http://minio:9000 minioadmin minioadmin;
-  #     /usr/bin/mc mb myminio/sandbox-files --ignore-existing;
-  #     /usr/bin/mc mb myminio/sandbox-uploads --ignore-existing; # Create additional bucket for uploads
-  #     exit 0;
-  #     "
+      - "9000:9000" # API
+      - "9001:9001" # Console
+    volumes:
+      - minio_data:/data
+    restart: unless-stopped
 
 volumes:
-  postgres-data:
-  # minio-data:
+  postgres_data: {}
+  minio_data: {}
