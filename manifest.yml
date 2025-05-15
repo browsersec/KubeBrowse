@@ -253,7 +253,7 @@ spec:
       serviceAccountName: browser-sandbox-sa
       containers:
         - name: api
-          image:  ghcr.io/browsersec/kubebrowse:sha-a5a9990
+          image:  ghcr.io/browsersec/kubebrowse:chore-improve-back
           ports:
             - containerPort: 4567
           resources:
@@ -484,7 +484,7 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: ghcr.io/browsersec/kubebrowse-frontend:latest
+          image: ghcr.io/browsersec/kubebrowse-frontend:chore-improve-back
           ports:
             - containerPort: 80
           resources:
@@ -496,7 +496,7 @@ spec:
               cpu: "200m"
           env:
             - name: GUAC_CLIENT_URL
-              value: "https://browser-sandbox-api.svc.cluster.local:4567"
+              value: "https://browser-sandbox-api.browser-sandbox.svc.cluster.local:4567"
 ---
 # Frontend Service
 apiVersion: v1
