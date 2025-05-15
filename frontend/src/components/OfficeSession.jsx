@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import GuacClient from './GuacClient';
 
-const API_BASE = process.env.VITE_GUAC_CLIENT_URL || 'https://127.0.0.1:4567';
+const API_BASE = process.env.VITE_GUAC_CLIENT_URL || 'https://browser-sandbox-api.browser-sandbox.svc.cluster.local:4567';
 
 const OfficeSession = () => {
   const [sessionState, setSessionState] = useState({
