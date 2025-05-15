@@ -253,7 +253,7 @@ spec:
       serviceAccountName: browser-sandbox-sa
       containers:
         - name: api
-          image:  ghcr.io/browsersec/kubebrowse:chore-improve-back
+          image:  ghcr.io/browsersec/kubebrowse:sha-5204798
           imagePullPolicy: Always
           ports:
             - containerPort: 4567
@@ -533,44 +533,3 @@ spec:
       port: 3389
       targetPort: rdp # Matches the named port "rdp" (3389) in the pod spec
 ---
-# Frontend Deployment
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: browser-sandbox-oznu
-  namespace: browser-sandbox
-spec:
-  # replicas: 2
-  selector:
-    matchLabels:
-      app: browser-sandbox-oznu
-  template:
-    metadata:
-      labels:
-        app: browser-sandbox-oznu
-    spec:
-      containers:
-        - name: oznu
-          image: oznu/guacamole:latest
-          ports:
-            - containerPort: 8080
-          resources:
-            requests:
-              memory: "128Mi"
-              cpu: "100m"
-            limits:
-              memory: "256Mi"
-              cpu: "200m"
----
-# service for oznu
-apiVersion: v1
-kind: Service
-metadata:
-  name: browser-sandbox-oznu
-  namespace: browser-sandbox
-spec:
-  ports:
-    - port: 8080
-      targetPort: 8080
-  selector:
-    app: browser-sandbox-oznu
