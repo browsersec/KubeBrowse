@@ -76,13 +76,13 @@ func CreateOfficeSandboxPod(clientset *kubernetes.Clientset, namespace, userID s
 							corev1.ResourceMemory: resource.MustParse("256Mi"),
 						},
 					},
-					SecurityContext: &corev1.SecurityContext{
-						// RunAsNonRoot: ptr.To(true),
-						// RunAsUser:    ptr.To(int64(1000)),
-						Capabilities: &corev1.Capabilities{
-							Drop: []corev1.Capability{"ALL"},
-						},
-					},
+					// SecurityContext: &corev1.SecurityContext{
+					// 	// RunAsNonRoot: ptr.To(true),
+					// 	// RunAsUser:    ptr.To(int64(1000)),
+					// 	Capabilities: &corev1.Capabilities{
+					// 		Drop: []corev1.Capability{"ALL"},
+					// 	},
+					// },
 					VolumeMounts: []corev1.VolumeMount{
 						{
 							Name:      "log-volume",
