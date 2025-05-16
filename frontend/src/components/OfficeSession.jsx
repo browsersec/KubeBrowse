@@ -46,6 +46,7 @@ const OfficeSession = () => {
         status: 'ready',
         error: null
       });
+      console.log(connectData)
     } catch (error) {
       setSessionState(prev => ({
         ...prev,
@@ -62,7 +63,7 @@ const OfficeSession = () => {
         method: 'DELETE'
       }).catch(console.error);
     }
-    
+    console.log("Disconnected")
     setSessionState({
       connectionId: null,
       websocketUrl: null,

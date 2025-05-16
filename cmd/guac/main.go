@@ -75,7 +75,7 @@ func main() {
 		return
 	}
 
-	logrus.SetLevel(logrus.DebugLevel)
+	logrus.SetLevel(logrus.TraceLevel)
 
 	// Get environment variables
 	if os.Getenv("CERT_PATH") != "" {

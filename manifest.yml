@@ -488,7 +488,7 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: ghcr.io/browsersec/kubebrowse-frontend:sha-b8a95b0c0d5cb499c9de068572c8d1bd0ccee6cd
+          image: ghcr.io/browsersec/kubebrowse-frontend:sha-cdffdc1babea12cbdb8c1b3dc55dd6bdcf701bc7
           imagePullPolicy: Always
           ports:
             - containerPort: 80

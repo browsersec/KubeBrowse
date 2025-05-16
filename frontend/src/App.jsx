@@ -86,6 +86,8 @@ function App() {
       }
     }
     
+    console.log(queryString.join("&"))
+    
     return queryString.join("&");
   };
 
