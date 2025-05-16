@@ -253,22 +253,6 @@ func main() {
 			// Generate a unique connection ID
 			connectionID := uuid.New().String()
 
-			// Store connection parameters in memory (in a real implementation, use a secure storage)
-			params := url.Values{}
-			params.Set("scheme", "rdp")
-			params.Set("hostname", fqdn)
-			params.Set("username", "rdpuser")
-			params.Set("password", "money4band")
-			params.Set("port", "3389")
-			params.Set("security", "")
-			params.Set("width", "1920")
-			params.Set("height", "1080")
-			params.Set("ignore-cert", "true")
-			params.Set("uuid", connectionID)
-
-			// Store the parameters in the activeTunnels store
-			activeTunnels.StoreConnectionParams(connectionID, params)
-
 			// Wait for pod readiness and RDP port
 			err = k8s.WaitForPodReadyAndRDP(k8sClient, k8sNamespace, pod.Name, fqdn, 60*time.Second)
 			if err != nil {
@@ -287,6 +271,22 @@ func main() {
 				podIP = ips[0].String()
 			}
 			logrus.Infof("Pod IP of connectionID: %s is %s", connectionID, podIP)
+
+			// Store connection parameters in memory (in a real implementation, use a secure storage)
+			params := url.Values{}
+			params.Set("scheme", "rdp")
+			params.Set("hostname", podIP)
+			params.Set("username", "rdpuser")
+			params.Set("password", "money4band")
+			params.Set("port", "3389")
+			params.Set("security", "")
+			params.Set("width", "1920")
+			params.Set("height", "1080")
+			params.Set("ignore-cert", "true")
+			params.Set("uuid", connectionID)
+
+			// Store the parameters in the activeTunnels store
+			activeTunnels.StoreConnectionParams(connectionID, params)
 			// Store session in Redis
 			session := SessionData{
 				PodName:      pod.Name,
