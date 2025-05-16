@@ -558,6 +558,7 @@ func DemoDoConnect(request *http.Request, tunnelStore *guac.ActiveTunnelStore) (
 	}
 
 	sanitisedCfg := config
+	config.ConnectionID = ""
 	sanitisedCfg.Parameters["password"] = "********"
 	logrus.Debugf("Starting handshake with config: %#v", sanitisedCfg)
 
