@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import GuacClient from './GuacClient';
 
-const API_BASE = process.env.VITE_GUAC_CLIENT_URL || `https://${location.host}`;
+const isSecure = window.location.protocol === 'https:';
+const API_BASE = process.env.VITE_GUAC_CLIENT_URL || `${isSecure ? 'https' : 'http'}://${location.host}`;
 
 const OfficeSession = () => {
   const [sessionState, setSessionState] = useState({
