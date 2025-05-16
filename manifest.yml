@@ -241,7 +241,7 @@ metadata:
   name: browser-sandbox-api
   namespace: browser-sandbox
 spec:
-  replicas: 3
+  replicas: 1
   selector:
     matchLabels:
       app: browser-sandbox-api
@@ -253,7 +253,7 @@ spec:
       serviceAccountName: browser-sandbox-sa
       containers:
         - name: api
-          image:  ghcr.io/browsersec/kubebrowse:sha-b36ef16
+          image:  ghcr.io/browsersec/kubebrowse:sha-23db457
           imagePullPolicy: Always
           ports:
             - containerPort: 4567
@@ -284,7 +284,7 @@ spec:
             - name: POSTGRES_DB
               value: "sandbox_db"
             - name: REDIS_HOST
-              value: "redis"
+              value: "redis.browser-sandbox.svc.cluster.local"
             - name: REDIS_PORT
               value: "6379"
             - name: MINIO_ENDPOINT

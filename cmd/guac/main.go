@@ -1,9 +1,10 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
-	"io"
 	"net"
 	"net/http"
 	"net/url"
@@ -16,6 +17,7 @@ import (
 	"github.com/browsersec/KubeBrowse/k8s"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"github.com/go-redis/redis/v8"
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/kubernetes"
@@ -32,6 +34,7 @@ var (
 )
 
 var activeTunnels *guac.ActiveTunnelStore
+var redisClient *redis.Client
 
 // GinHandlerAdapter adapts http.Handler to gin.HandlerFunc
 func GinHandlerAdapter(h http.Handler) gin.HandlerFunc {
@@ -40,7 +43,27 @@ func GinHandlerAdapter(h http.Handler) gin.HandlerFunc {
 	}
 }
 
+func initRedis() {
+	redisClient = redis.NewClient(&redis.Options{
+		Addr: "redis:6379",
+	})
+	// check if redis is connected
+	_, err := redisClient.Ping(context.Background()).Result()
+	if err != nil {
+		logrus.Printf("Failed to connect to Redis: %v", err)
+	}
+}
+
+// SessionData struct for Redis
+type SessionData struct {
+	PodName          string            `json:"podName"`
+	FQDN             string            `json:"fqdn"`
+	ConnectionID     string            `json:"connection_id"`
+	ConnectionParams map[string]string `json:"connection_params"`
+}
+
 func main() {
+	initRedis()
 	// Parse command line flags
 	helpFlag := flag.Bool("h", false, "Display help information")
 	flag.Parse()
@@ -251,6 +274,25 @@ func main() {
 				return
 			}
 
+			// Store session in Redis
+			session := SessionData{
+				PodName:      pod.Name,
+				FQDN:         fqdn,
+				ConnectionID: connectionID,
+				ConnectionParams: map[string]string{
+					"scheme":      "rdp",
+					"hostname":    fqdn,
+					"username":    "rdpuser",
+					"password":    "money4band",
+					"width":       "1920",
+					"height":      "1080",
+					"ignore-cert": "true",
+					"uuid":        connectionID,
+				},
+			}
+			data, _ := json.Marshal(session)
+			redisClient.Set(context.Background(), "session:"+connectionID, data, 0)
+
 			// Return only the connection ID to the client
 			c.JSON(http.StatusCreated, gin.H{
 				"podName":       pod.Name,
@@ -362,27 +404,24 @@ func main() {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Connection ID is required"})
 			return
 		}
-
-		tunnel, found := activeTunnels.Get(connectionID)
-		if !found {
+		val, err := redisClient.Get(context.Background(), "session:"+connectionID).Result()
+		if err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Session not found"})
 			return
 		}
-
-		logrus.Infof("Attempting to stop session: %s", connectionID)
-		err := tunnel.Close() // This should trigger OnDisconnect which will call activeTunnels.Delete
+		var session SessionData
+		err = json.Unmarshal([]byte(val), &session)
 		if err != nil {
-			// Log error, but the tunnel might be already closing or closed.
-			// The client might still perceive this as success if the connection drops.
-			logrus.Errorf("Error closing tunnel for session %s: %v", connectionID, err)
-			// We don't delete from activeTunnels here, let OnDisconnect handle it
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error trying to close session, it might already be closed or unresponsive."})
+			logrus.Errorf("Failed to unmarshal session data: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unmarshal session data"})
 			return
 		}
-
-		// OnDisconnect will handle removal from activeTunnels.
-		// If tunnel.Close() was successful, the connection will be terminated.
-		c.JSON(http.StatusOK, gin.H{"message": fmt.Sprintf("Session %s stop initiated.", connectionID)})
+		err = k8s.DeletePod(k8sClient, session.PodName)
+		if err != nil {
+			logrus.Errorf("Failed to delete pod: %v", err)
+		}
+		redisClient.Del(context.Background(), "session:"+connectionID)
+		c.JSON(http.StatusOK, gin.H{"message": fmt.Sprintf("Session %s stopped and pod deleted.", connectionID)})
 	})
 
 	// Start server with appropriate TLS configuration
@@ -406,23 +445,24 @@ func main() {
 // Now accepts ActiveTunnelStore to register the tunnel
 func DemoDoConnect(request *http.Request, tunnelStore *guac.ActiveTunnelStore) (guac.Tunnel, error) {
 	config := guac.NewGuacamoleConfiguration()
-
 	var query url.Values
-	if request.URL.RawQuery == "connect" {
-		// http tunnel uses the body to pass parameters
-		data, err := io.ReadAll(request.Body)
+	uuid := request.URL.Query().Get("uuid")
+	if uuid != "" {
+		val, err := redisClient.Get(context.Background(), "session:"+uuid).Result()
 		if err != nil {
-			logrus.Error("Failed to read body ", err)
-			return nil, err
+			logrus.Error("Session not found in Redis")
+			return nil, fmt.Errorf("session not found")
 		}
-		_ = request.Body.Close()
-		queryString := string(data)
-		query, err = url.ParseQuery(queryString)
+		var session SessionData
+		err = json.Unmarshal([]byte(val), &session)
 		if err != nil {
-			logrus.Error("Failed to parse body query ", err)
-			return nil, err
+			logrus.Errorf("Failed to unmarshal session data: %v", err)
+			return nil, fmt.Errorf("failed to unmarshal session data")
 		}
-		logrus.Debugln("body:", queryString, query)
+		query = url.Values{}
+		for k, v := range session.ConnectionParams {
+			query.Set(k, v)
+		}
 	} else {
 		query = request.URL.Query()
 	}
