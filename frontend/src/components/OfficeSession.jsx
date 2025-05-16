@@ -17,7 +17,7 @@ const OfficeSession = () => {
   const createSession = async () => {
     try {
       setSessionState(prev => ({ ...prev, status: 'creating', error: null }));
-      
+
       // Create a new office pod session
       const response = await fetch(`${API_BASE}/test/deploy-office`, {
         method: 'POST',
@@ -31,7 +31,7 @@ const OfficeSession = () => {
       }
 
       const data = await response.json();
-      
+
       // Get the websocket URL for the connection
       const connectResponse = await fetch(`${API_BASE}/test/connect/${data.connection_id}`);
       if (!connectResponse.ok) {
@@ -39,7 +39,7 @@ const OfficeSession = () => {
       }
 
       const connectData = await connectResponse.json();
-      
+
       setSessionState({
         connectionId: data.connection_id,
         websocketUrl: connectData.websocket_url,
@@ -108,7 +108,10 @@ const OfficeSession = () => {
           </div>
           <div className="w-full h-[600px] border border-gray-300 rounded">
             <GuacClient
-              query={{ uuid: sessionState.connectionId }}
+              query={{
+                uuid: sessionState.connectionId, width: Math.round(window.innerWidth * (window.devicePixelRatio || 1)),
+                height: Math.round(window.innerHeight * (window.devicePixelRatio || 1))
+              }}
               onDisconnect={handleDisconnect}
             />
           </div>

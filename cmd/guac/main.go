@@ -465,18 +465,26 @@ func DemoDoConnect(request *http.Request, tunnelStore *guac.ActiveTunnelStore) (
 	config := guac.NewGuacamoleConfiguration()
 	var query url.Values
 	uuid := request.URL.Query().Get("uuid")
+	width := request.URL.Query().Get("width")
+	height := request.URL.Query().Get("height")
 	if uuid != "" {
 		val, err := redisClient.Get(context.Background(), "session:"+uuid).Result()
 		if err != nil {
-			logrus.Error("Session not found in Redis")
+			logrus.Errorf("Failed to get session from Redis for UUID %s: %v", uuid, err)
 			return nil, fmt.Errorf("session not found")
 		}
 		var session SessionData
 		err = json.Unmarshal([]byte(val), &session)
-		logrus.Debugf("Session data: %+v", session)
+		logrus.Debugf("Retrieved session data for UUID %s: %+v", uuid, session)
 		if err != nil {
-			logrus.Errorf("Failed to unmarshal session data: %v", err)
+			logrus.Errorf("Failed to unmarshal session data for UUID %s: %v", uuid, err)
 			return nil, fmt.Errorf("failed to unmarshal session data")
+		}
+		if width != "" {
+			session.ConnectionParams["width"] = width
+		}
+		if height != "" {
+			session.ConnectionParams["height"] = height
 		}
 		query = url.Values{}
 		for k, v := range session.ConnectionParams {
@@ -489,8 +497,11 @@ func DemoDoConnect(request *http.Request, tunnelStore *guac.ActiveTunnelStore) (
 	// Check if we have stored parameters for this connection
 	if uuid := query.Get("uuid"); uuid != "" {
 		if storedParams, exists := tunnelStore.GetConnectionParams(uuid); exists {
+			logrus.Debugf("Using stored parameters for UUID %s", uuid)
 			// Use stored parameters instead of query parameters
 			query = storedParams
+		} else {
+			logrus.Debugf("No stored parameters found for UUID %s", uuid)
 		}
 	}
 
@@ -504,23 +515,23 @@ func DemoDoConnect(request *http.Request, tunnelStore *guac.ActiveTunnelStore) (
 	if query.Get("width") != "" {
 		config.OptimalScreenHeight, err = strconv.Atoi(query.Get("width"))
 		if err != nil || config.OptimalScreenHeight == 0 {
-			logrus.Error("Invalid height")
+			logrus.Errorf("Invalid height value '%s': %v", query.Get("width"), err)
 			config.OptimalScreenHeight = 600
 		}
 	}
 	if query.Get("height") != "" {
 		config.OptimalScreenWidth, err = strconv.Atoi(query.Get("height"))
 		if err != nil || config.OptimalScreenWidth == 0 {
-			logrus.Error("Invalid width")
+			logrus.Errorf("Invalid width value '%s': %v", query.Get("height"), err)
 			config.OptimalScreenWidth = 800
 		}
 	}
 	config.AudioMimetypes = []string{"audio/L16", "rate=44100", "channels=2"}
 
-	logrus.Debug("Connecting to guacd")
+	logrus.Debugf("Attempting to connect to guacd at %s", guacdAddr)
 	addr, err := net.ResolveTCPAddr("tcp", guacdAddr)
 	if err != nil {
-		logrus.Errorln("error resolving guacd address", err)
+		logrus.Errorf("Failed to resolve guacd address %s: %v", guacdAddr, err)
 		return nil, err
 	}
 
@@ -530,25 +541,26 @@ func DemoDoConnect(request *http.Request, tunnelStore *guac.ActiveTunnelStore) (
 	}
 	conn, err := dialer.Dial("tcp", addr.String())
 	if err != nil {
-		logrus.Errorln("error while connecting to guacd", err)
+		logrus.Errorf("Failed to connect to guacd at %s: %v", addr.String(), err)
 		return nil, err
 	}
 
 	stream := guac.NewStream(conn, guac.SocketTimeout)
 
-	logrus.Debug("Connected to guacd")
+	logrus.Debug("Successfully connected to guacd")
 	if request.URL.Query().Get("uuid") != "" {
 		config.ConnectionID = request.URL.Query().Get("uuid")
 	}
 
 	sanitisedCfg := config
 	sanitisedCfg.Parameters["password"] = "********"
-	logrus.Debugf("Starting handshake with %#v", sanitisedCfg)
+	logrus.Debugf("Starting handshake with config: %#v", sanitisedCfg)
 	err = stream.Handshake(config)
 	if err != nil {
+		logrus.Errorf("Handshake failed: %v", err)
 		return nil, err
 	}
-	logrus.Debug("Socket configured")
+	logrus.Debug("Handshake completed successfully")
 
 	tunnel := guac.NewSimpleTunnel(stream)
 
@@ -558,9 +570,11 @@ func DemoDoConnect(request *http.Request, tunnelStore *guac.ActiveTunnelStore) (
 		// If it's crucial, it needs to be passed down or handled differently.
 		// For now, passing nil as it's not used by the current Add implementation.
 		tunnelStore.Add(tunnel.ConnectionID(), tunnel, nil)
-		logrus.Debugf("Tunnel %s added to active store", tunnel.ConnectionID())
+		logrus.Debugf("Tunnel %s successfully added to active store", tunnel.ConnectionID())
 	} else if tunnel != nil {
 		logrus.Warnf("Tunnel created but ConnectionID is empty. Not adding to store. UUID: %s", tunnel.GetUUID())
+	} else {
+		logrus.Error("Failed to create tunnel - tunnel is nil")
 	}
 
 	return tunnel, nil
