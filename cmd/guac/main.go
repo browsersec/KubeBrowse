@@ -275,6 +275,15 @@ func main() {
 				return
 			}
 			podIP := pod.Status.PodIP
+			if podIP == "" {
+				logrus.Errorf("Pod IP is empty for connectionID: %s", connectionID)
+				podIP = fqdn
+			}
+			// nsLookup fqdn
+			ips, err := net.LookupIP(fqdn)
+			if err == nil && len(ips) > 0 {
+				podIP = ips[0].String()
+			}
 			logrus.Infof("Pod IP of connectionID: %s is %s", connectionID, podIP)
 			// Store session in Redis
 			session := SessionData{
@@ -299,7 +308,7 @@ func main() {
 			// Return only the connection ID to the client
 			c.JSON(http.StatusCreated, gin.H{
 				"podName":       pod.Name,
-				"fqdn":          fqdn,
+				"fqdn":          podIP,
 				"connection_id": connectionID,
 				"status":        "creating",
 				"message":       "Office pod deployed and connection parameters generated",
