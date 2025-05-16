@@ -467,6 +467,7 @@ func DemoDoConnect(request *http.Request, tunnelStore *guac.ActiveTunnelStore) (
 	uuid := request.URL.Query().Get("uuid")
 	width := request.URL.Query().Get("width")
 	height := request.URL.Query().Get("height")
+
 	if uuid != "" {
 		val, err := redisClient.Get(context.Background(), "session:"+uuid).Result()
 		if err != nil {
@@ -482,9 +483,11 @@ func DemoDoConnect(request *http.Request, tunnelStore *guac.ActiveTunnelStore) (
 		}
 		if width != "" {
 			session.ConnectionParams["width"] = width
+			config.Parameters["width"] = width
 		}
 		if height != "" {
 			session.ConnectionParams["height"] = height
+			config.Parameters["height"] = height
 		}
 		query = url.Values{}
 		for k, v := range session.ConnectionParams {
@@ -537,8 +540,9 @@ func DemoDoConnect(request *http.Request, tunnelStore *guac.ActiveTunnelStore) (
 
 	// Set connection timeout
 	dialer := net.Dialer{
-		Timeout: 30 * time.Second,
+		Timeout: 60 * time.Second,
 	}
+	logrus.Debugf("Attempting to establish TCP connection to guacd at %s with timeout %v", addr.String(), dialer.Timeout)
 	conn, err := dialer.Dial("tcp", addr.String())
 	if err != nil {
 		logrus.Errorf("Failed to connect to guacd at %s: %v", addr.String(), err)
@@ -546,6 +550,7 @@ func DemoDoConnect(request *http.Request, tunnelStore *guac.ActiveTunnelStore) (
 	}
 
 	stream := guac.NewStream(conn, guac.SocketTimeout)
+	logrus.Debugf("TCP connection established, created new stream with timeout %v", guac.SocketTimeout)
 
 	logrus.Debug("Successfully connected to guacd")
 	if request.URL.Query().Get("uuid") != "" {
@@ -555,11 +560,40 @@ func DemoDoConnect(request *http.Request, tunnelStore *guac.ActiveTunnelStore) (
 	sanitisedCfg := config
 	sanitisedCfg.Parameters["password"] = "********"
 	logrus.Debugf("Starting handshake with config: %#v", sanitisedCfg)
-	err = stream.Handshake(config)
-	if err != nil {
-		logrus.Errorf("Handshake failed: %v", err)
-		return nil, err
+
+	// err = stream.Handshake(config)
+	// if err != nil {
+	//     logrus.Errorf("Handshake failed: %v", err)
+	//     return nil, err
+	// }
+
+	// Add context with timeout for handshake
+	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+	defer cancel()
+
+	// Create a channel to handle the handshake
+	handshakeDone := make(chan error, 1)
+	go func() {
+		handshakeDone <- stream.Handshake(config)
+	}()
+
+	// Wait for handshake with timeout
+	select {
+	case err := <-handshakeDone:
+		if err != nil {
+			logrus.Errorf("Handshake failed: %v. Connection details - Local: %s, Remote: %s",
+				err,
+				conn.LocalAddr().String(),
+				conn.RemoteAddr().String())
+			return nil, err
+		}
+	case <-ctx.Done():
+		logrus.Errorf("Handshake timed out after 45 seconds. Connection details - Local: %s, Remote: %s",
+			conn.LocalAddr().String(),
+			conn.RemoteAddr().String())
+		return nil, fmt.Errorf("handshake timed out: %v", ctx.Err())
 	}
+
 	logrus.Debug("Handshake completed successfully")
 
 	tunnel := guac.NewSimpleTunnel(stream)
