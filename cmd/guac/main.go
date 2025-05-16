@@ -259,6 +259,8 @@ func main() {
 			params.Set("hostname", fqdn)
 			params.Set("username", "rdpuser")
 			params.Set("password", "money4band")
+			params.Set("port", "3389")
+			params.Set("security", "")
 			params.Set("width", "1920")
 			params.Set("height", "1080")
 			params.Set("ignore-cert", "true")
@@ -292,13 +294,15 @@ func main() {
 				FQDN:         fqdn,
 				ConnectionID: connectionID,
 				ConnectionParams: map[string]string{
-					"scheme":      "rdp",
 					"hostname":    podIP,
-					"username":    "rdpuser",
-					"password":    "money4band",
-					"width":       "1920",
-					"height":      "1080",
 					"ignore-cert": "true",
+					"password":    "money4band",
+					"port":        "3389",
+					"scheme":      "rdp",
+					"security":    "",
+					"username":    "rdpuser",
+					"height":      "1080",
+					"width":       "1920",
 					"uuid":        connectionID,
 				},
 			}
