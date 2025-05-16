@@ -469,6 +469,7 @@ func DemoDoConnect(request *http.Request, tunnelStore *guac.ActiveTunnelStore) (
 		}
 		var session SessionData
 		err = json.Unmarshal([]byte(val), &session)
+		logrus.Debugf("Session data: %+v", session)
 		if err != nil {
 			logrus.Errorf("Failed to unmarshal session data: %v", err)
 			return nil, fmt.Errorf("failed to unmarshal session data")
