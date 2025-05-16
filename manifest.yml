@@ -310,6 +310,7 @@ metadata:
   name: browser-sandbox-api
   namespace: browser-sandbox
 spec:
+  type: LoadBalancer
   ports:
     - port: 4567
       targetPort: 4567
@@ -487,7 +488,7 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: ghcr.io/browsersec/kubebrowse-frontend:sha-abc9d0726f94b1a6df9cf2f3986f49435e1c194b
+          image: ghcr.io/browsersec/kubebrowse-frontend:sha-71e32fef5f41bb29fdbc93e0371a6644810ded01
           imagePullPolicy: Always
           ports:
             - containerPort: 80

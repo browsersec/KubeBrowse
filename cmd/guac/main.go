@@ -459,7 +459,7 @@ func DemoDoConnect(request *http.Request, tunnelStore *guac.ActiveTunnelStore) (
 
 	// Set connection timeout
 	dialer := net.Dialer{
-		Timeout: 10 * time.Second,
+		Timeout: 30 * time.Second,
 	}
 	conn, err := dialer.Dial("tcp", addr.String())
 	if err != nil {
