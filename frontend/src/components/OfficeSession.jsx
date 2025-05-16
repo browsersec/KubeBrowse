@@ -19,7 +19,7 @@ const OfficeSession = () => {
       setSessionState(prev => ({ ...prev, status: 'creating', error: null }));
 
       // Create a new office pod session
-      const response = await fetch(`${API_BASE}/test/deploy-office`, {
+      const response = await fetch(`${API_BASE}/test/deploy-office?width=${window.innerWidth * (window.devicePixelRatio || 1)}&height=${window.innerHeight * (window.devicePixelRatio || 1)}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -109,7 +109,8 @@ const OfficeSession = () => {
           <div className="w-full h-[600px] border border-gray-300 rounded">
             <GuacClient
               query={{
-                uuid: sessionState.connectionId, width: Math.round(window.innerWidth * (window.devicePixelRatio || 1)),
+                uuid: sessionState.connectionId,
+                width: Math.round(window.innerWidth * (window.devicePixelRatio || 1)),
                 height: Math.round(window.innerHeight * (window.devicePixelRatio || 1))
               }}
               onDisconnect={handleDisconnect}

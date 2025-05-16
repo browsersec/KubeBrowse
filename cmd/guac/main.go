@@ -233,6 +233,8 @@ func main() {
 				})
 				return
 			}
+			height := c.Query("height")
+			width := c.Query("width")
 
 			// Generate a unique pod name
 			podName := "office-" + uuid.New().String()[0:8]
@@ -275,13 +277,13 @@ func main() {
 			// Store connection parameters in memory (in a real implementation, use a secure storage)
 			params := url.Values{}
 			params.Set("scheme", "rdp")
-			params.Set("hostname", podIP)
+			params.Set("hostname", fqdn)
 			params.Set("username", "rdpuser")
 			params.Set("password", "money4band")
 			params.Set("port", "3389")
 			params.Set("security", "")
-			params.Set("width", "1920")
-			params.Set("height", "1080")
+			params.Set("width", width)
+			params.Set("height", height)
 			params.Set("ignore-cert", "true")
 			params.Set("uuid", connectionID)
 
@@ -294,15 +296,15 @@ func main() {
 				FQDN:         fqdn,
 				ConnectionID: connectionID,
 				ConnectionParams: map[string]string{
-					"hostname":    podIP,
+					"hostname":    fqdn,
 					"ignore-cert": "true",
 					"password":    "money4band",
 					"port":        "3389",
 					"scheme":      "rdp",
 					"security":    "",
 					"username":    "rdpuser",
-					"height":      "1080",
-					"width":       "1920",
+					"height":      height,
+					"width":       width,
 					"uuid":        connectionID,
 				},
 			}
@@ -312,7 +314,7 @@ func main() {
 			// Return only the connection ID to the client
 			c.JSON(http.StatusCreated, gin.H{
 				"podName":       pod.Name,
-				"fqdn":          podIP,
+				"fqdn":          fqdn,
 				"connection_id": connectionID,
 				"status":        "creating",
 				"message":       "Office pod deployed and connection parameters generated",
@@ -465,8 +467,6 @@ func DemoDoConnect(request *http.Request, tunnelStore *guac.ActiveTunnelStore) (
 	config := guac.NewGuacamoleConfiguration()
 	var query url.Values
 	uuid := request.URL.Query().Get("uuid")
-	width := request.URL.Query().Get("width")
-	height := request.URL.Query().Get("height")
 
 	if uuid != "" {
 		val, err := redisClient.Get(context.Background(), "session:"+uuid).Result()
@@ -480,14 +480,6 @@ func DemoDoConnect(request *http.Request, tunnelStore *guac.ActiveTunnelStore) (
 		if err != nil {
 			logrus.Errorf("Failed to unmarshal session data for UUID %s: %v", uuid, err)
 			return nil, fmt.Errorf("failed to unmarshal session data")
-		}
-		if width != "" {
-			session.ConnectionParams["width"] = width
-			config.Parameters["width"] = width
-		}
-		if height != "" {
-			session.ConnectionParams["height"] = height
-			config.Parameters["height"] = height
 		}
 		query = url.Values{}
 		for k, v := range session.ConnectionParams {
