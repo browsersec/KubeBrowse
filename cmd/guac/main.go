@@ -243,6 +243,14 @@ func main() {
 			// Store the parameters in the activeTunnels store
 			activeTunnels.StoreConnectionParams(connectionID, params)
 
+			// Wait for pod readiness and RDP port
+			err = k8s.WaitForPodReadyAndRDP(k8sClient, k8sNamespace, pod.Name, fqdn, 60*time.Second)
+			if err != nil {
+				logrus.Errorf("Pod not ready: %v", err)
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Pod not ready for RDP connection"})
+				return
+			}
+
 			// Return only the connection ID to the client
 			c.JSON(http.StatusCreated, gin.H{
 				"podName":       pod.Name,
