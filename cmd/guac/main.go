@@ -57,6 +57,7 @@ func initRedis() {
 // SessionData struct for Redis
 type SessionData struct {
 	PodName          string            `json:"podName"`
+	PodIP            string            `json:"podIP"`
 	FQDN             string            `json:"fqdn"`
 	ConnectionID     string            `json:"connection_id"`
 	ConnectionParams map[string]string `json:"connection_params"`
@@ -273,15 +274,17 @@ func main() {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Pod not ready for RDP connection"})
 				return
 			}
-
+			podIP := pod.Status.PodIP
+			logrus.Infof("Pod IP of connectionID: %s is %s", connectionID, podIP)
 			// Store session in Redis
 			session := SessionData{
 				PodName:      pod.Name,
+				PodIP:        podIP,
 				FQDN:         fqdn,
 				ConnectionID: connectionID,
 				ConnectionParams: map[string]string{
 					"scheme":      "rdp",
-					"hostname":    fqdn,
+					"hostname":    podIP,
 					"username":    "rdpuser",
 					"password":    "money4band",
 					"width":       "1920",
@@ -358,6 +361,7 @@ func main() {
 				"namespace":     pod.Namespace,
 				"status":        "creating",
 				"connectionURI": connectionURI,
+				"podIP":         pod.Status.PodIP,
 				"message":       "Browser sandbox pod created successfully",
 			})
 		})
@@ -392,6 +396,7 @@ func main() {
 				"namespace":     pod.Namespace,
 				"status":        "creating",
 				"connectionURI": connectionURI,
+				"podIP":         pod.Status.PodIP,
 				"message":       "Office sandbox pod created successfully",
 			})
 		})

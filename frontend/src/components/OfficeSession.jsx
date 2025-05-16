@@ -3,7 +3,8 @@ import GuacClient from './GuacClient';
 
 
 const isSecure = window.location.protocol === 'https:';
-const API_BASE = import.meta.env.VITE_GUAC_CLIENT_URL || `${isSecure ? 'https' : 'http'}://${location.host}`;
+// const API_BASE = import.meta.env.VITE_GUAC_CLIENT_URL || `${isSecure ? 'https' : 'http'}://${location.host}`;
+const API_BASE = 'https://152.53.244.80:30006'
 
 const OfficeSession = () => {
   const [sessionState, setSessionState] = useState({
