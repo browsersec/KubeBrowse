@@ -15,6 +15,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
+// Endpoint to stop a specific WebSocket session
 func HandlerStopWSSession(c *gin.Context, redisClient *redis.Client, k8sClient *kubernetes.Clientset) {
 	connectionID := c.Param("connectionID")
 	if connectionID == "" {
