@@ -1,29 +1,29 @@
 package main
 
 import (
-	"context"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"net"
 	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
-	"strconv"
-	"time"
 
 	guac "github.com/browsersec/KubeBrowse"
-	"github.com/browsersec/KubeBrowse/k8s"
+	"github.com/browsersec/KubeBrowse/api"
+	"github.com/browsersec/KubeBrowse/docs"
+	redis2 "github.com/browsersec/KubeBrowse/internal/redis"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis/v8"
-	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
+	swaggerfiles "github.com/swaggo/files"
+	"github.com/swaggo/gin-swagger"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
+
+// @BasePath /test
 
 var (
 	certPath     string
@@ -43,28 +43,8 @@ func GinHandlerAdapter(h http.Handler) gin.HandlerFunc {
 	}
 }
 
-func initRedis() {
-	redisClient = redis.NewClient(&redis.Options{
-		Addr: "redis:6379",
-	})
-	// check if redis is connected
-	_, err := redisClient.Ping(context.Background()).Result()
-	if err != nil {
-		logrus.Printf("Failed to connect to Redis: %v", err)
-	}
-}
-
-// SessionData struct for Redis
-type SessionData struct {
-	PodName          string            `json:"podName"`
-	PodIP            string            `json:"podIP"`
-	FQDN             string            `json:"fqdn"`
-	ConnectionID     string            `json:"connection_id"`
-	ConnectionParams map[string]string `json:"connection_params"`
-}
-
 func main() {
-	initRedis()
+	redisClient = redis2.InitRedis()
 	// Parse command line flags
 	helpFlag := flag.Bool("h", false, "Display help information")
 	flag.Parse()
@@ -155,6 +135,14 @@ func main() {
 	// Initialize Gin
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
+
+	// Configure Swagger
+	docs.SwaggerInfo.BasePath = "/"
+	docs.SwaggerInfo.Title = "KubeBrowse API"
+	docs.SwaggerInfo.Description = "KubeBrowse API for managing browser and office sandbox pods"
+	docs.SwaggerInfo.Version = "1.0"
+	docs.SwaggerInfo.Host = "localhost:4567"
+	docs.SwaggerInfo.Schemes = []string{"http", "https"}
 	router.Use(cors.Default())
 	router.Use(gin.Recovery())
 	router.Use(gin.Logger())
@@ -165,7 +153,7 @@ func main() {
 
 	// Pass activeTunnels to DemoDoConnect by wrapping it
 	doConnectWrapper := func(request *http.Request) (guac.Tunnel, error) {
-		return DemoDoConnect(request, activeTunnels)
+		return api.DemoDoConnect(request, activeTunnels, redisClient, guacdAddr)
 	}
 
 	servlet := guac.NewServer(doConnectWrapper)
@@ -227,222 +215,33 @@ func main() {
 	{
 		// New route for deploying and connecting to office pod with RDP credentials
 		testRoutes.POST("/deploy-office", func(c *gin.Context) {
-			if k8sClient == nil {
-				c.JSON(http.StatusServiceUnavailable, gin.H{
-					"error": "Kubernetes client not initialized",
-				})
-				return
-			}
-			height := c.Query("height")
-			width := c.Query("width")
-
-			// Generate a unique pod name
-			podName := "office-" + uuid.New().String()[0:8]
-
-			// Create an office sandbox pod
-			pod, err := k8s.CreateOfficeSandboxPod(k8sClient, k8sNamespace, podName)
-			if err != nil {
-				logrus.Errorf("Failed to create office pod: %v", err)
-				c.JSON(http.StatusInternalServerError, gin.H{
-					"error": fmt.Sprintf("Failed to create office pod: %v", err),
-				})
-				return
-			}
-
-			// Construct the FQDN
-			fqdn := fmt.Sprintf("%s.sandbox-instances.browser-sandbox.svc.cluster.local", pod.Name)
-
-			// Generate a unique connection ID
-			connectionID := uuid.New().String()
-
-			// Wait for pod readiness and RDP port
-			err = k8s.WaitForPodReadyAndRDP(k8sClient, k8sNamespace, pod.Name, fqdn, 60*time.Second)
-			if err != nil {
-				logrus.Errorf("Pod not ready: %v", err)
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Pod not ready for RDP connection"})
-				return
-			}
-			podIP := pod.Status.PodIP
-			if podIP == "" {
-				logrus.Errorf("Pod IP is empty for connectionID: %s", connectionID)
-				podIP = fqdn
-			}
-			// nsLookup fqdn
-			ips, err := net.LookupIP(fqdn)
-			if err == nil && len(ips) > 0 {
-				podIP = ips[0].String()
-			}
-			logrus.Infof("Pod IP of connectionID: %s is %s", connectionID, podIP)
-
-			// Store connection parameters in memory (in a real implementation, use a secure storage)
-			params := url.Values{}
-			params.Set("scheme", "rdp")
-			params.Set("hostname", fqdn)
-			params.Set("username", "rdpuser")
-			params.Set("password", "money4band")
-			params.Set("port", "3389")
-			params.Set("security", "")
-			params.Set("width", width)
-			params.Set("height", height)
-			params.Set("ignore-cert", "true")
-			params.Set("uuid", connectionID)
-
-			// Store the parameters in the activeTunnels store
-			activeTunnels.StoreConnectionParams(connectionID, params)
-			// Store session in Redis
-			session := SessionData{
-				PodName:      pod.Name,
-				PodIP:        podIP,
-				FQDN:         fqdn,
-				ConnectionID: connectionID,
-				ConnectionParams: map[string]string{
-					"hostname":    fqdn,
-					"ignore-cert": "true",
-					"password":    "money4band",
-					"port":        "3389",
-					"scheme":      "rdp",
-					"security":    "",
-					"username":    "rdpuser",
-					"height":      height,
-					"width":       width,
-					"uuid":        connectionID,
-				},
-			}
-			data, _ := json.Marshal(session)
-			redisClient.Set(context.Background(), "session:"+connectionID, data, 0)
-
-			// Return only the connection ID to the client
-			c.JSON(http.StatusCreated, gin.H{
-				"podName":       pod.Name,
-				"fqdn":          fqdn,
-				"connection_id": connectionID,
-				"status":        "creating",
-				"message":       "Office pod deployed and connection parameters generated",
-			})
+			api.DeployOffice(c, k8sClient, k8sNamespace, redisClient, activeTunnels)
 		})
 
 		// New endpoint to handle websocket connections using stored parameters
 		testRoutes.GET("/connect/:connectionID", func(c *gin.Context) {
-			connectionID := c.Param("connectionID")
-			if connectionID == "" {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "Connection ID is required"})
-				return
-			}
-
-			// Get stored parameters
-			_, exists := activeTunnels.GetConnectionParams(connectionID)
-			if !exists {
-				c.JSON(http.StatusNotFound, gin.H{"error": "Connection parameters not found"})
-				return
-			}
-
-			// Construct the websocket URL with only the connection ID
-			wsURL := fmt.Sprintf("/websocket-tunnel?uuid=%s", connectionID)
-
-			c.JSON(http.StatusOK, gin.H{
-				"websocket_url": wsURL,
-				"status":        "ready",
-				"message":       "Connection parameters retrieved successfully",
-			})
+			api.HandlerConnectionID(c, activeTunnels)
 		})
 
 		// Test route to create a browser sandbox pod
 		testRoutes.POST("/browser-pod", func(c *gin.Context) {
-			if k8sClient == nil {
-				c.JSON(http.StatusServiceUnavailable, gin.H{
-					"error": "Kubernetes client not initialized",
-				})
-				return
-			}
-
-			// Generate a dummy user ID for testing
-			userID := "test-" + uuid.New().String()[0:8]
-
-			// Create a browser sandbox pod
-			pod, err := k8s.CreateBrowserSandboxPod(k8sClient, k8sNamespace, userID+"-browser")
-			if err != nil {
-				logrus.Errorf("Failed to create browser pod: %v", err)
-				c.JSON(http.StatusInternalServerError, gin.H{
-					"error": fmt.Sprintf("Failed to create browser pod: %v", err),
-				})
-				return
-			}
-
-			// Connection URI for the pod (simplified version)
-			connectionURI := fmt.Sprintf("/guac/?id=%s&type=browser", pod.Name)
-
-			c.JSON(http.StatusCreated, gin.H{
-				"podName":       pod.Name,
-				"namespace":     pod.Namespace,
-				"status":        "creating",
-				"connectionURI": connectionURI,
-				"podIP":         pod.Status.PodIP,
-				"message":       "Browser sandbox pod created successfully",
-			})
+			api.HandlerBrowserPod(c, activeTunnels, k8sClient, k8sNamespace)
 		})
 
 		// Test route to create an office sandbox pod
 		testRoutes.POST("/office-pod", func(c *gin.Context) {
-			if k8sClient == nil {
-				c.JSON(http.StatusServiceUnavailable, gin.H{
-					"error": "Kubernetes client not initialized",
-				})
-				return
-			}
-
-			// Generate a dummy user ID for testing
-			userID := "test-" + uuid.New().String()[0:8]
-
-			// Create an office sandbox pod
-			pod, err := k8s.CreateOfficeSandboxPod(k8sClient, k8sNamespace, userID+"-office")
-			if err != nil {
-				logrus.Errorf("Failed to create office pod: %v", err)
-				c.JSON(http.StatusInternalServerError, gin.H{
-					"error": fmt.Sprintf("Failed to create office pod: %v", err),
-				})
-				return
-			}
-
-			// Connection URI for the pod (simplified version)
-			connectionURI := fmt.Sprintf("/guac/?id=%s&type=office", pod.Name)
-
-			c.JSON(http.StatusCreated, gin.H{
-				"podName":       pod.Name,
-				"namespace":     pod.Namespace,
-				"status":        "creating",
-				"connectionURI": connectionURI,
-				"podIP":         pod.Status.PodIP,
-				"message":       "Office sandbox pod created successfully",
-			})
+			api.HandlerOfficePod(c, activeTunnels, k8sClient, k8sNamespace)
 		})
 	}
 
 	// Endpoint to stop a specific WebSocket session
 	router.DELETE("/sessions/:connectionID/stop", func(c *gin.Context) {
-		connectionID := c.Param("connectionID")
-		if connectionID == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Connection ID is required"})
-			return
-		}
-		val, err := redisClient.Get(context.Background(), "session:"+connectionID).Result()
-		if err != nil {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Session not found"})
-			return
-		}
-		var session SessionData
-		err = json.Unmarshal([]byte(val), &session)
-		if err != nil {
-			logrus.Errorf("Failed to unmarshal session data: %v", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unmarshal session data"})
-			return
-		}
-		err = k8s.DeletePod(k8sClient, session.PodName)
-		if err != nil {
-			logrus.Errorf("Failed to delete pod: %v", err)
-		}
-		redisClient.Del(context.Background(), "session:"+connectionID)
-		c.JSON(http.StatusOK, gin.H{"message": fmt.Sprintf("Session %s stopped and pod deleted.", connectionID)})
+
 	})
+
+	// Add Swagger documentation route
+	router.GET("/swagger/*any", ginSwagger.WrapHandler(
+		swaggerfiles.Handler))
 
 	// Start server with appropriate TLS configuration
 	addr := "0.0.0.0:4567"
@@ -463,149 +262,149 @@ func main() {
 
 // DemoDoConnect creates the tunnel to the remote machine (via guacd)
 // Now accepts ActiveTunnelStore to register the tunnel
-func DemoDoConnect(request *http.Request, tunnelStore *guac.ActiveTunnelStore) (guac.Tunnel, error) {
-	config := guac.NewGuacamoleConfiguration()
-	var query url.Values
-	uuid := request.URL.Query().Get("uuid")
-
-	if uuid != "" {
-		val, err := redisClient.Get(context.Background(), "session:"+uuid).Result()
-		if err != nil {
-			logrus.Errorf("Failed to get session from Redis for UUID %s: %v", uuid, err)
-			return nil, fmt.Errorf("session not found")
-		}
-		var session SessionData
-		err = json.Unmarshal([]byte(val), &session)
-		logrus.Debugf("Retrieved session data for UUID %s: %+v", uuid, session)
-		if err != nil {
-			logrus.Errorf("Failed to unmarshal session data for UUID %s: %v", uuid, err)
-			return nil, fmt.Errorf("failed to unmarshal session data")
-		}
-		query = url.Values{}
-		for k, v := range session.ConnectionParams {
-			query.Set(k, v)
-		}
-	} else {
-		query = request.URL.Query()
-	}
-
-	// Check if we have stored parameters for this connection
-	if uuid := query.Get("uuid"); uuid != "" {
-		if storedParams, exists := tunnelStore.GetConnectionParams(uuid); exists {
-			logrus.Debugf("Using stored parameters for UUID %s", uuid)
-			// Use stored parameters instead of query parameters
-			query = storedParams
-		} else {
-			logrus.Debugf("No stored parameters found for UUID %s", uuid)
-		}
-	}
-
-	config.Protocol = query.Get("scheme")
-	config.Parameters = map[string]string{}
-	for k, v := range query {
-		config.Parameters[k] = v[0]
-	}
-
-	var err error
-	if query.Get("width") != "" {
-		config.OptimalScreenHeight, err = strconv.Atoi(query.Get("width"))
-		if err != nil || config.OptimalScreenHeight == 0 {
-			logrus.Errorf("Invalid height value '%s': %v", query.Get("width"), err)
-			config.OptimalScreenHeight = 600
-		}
-	}
-	if query.Get("height") != "" {
-		config.OptimalScreenWidth, err = strconv.Atoi(query.Get("height"))
-		if err != nil || config.OptimalScreenWidth == 0 {
-			logrus.Errorf("Invalid width value '%s': %v", query.Get("height"), err)
-			config.OptimalScreenWidth = 800
-		}
-	}
-	config.AudioMimetypes = []string{"audio/L16", "rate=44100", "channels=2"}
-
-	logrus.Debugf("Attempting to connect to guacd at %s", guacdAddr)
-	addr, err := net.ResolveTCPAddr("tcp", guacdAddr)
-	if err != nil {
-		logrus.Errorf("Failed to resolve guacd address %s: %v", guacdAddr, err)
-		return nil, err
-	}
-
-	// Set connection timeout
-	dialer := net.Dialer{
-		Timeout: 60 * time.Second,
-	}
-	logrus.Debugf("Attempting to establish TCP connection to guacd at %s with timeout %v", addr.String(), dialer.Timeout)
-	conn, err := dialer.Dial("tcp", addr.String())
-	if err != nil {
-		logrus.Errorf("Failed to connect to guacd at %s: %v", addr.String(), err)
-		return nil, err
-	}
-
-	stream := guac.NewStream(conn, guac.SocketTimeout)
-	logrus.Debugf("TCP connection established, created new stream with timeout %v", guac.SocketTimeout)
-
-	logrus.Debug("Successfully connected to guacd")
-	if request.URL.Query().Get("uuid") != "" {
-		config.ConnectionID = request.URL.Query().Get("uuid")
-	}
-
-	sanitisedCfg := config
-	config.ConnectionID = ""
-	sanitisedCfg.Parameters["password"] = "********"
-	logrus.Debugf("Starting handshake with config: %#v", sanitisedCfg)
-
-	// err = stream.Handshake(config)
-	// if err != nil {
-	//     logrus.Errorf("Handshake failed: %v", err)
-	//     return nil, err
-	// }
-
-	// Add context with timeout for handshake
-	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
-	defer cancel()
-
-	// Create a channel to handle the handshake
-	handshakeDone := make(chan error, 1)
-	go func() {
-		handshakeDone <- stream.Handshake(config)
-	}()
-
-	// Wait for handshake with timeout
-	select {
-	case err := <-handshakeDone:
-		if err != nil {
-			logrus.Errorf("Handshake failed: %v. Connection details - Local: %s, Remote: %s",
-				err,
-				conn.LocalAddr().String(),
-				conn.RemoteAddr().String())
-			return nil, err
-		}
-	case <-ctx.Done():
-		logrus.Errorf("Handshake timed out after 45 seconds. Connection details - Local: %s, Remote: %s",
-			conn.LocalAddr().String(),
-			conn.RemoteAddr().String())
-		return nil, fmt.Errorf("handshake timed out: %v", ctx.Err())
-	}
-
-	logrus.Debug("Handshake completed successfully")
-
-	tunnel := guac.NewSimpleTunnel(stream)
-
-	// Register the tunnel with its ConnectionID after handshake
-	if tunnel != nil && tunnel.ConnectionID() != "" {
-		// The request object 'req' for Add method is 'nil' here.
-		// If it's crucial, it needs to be passed down or handled differently.
-		// For now, passing nil as it's not used by the current Add implementation.
-		tunnelStore.Add(tunnel.ConnectionID(), tunnel, nil)
-		logrus.Debugf("Tunnel %s successfully added to active store", tunnel.ConnectionID())
-	} else if tunnel != nil {
-		logrus.Warnf("Tunnel created but ConnectionID is empty. Not adding to store. UUID: %s", tunnel.GetUUID())
-	} else {
-		logrus.Error("Failed to create tunnel - tunnel is nil")
-	}
-
-	return tunnel, nil
-}
+//func DemoDoConnect(request *http.Request, tunnelStore *guac.ActiveTunnelStore) (guac.Tunnel, error) {
+//	config := guac.NewGuacamoleConfiguration()
+//	var query url.Values
+//	uuid := request.URL.Query().Get("uuid")
+//
+//	if uuid != "" {
+//		val, err := redisClient.Get(context.Background(), "session:"+uuid).Result()
+//		if err != nil {
+//			logrus.Errorf("Failed to get session from Redis for UUID %s: %v", uuid, err)
+//			return nil, fmt.Errorf("session not found")
+//		}
+//		var session redis2.SessionData
+//		err = json.Unmarshal([]byte(val), &session)
+//		logrus.Debugf("Retrieved session data for UUID %s: %+v", uuid, session)
+//		if err != nil {
+//			logrus.Errorf("Failed to unmarshal session data for UUID %s: %v", uuid, err)
+//			return nil, fmt.Errorf("failed to unmarshal session data")
+//		}
+//		query = url.Values{}
+//		for k, v := range session.ConnectionParams {
+//			query.Set(k, v)
+//		}
+//	} else {
+//		query = request.URL.Query()
+//	}
+//
+//	// Check if we have stored parameters for this connection
+//	if uuid := query.Get("uuid"); uuid != "" {
+//		if storedParams, exists := tunnelStore.GetConnectionParams(uuid); exists {
+//			logrus.Debugf("Using stored parameters for UUID %s", uuid)
+//			// Use stored parameters instead of query parameters
+//			query = storedParams
+//		} else {
+//			logrus.Debugf("No stored parameters found for UUID %s", uuid)
+//		}
+//	}
+//
+//	config.Protocol = query.Get("scheme")
+//	config.Parameters = map[string]string{}
+//	for k, v := range query {
+//		config.Parameters[k] = v[0]
+//	}
+//
+//	var err error
+//	if query.Get("width") != "" {
+//		config.OptimalScreenHeight, err = strconv.Atoi(query.Get("width"))
+//		if err != nil || config.OptimalScreenHeight == 0 {
+//			logrus.Errorf("Invalid height value '%s': %v", query.Get("width"), err)
+//			config.OptimalScreenHeight = 600
+//		}
+//	}
+//	if query.Get("height") != "" {
+//		config.OptimalScreenWidth, err = strconv.Atoi(query.Get("height"))
+//		if err != nil || config.OptimalScreenWidth == 0 {
+//			logrus.Errorf("Invalid width value '%s': %v", query.Get("height"), err)
+//			config.OptimalScreenWidth = 800
+//		}
+//	}
+//	config.AudioMimetypes = []string{"audio/L16", "rate=44100", "channels=2"}
+//
+//	logrus.Debugf("Attempting to connect to guacd at %s", guacdAddr)
+//	addr, err := net.ResolveTCPAddr("tcp", guacdAddr)
+//	if err != nil {
+//		logrus.Errorf("Failed to resolve guacd address %s: %v", guacdAddr, err)
+//		return nil, err
+//	}
+//
+//	// Set connection timeout
+//	dialer := net.Dialer{
+//		Timeout: 60 * time.Second,
+//	}
+//	logrus.Debugf("Attempting to establish TCP connection to guacd at %s with timeout %v", addr.String(), dialer.Timeout)
+//	conn, err := dialer.Dial("tcp", addr.String())
+//	if err != nil {
+//		logrus.Errorf("Failed to connect to guacd at %s: %v", addr.String(), err)
+//		return nil, err
+//	}
+//
+//	stream := guac.NewStream(conn, guac.SocketTimeout)
+//	logrus.Debugf("TCP connection established, created new stream with timeout %v", guac.SocketTimeout)
+//
+//	logrus.Debug("Successfully connected to guacd")
+//	if request.URL.Query().Get("uuid") != "" {
+//		config.ConnectionID = request.URL.Query().Get("uuid")
+//	}
+//
+//	sanitisedCfg := config
+//	config.ConnectionID = ""
+//	sanitisedCfg.Parameters["password"] = "********"
+//	logrus.Debugf("Starting handshake with config: %#v", sanitisedCfg)
+//
+//	// err = stream.Handshake(config)
+//	// if err != nil {
+//	//     logrus.Errorf("Handshake failed: %v", err)
+//	//     return nil, err
+//	// }
+//
+//	// Add context with timeout for handshake
+//	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+//	defer cancel()
+//
+//	// Create a channel to handle the handshake
+//	handshakeDone := make(chan error, 1)
+//	go func() {
+//		handshakeDone <- stream.Handshake(config)
+//	}()
+//
+//	// Wait for handshake with timeout
+//	select {
+//	case err := <-handshakeDone:
+//		if err != nil {
+//			logrus.Errorf("Handshake failed: %v. Connection details - Local: %s, Remote: %s",
+//				err,
+//				conn.LocalAddr().String(),
+//				conn.RemoteAddr().String())
+//			return nil, err
+//		}
+//	case <-ctx.Done():
+//		logrus.Errorf("Handshake timed out after 45 seconds. Connection details - Local: %s, Remote: %s",
+//			conn.LocalAddr().String(),
+//			conn.RemoteAddr().String())
+//		return nil, fmt.Errorf("handshake timed out: %v", ctx.Err())
+//	}
+//
+//	logrus.Debug("Handshake completed successfully")
+//
+//	tunnel := guac.NewSimpleTunnel(stream)
+//
+//	// Register the tunnel with its ConnectionID after handshake
+//	if tunnel != nil && tunnel.ConnectionID() != "" {
+//		// The request object 'req' for Add method is 'nil' here.
+//		// If it's crucial, it needs to be passed down or handled differently.
+//		// For now, passing nil as it's not used by the current Add implementation.
+//		tunnelStore.Add(tunnel.ConnectionID(), tunnel, nil)
+//		logrus.Debugf("Tunnel %s successfully added to active store", tunnel.ConnectionID())
+//	} else if tunnel != nil {
+//		logrus.Warnf("Tunnel created but ConnectionID is empty. Not adding to store. UUID: %s", tunnel.GetUUID())
+//	} else {
+//		logrus.Error("Failed to create tunnel - tunnel is nil")
+//	}
+//
+//	return tunnel, nil
+//}
 
 // Add a help command to display CLI usage information
 func displayHelp() {
