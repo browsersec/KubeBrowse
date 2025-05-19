@@ -1,13 +1,20 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { Upload } from 'lucide-react';
 
 /**
  * A collapsible control panel for WebSocket connection management
  * positioned in the bottom right of the screen with a high z-index
  */
-function WebSocketControl({ connectionState, onDisconnect }) {
+function WebSocketControl({ connectionState, onDisconnect, connectionId }) {
   const [expanded, setExpanded] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
   const [animationTimeout, setAnimationTimeout] = useState(null);
+  // Upload state
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadError, setUploadError] = useState(null);
+  const [uploadSuccess, setUploadSuccess] = useState(false);
+  const fileInputRef = useRef();
 
   // Clear animation timeout on unmount
   useEffect(() => {
@@ -36,6 +43,50 @@ function WebSocketControl({ connectionState, onDisconnect }) {
     }, 800); // Animation duration
     
     setAnimationTimeout(timeout);
+  };
+
+  // Upload handlers
+  const handleFileUploadClick = () => {
+    if (fileInputRef.current) fileInputRef.current.value = null;
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file || !connectionId) return;
+    setUploading(true);
+    setUploadProgress(0);
+    setUploadError(null);
+    setUploadSuccess(false);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const xhr = new window.XMLHttpRequest();
+      xhr.open('POST', `/sessions/${connectionId}/upload`, true);
+      xhr.withCredentials = false;
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          setUploadProgress(Math.round((event.loaded / event.total) * 100));
+        }
+      };
+      xhr.onload = () => {
+        setUploading(false);
+        if (xhr.status >= 200 && xhr.status < 300) {
+          setUploadSuccess(true);
+          setTimeout(() => setUploadSuccess(false), 2000);
+        } else {
+          setUploadError('Upload failed');
+        }
+      };
+      xhr.onerror = () => {
+        setUploading(false);
+        setUploadError('Upload failed');
+      };
+      xhr.send(formData);
+    } catch (err) {
+      setUploading(false);
+      setUploadError('Upload failed');
+    }
   };
 
   // Determine connection status for display
@@ -79,6 +130,43 @@ function WebSocketControl({ connectionState, onDisconnect }) {
       
       {expanded && (
         <div className="p-2.5">
+          {/* Upload UI */}
+          {connectionId && (
+            <div className="mb-2 flex items-center gap-2">
+              <button
+                onClick={handleFileUploadClick}
+                className="p-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors disabled:opacity-50"
+                disabled={uploading}
+                title="Upload File"
+              >
+                <Upload className="w-5 h-5" />
+              </button>
+              <input
+                type="file"
+                ref={fileInputRef}
+                style={{ display: 'none' }}
+                onChange={handleFileChange}
+                disabled={uploading}
+              />
+              {uploading && (
+                <div className="w-24">
+                  <div className="h-2 bg-gray-200 rounded">
+                    <div
+                      className="h-2 bg-blue-500 rounded transition-all duration-300"
+                      style={{ width: `${uploadProgress}%` }}
+                    ></div>
+                  </div>
+                  <div className="text-xs text-gray-600 mt-1">{uploadProgress}%</div>
+                </div>
+              )}
+              {uploadSuccess && (
+                <div className="text-xs text-green-600 animate-pulse">✓</div>
+              )}
+              {uploadError && (
+                <div className="text-xs text-red-600">{uploadError}</div>
+              )}
+            </div>
+          )}
           <button 
             className={`w-full py-2 px-3 rounded text-white border-none transition-colors relative overflow-hidden ${
               disconnecting

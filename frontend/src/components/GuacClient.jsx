@@ -30,7 +30,7 @@ const buildQueryString = (queryObj) => {
   return params.toString();
 };
 
-function GuacClient({ query, forceHttp = false, onDisconnect }) {
+function GuacClient({ query, forceHttp = false, onDisconnect, connectionId }) {
   const [connected, setConnected] = useState(false);
   
   // Convert query object to proper query string
@@ -388,6 +388,7 @@ function GuacClient({ query, forceHttp = false, onDisconnect }) {
       <WebSocketControl 
         connectionState={connectionState} 
         onDisconnect={handleDisconnect} 
+        connectionId={connectionId}
       />
     </div>
   );
