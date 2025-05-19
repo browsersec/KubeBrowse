@@ -143,7 +143,9 @@ func main() {
 	docs.SwaggerInfo.Version = "1.0"
 	docs.SwaggerInfo.Host = "localhost:4567"
 	docs.SwaggerInfo.Schemes = []string{"http", "https"}
-	router.Use(cors.Default())
+	coors := cors.DefaultConfig()
+	coors.AllowAllOrigins = true
+	router.Use(cors.New(coors))
 	router.Use(gin.Recovery())
 	router.Use(gin.Logger())
 

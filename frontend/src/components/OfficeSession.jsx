@@ -91,7 +91,7 @@ const OfficeSession = () => {
               onClick={handleDisconnect}
               className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
             >
-              Disconnect
+             hello Disconnect
             </button>
           </div>
           <div className="w-full h-[600px] border border-gray-300 rounded">
