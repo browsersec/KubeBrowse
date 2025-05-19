@@ -187,7 +187,7 @@ func getFQDNURL(connectionID string, redisClient *redis.Client) (string, error) 
 	}
 
 	fqdn := session.FQDN
-	url := fmt.Sprintf("https://%s:%d/%s", fqdn, 8080, "upload")
+	url := fmt.Sprintf("http://%s:%d/%s", fqdn, 8080, "upload")
 	logrus.Infof("File URL: %s", url)
 	return url, nil
 }
