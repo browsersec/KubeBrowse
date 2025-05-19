@@ -17,7 +17,7 @@ import (
 	"github.com/go-redis/redis/v8"
 	"github.com/sirupsen/logrus"
 	swaggerfiles "github.com/swaggo/files"
-	"github.com/swaggo/gin-swagger"
+	ginSwagger "github.com/swaggo/gin-swagger"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -145,6 +145,9 @@ func main() {
 	docs.SwaggerInfo.Schemes = []string{"http", "https"}
 	coors := cors.DefaultConfig()
 	coors.AllowAllOrigins = true
+	coors.AllowMethods = []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"}
+	coors.AllowHeaders = []string{"Origin", "Content-Length", "Content-Type", "Authorization"}
+	coors.AllowCredentials = true
 	router.Use(cors.New(coors))
 	router.Use(gin.Recovery())
 	router.Use(gin.Logger())
