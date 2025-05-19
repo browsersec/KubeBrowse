@@ -177,37 +177,8 @@ func main() {
 
 	// Session management handler
 	router.GET("/sessions/", func(c *gin.Context) {
-		c.Header("Content-Type", "application/json")
+		api.HandlerSession(c, activeTunnels)
 
-		// sessions.RLock() // Old store lock
-		// defer sessions.RUnlock() // Old store unlock
-
-		type ConnInfo struct {
-			Uuid string `json:"uuid"`
-			// Num  int    `json:"num"` // We don't have a 'Num' equivalent directly, can show count if needed
-		}
-
-		// connIds := make([]*ConnIds, len(sessions.ConnIds)) // Old way
-		allIDs := activeTunnels.GetAllIDs()
-		connInfos := make([]*ConnInfo, len(allIDs))
-
-		// i := 0 // Old way
-		// for id, num := range sessions.ConnIds { // Old way
-		// 	connIds[i] = &ConnIds{ // Old way
-		// 		Uuid: id, // Old way
-		// 		Num:  num, // Old way
-		// 	}
-		// 	i++ // Old way
-		// }
-		for i, id := range allIDs {
-			connInfos[i] = &ConnInfo{Uuid: id}
-		}
-
-		// c.JSON(http.StatusOK, connIds) // Old way
-		c.JSON(http.StatusOK, gin.H{
-			"active_sessions": len(connInfos),
-			"connection_ids":  connInfos,
-		})
 	})
 
 	// Add test routes for pod creation
@@ -234,10 +205,19 @@ func main() {
 		})
 	}
 
-	// Endpoint to stop a specific WebSocket session
-	router.DELETE("/sessions/:connectionID/stop", func(c *gin.Context) {
-		api.HandlerStopWSSession(c, redisClient, k8sClient)
-	})
+	sessionRoutes := router.Group("/sessions")
+	{
+
+		// Endpoint to stop a specific WebSocket session
+		sessionRoutes.DELETE("/:connectionID/stop", func(c *gin.Context) {
+			api.HandlerStopWSSession(c, redisClient, k8sClient)
+		})
+
+		// Tunnel a Pod Rest API to Upload a file to a pod
+		sessionRoutes.POST("/:connectionID/upload", func(c *gin.Context) {
+			api.HandlerUploadFile(c, redisClient, k8sClient)
+		})
+	}
 
 	// Add Swagger documentation route
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(
