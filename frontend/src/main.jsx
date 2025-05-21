@@ -10,10 +10,6 @@ import { ThemeProvider } from './context/ThemeContext'
 import DashboardLayout from './layouts/DashboardLayout'
 
 // Routes
-import DashboardRoute from './routes/DashboardRoute'
-import NewConnectionRoute from './routes/NewConnectionRoute'
-import EditConnectionRoute from './routes/EditConnectionRoute'
-import ConnectionRoute from './routes/ConnectionRoute'
 import SettingsRoute from './routes/SettingsRoute'
 import NotFoundRoute from './routes/NotFoundRoute'
 import OfficeSessionRoute from './routes/OfficeSessionRoute'
@@ -25,19 +21,7 @@ const router = createBrowserRouter([
     children: [
       {
         index: true,
-        element: <DashboardRoute />
-      },
-      {
-        path: 'connections/new',
-        element: <NewConnectionRoute />
-      },
-      {
-        path: 'connections/:id',
-        element: <ConnectionRoute />
-      },
-      {
-        path: 'connections/:id/edit',
-        element: <EditConnectionRoute />
+        element: <OfficeSessionRoute />
       },
       {
         path: 'settings',

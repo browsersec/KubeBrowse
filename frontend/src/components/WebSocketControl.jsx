@@ -130,6 +130,45 @@ function WebSocketControl({ connectionState, onDisconnect, connectionId }) {
 
       {expanded && (
         <div className="p-2.5">
+          {/* Upload UI */}
+          {connectionId && (
+            <div className="mb-2 flex items-center gap-2">
+              <button
+                onClick={handleFileUploadClick}
+                className="p-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors disabled:opacity-50"
+                disabled={uploading}
+                title="Upload File"
+              >
+                <Upload className="w-5 h-5" />
+              </button>
+              <input
+                type="file"
+                ref={fileInputRef}
+                style={{ display: "none" }}
+                onChange={handleFileChange}
+                disabled={uploading}
+              />
+              {uploading && (
+                <div className="w-24">
+                  <div className="h-2 bg-gray-200 rounded">
+                    <div
+                      className="h-2 bg-blue-500 rounded transition-all duration-300"
+                      style={{ width: `${uploadProgress}%` }}
+                    ></div>
+                  </div>
+                  <div className="text-xs text-gray-600 mt-1">
+                    {uploadProgress}%
+                  </div>
+                </div>
+              )}
+              {uploadSuccess && (
+                <div className="text-xs text-green-600 animate-pulse">✓</div>
+              )}
+              {uploadError && (
+                <div className="text-xs text-red-600">{uploadError}</div>
+              )}
+            </div>
+          )}
           <button
             className={`w-full py-2 px-3 rounded text-white border-none transition-colors relative overflow-hidden ${
               disconnecting
@@ -141,45 +180,6 @@ function WebSocketControl({ connectionState, onDisconnect, connectionId }) {
             onClick={handleDisconnect}
             disabled={!isConnected || disconnecting}
           >
-            {/* Upload UI */}
-            {connectionId && (
-              <div className="mb-2 flex items-center gap-2">
-                <button
-                  onClick={handleFileUploadClick}
-                  className="p-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors disabled:opacity-50"
-                  disabled={uploading}
-                  title="Upload File"
-                >
-                  <Upload className="w-5 h-5" />
-                </button>
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  style={{ display: "none" }}
-                  onChange={handleFileChange}
-                  disabled={uploading}
-                />
-                {uploading && (
-                  <div className="w-24">
-                    <div className="h-2 bg-gray-200 rounded">
-                      <div
-                        className="h-2 bg-blue-500 rounded transition-all duration-300"
-                        style={{ width: `${uploadProgress}%` }}
-                      ></div>
-                    </div>
-                    <div className="text-xs text-gray-600 mt-1">
-                      {uploadProgress}%
-                    </div>
-                  </div>
-                )}
-                {uploadSuccess && (
-                  <div className="text-xs text-green-600 animate-pulse">✓</div>
-                )}
-                {uploadError && (
-                  <div className="text-xs text-red-600">{uploadError}</div>
-                )}
-              </div>
-            )}
             {disconnecting && (
               <span className="absolute inset-0 flex items-center justify-center">
                 <svg

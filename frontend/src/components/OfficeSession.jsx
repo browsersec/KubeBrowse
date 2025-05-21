@@ -2,8 +2,10 @@ import { useState } from 'react';
 import GuacClient from './GuacClient';
 
 const isSecure = window.location.protocol === 'https:';
-const API_BASE = import.meta.env.VITE_GUAC_CLIENT_URL || `${isSecure ? 'https' : 'http'}://${location.host}`;
+// const API_BASE = import.meta.env.VITE_GUAC_CLIENT_URL || `${isSecure ? 'https' : 'http'}://${location.host}`;
 // const API_BASE = 'https://152.53.244.80:30006'
+// const API_BASE = 'http://localhost:4567'
+const API_BASE = '' // Use relative URLs to leverage Vite's proxy
 
 const OfficeSession = () => {
   const [sessionState, setSessionState] = useState({
@@ -90,8 +92,8 @@ const OfficeSession = () => {
             <button
               onClick={handleDisconnect}
               className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
-            >Hello world 
-             {/* Disconnect */}
+            >
+             Disconnect
             </button>
           </div>
           <div className="w-full h-[600px] border border-gray-300 rounded">

@@ -194,6 +194,11 @@ func main() {
 			api.DeployOffice(c, k8sClient, k8sNamespace, redisClient, activeTunnels)
 		})
 
+		// New route for deploying and connecting to browser pod with RDP credentials
+		testRoutes.POST("/deploy-browser", func(c *gin.Context) {
+			api.DeployBrowser(c, k8sClient, k8sNamespace, redisClient, activeTunnels)
+		})
+
 		// New endpoint to handle websocket connections using stored parameters
 		testRoutes.GET("/connect/:connectionID", func(c *gin.Context) {
 			api.HandlerConnectionID(c, activeTunnels)

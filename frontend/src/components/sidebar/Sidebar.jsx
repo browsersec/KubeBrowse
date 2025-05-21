@@ -3,7 +3,7 @@ import { NavLink } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useTheme } from '../../context/ThemeContext';
 
-export default function Sidebar({ connections = [] }) {
+export default function Sidebar() {
   const [expanded, setExpanded] = useState(true);
   const { theme, toggleTheme } = useTheme();
 
@@ -39,64 +39,11 @@ export default function Sidebar({ connections = [] }) {
             }
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-            </svg>
-            {expanded && <span className="ml-3">Dashboard</span>}
-          </NavLink>
-
-          <NavLink 
-            to="/connections/new"
-            className={({ isActive }) => 
-              `flex items-center py-3 px-4 rounded-lg transition-colors mt-2 ${isActive ? 'bg-blue-700' : 'hover:bg-gray-800'}`
-            }
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            {expanded && <span className="ml-3">New Connection</span>}
-          </NavLink>
-
-          <NavLink 
-            to="/office-session"
-            className={({ isActive }) => 
-              `flex items-center py-3 px-4 rounded-lg transition-colors mt-2 ${isActive ? 'bg-blue-700' : 'hover:bg-gray-800'}`
-            }
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-3-3v6m9-6a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            {expanded && <span className="ml-3">New Office Session</span>}
+            {expanded && <span className="ml-3">Office Session</span>}
           </NavLink>
         </div>
-
-        {connections.length > 0 && (
-          <div className="px-4">
-            <div className="flex items-center justify-between mb-2">
-              <h2 className={`text-gray-400 text-xs uppercase font-semibold ${expanded ? '' : 'sr-only'}`}>
-                Saved Connections
-              </h2>
-            </div>
-            
-            <div className="space-y-1">
-              {connections.map((connection, index) => (
-                <NavLink
-                key={connection.id}
-                to={`/connections/${connection.id}`}
-                  className={({ isActive }) => 
-                    `flex items-center py-3 px-4 rounded-lg transition-colors ${isActive ? 'bg-blue-700' : 'hover:bg-gray-800'}`
-                  }
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
-                  </svg>
-                  {expanded && (
-                    <span className="ml-3 truncate">{connection.name || `Connection ${index + 1}`}</span>
-                  )}
-                </NavLink>
-              ))}
-            </div>
-          </div>
-        )}
       </nav>
 
       <div className="p-4 border-t border-gray-800 flex flex-col space-y-2">
