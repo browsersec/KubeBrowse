@@ -59,7 +59,7 @@ func CreateBrowserSandboxPod(clientset *kubernetes.Clientset, namespace, userID 
 			Containers: []corev1.Container{
 				{
 					Name:  "rdp-chromium",
-					Image: "ghcr.io/browsersec/rdp-chromium:latest",
+					Image: "ghcr.io/browsersec/rdp-chromium:sha-64ed77a",
 					Ports: []corev1.ContainerPort{
 						{
 							Name:          "rdp",
