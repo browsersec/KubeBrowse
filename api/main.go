@@ -141,14 +141,14 @@ func DeployBrowser(c *gin.Context, k8sClient *kubernetes.Clientset, k8sNamespace
 	width := c.Query("width")
 
 	// Generate a unique pod name
-	podName := "office-" + uuid.New().String()[0:8]
+	podName := "browser-" + uuid.New().String()[0:8]
 
 	// Create an office sandbox pod
 	pod, err := k8s.CreateBrowserSandboxPod(k8sClient, k8sNamespace, podName)
 	if err != nil {
 		logrus.Errorf("Failed to create office pod: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": fmt.Sprintf("Failed to create office pod: %v", err),
+			"error": fmt.Sprintf("Failed to create browser pod: %v", err),
 		})
 		return
 	}
