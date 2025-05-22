@@ -10,6 +10,7 @@ import (
 	"time"
 
 	guac "github.com/browsersec/KubeBrowse"
+	redis2 "github.com/browsersec/KubeBrowse/internal/redis"
 	"github.com/browsersec/KubeBrowse/k8s"
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis/v8"
@@ -18,11 +19,25 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
+// Struct for request body
+type DeploySessionRequest struct {
+	Height string `json:"height"`
+	Width  string `json:"width"`
+	Share  bool   `json:"share,omitempty"` // Added optional share field
+}
+
 // DeployOffice godoc
 // @Summary New route for deploying and connecting to office pod with RDP credentials
 // @Schemes
 // @Description New route for deploying and connecting to office pod with RDP credentials
 // @Tags test
+// @Accept  json
+// @Produce  json
+// @Param request body DeploySessionRequest true "Session Deployment Request"
+// @Success 201 {object} gin.H{"podName":string,"fqdn":string,"connection_id":string,"status":string,"message":string}
+// @Failure 503 {object} gin.H{"error":string}
+// @Failure 500 {object} gin.H{"error":string}
+// @Router /test/deploy-office [post]
 func DeployOffice(c *gin.Context, k8sClient *kubernetes.Clientset, k8sNamespace string, redisClient *redis.Client, activeTunnels *guac.ActiveTunnelStore) {
 
 	if k8sClient == nil {
@@ -31,8 +46,13 @@ func DeployOffice(c *gin.Context, k8sClient *kubernetes.Clientset, k8sNamespace 
 		})
 		return
 	}
-	height := c.Query("height")
-	width := c.Query("width")
+
+	var reqBody DeploySessionRequest
+	if err := c.ShouldBindJSON(&reqBody); err != nil {
+		logrus.Errorf("Failed to bind request body: %v", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
 	// Generate a unique pod name
 	podName := "office-" + uuid.New().String()[0:8]
@@ -80,25 +100,16 @@ func DeployOffice(c *gin.Context, k8sClient *kubernetes.Clientset, k8sNamespace 
 	params.Set("password", "money4band")
 	params.Set("port", "3389")
 	params.Set("security", "")
-	params.Set("width", width)
-	params.Set("height", height)
+	params.Set("width", reqBody.Width)
+	params.Set("height", reqBody.Height)
 	params.Set("ignore-cert", "true")
 	params.Set("uuid", connectionID)
 
 	// Store the parameters in the activeTunnels store
 	activeTunnels.StoreConnectionParams(connectionID, params)
 
-	// Define SessionData struct
-	type SessionData struct {
-		PodName          string            `json:"podName"`
-		PodIP            string            `json:"podIP"`
-		FQDN             string            `json:"fqdn"`
-		ConnectionID     string            `json:"connection_id"`
-		ConnectionParams map[string]string `json:"connection_params"`
-	}
-
-	// Store session in Redis
-	session := SessionData{
+	// Store session in Redis using the struct from internal/redis
+	session := redis2.SessionData{
 		PodName:      pod.Name,
 		PodIP:        podIP,
 		FQDN:         fqdn,
@@ -111,10 +122,11 @@ func DeployOffice(c *gin.Context, k8sClient *kubernetes.Clientset, k8sNamespace 
 			"scheme":      "rdp",
 			"security":    "",
 			"username":    "rdpuser",
-			"height":      height,
-			"width":       width,
+			"height":      reqBody.Height,
+			"width":       reqBody.Width,
 			"uuid":        connectionID,
 		},
+		Share: reqBody.Share, // Include the share value
 	}
 	data, _ := json.Marshal(session)
 	redisClient.Set(context.Background(), "session:"+connectionID, data, 0)
@@ -129,6 +141,18 @@ func DeployOffice(c *gin.Context, k8sClient *kubernetes.Clientset, k8sNamespace 
 	})
 }
 
+// DeployBrowser godoc
+// @Summary New route for deploying and connecting to browser pod with RDP credentials
+// @Schemes
+// @Description New route for deploying and connecting to browser pod with RDP credentials
+// @Tags test
+// @Accept  json
+// @Produce  json
+// @Param request body DeploySessionRequest true "Session Deployment Request"
+// @Success 201 {object} gin.H{"podName":string,"fqdn":string,"connection_id":string,"status":string,"message":string}
+// @Failure 503 {object} gin.H{"error":string}
+// @Failure 500 {object} gin.H{"error":string}
+// @Router /test/deploy-browser [post]
 func DeployBrowser(c *gin.Context, k8sClient *kubernetes.Clientset, k8sNamespace string, redisClient *redis.Client, activeTunnels *guac.ActiveTunnelStore) {
 
 	if k8sClient == nil {
@@ -137,8 +161,13 @@ func DeployBrowser(c *gin.Context, k8sClient *kubernetes.Clientset, k8sNamespace
 		})
 		return
 	}
-	height := c.Query("height")
-	width := c.Query("width")
+
+	var reqBody DeploySessionRequest
+	if err := c.ShouldBindJSON(&reqBody); err != nil {
+		logrus.Errorf("Failed to bind request body: %v", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
 	// Generate a unique pod name
 	podName := "browser-" + uuid.New().String()[0:8]
@@ -186,25 +215,16 @@ func DeployBrowser(c *gin.Context, k8sClient *kubernetes.Clientset, k8sNamespace
 	params.Set("password", "money4band")
 	params.Set("port", "3389")
 	params.Set("security", "")
-	params.Set("width", width)
-	params.Set("height", height)
+	params.Set("width", reqBody.Width)
+	params.Set("height", reqBody.Height)
 	params.Set("ignore-cert", "true")
 	params.Set("uuid", connectionID)
 
 	// Store the parameters in the activeTunnels store
 	activeTunnels.StoreConnectionParams(connectionID, params)
 
-	// Define SessionData struct
-	type SessionData struct {
-		PodName          string            `json:"podName"`
-		PodIP            string            `json:"podIP"`
-		FQDN             string            `json:"fqdn"`
-		ConnectionID     string            `json:"connection_id"`
-		ConnectionParams map[string]string `json:"connection_params"`
-	}
-
-	// Store session in Redis
-	session := SessionData{
+	// Store session in Redis using the struct from internal/redis
+	session := redis2.SessionData{
 		PodName:      pod.Name,
 		PodIP:        podIP,
 		FQDN:         fqdn,
@@ -217,10 +237,11 @@ func DeployBrowser(c *gin.Context, k8sClient *kubernetes.Clientset, k8sNamespace
 			"scheme":      "rdp",
 			"security":    "",
 			"username":    "rdpuser",
-			"height":      height,
-			"width":       width,
+			"height":      reqBody.Height,
+			"width":       reqBody.Width,
 			"uuid":        connectionID,
 		},
+		Share: reqBody.Share, // Include the share value
 	}
 	data, _ := json.Marshal(session)
 	redisClient.Set(context.Background(), "session:"+connectionID, data, 0)
@@ -231,18 +252,73 @@ func DeployBrowser(c *gin.Context, k8sClient *kubernetes.Clientset, k8sNamespace
 		"fqdn":          fqdn,
 		"connection_id": connectionID,
 		"status":        "creating",
-		"message":       "Office pod deployed and connection parameters generated",
+		"message":       "Browser pod deployed and connection parameters generated",
 	})
 }
 
-func HandlerConnectionID(c *gin.Context, activeTunnels *guac.ActiveTunnelStore) {
+func HandlerConnectionID(c *gin.Context, activeTunnels *guac.ActiveTunnelStore, redisClient *redis.Client) {
+
+	connectionID := c.Param("connectionID")
+
+	if connectionID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Connection ID is required"})
+		return
+	}
+
+	// Check if the connectionID is valid in redis
+	_, err := redisClient.Get(context.Background(), "session:"+connectionID).Result()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get session data"})
+		return
+	}
+
+	// Get stored parameters
+	_, exists := activeTunnels.GetConnectionParams(connectionID)
+	if !exists {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Connection parameters not found"})
+		return
+	}
+
+	// Construct the websocket URL with only the connection ID
+	wsURL := fmt.Sprintf("/websocket-tunnel?uuid=%s", connectionID)
+
+	c.JSON(http.StatusOK, gin.H{
+		"websocket_url": wsURL,
+		"status":        "ready",
+		"message":       "Connection parameters retrieved successfully",
+	})
+}
+
+func HandlerShareSession(c *gin.Context, activeTunnels *guac.ActiveTunnelStore, redisClient *redis.Client) {
 	connectionID := c.Param("connectionID")
 	if connectionID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Connection ID is required"})
 		return
 	}
 
-	// Get stored parameters
+	// Check if the connectionID is valid in redis
+	_, err := redisClient.Get(context.Background(), "session:"+connectionID).Result()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get session data"})
+		return
+	} else {
+		// Update the redis session store
+		session, err := redisClient.Get(context.Background(), "session:"+connectionID).Result()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get session data"})
+			return
+		}
+		var sessionData redis2.SessionData
+		err = json.Unmarshal([]byte(session), &sessionData)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unmarshal session data"})
+			return
+		}
+		sessionData.Share = true
+		data, _ := json.Marshal(sessionData)
+		redisClient.Set(context.Background(), "session:"+connectionID, data, 0)
+	}
+
 	_, exists := activeTunnels.GetConnectionParams(connectionID)
 	if !exists {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Connection parameters not found"})

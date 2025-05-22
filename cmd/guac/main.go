@@ -201,7 +201,12 @@ func main() {
 
 		// New endpoint to handle websocket connections using stored parameters
 		testRoutes.GET("/connect/:connectionID", func(c *gin.Context) {
-			api.HandlerConnectionID(c, activeTunnels)
+			api.HandlerConnectionID(c, activeTunnels, redisClient)
+		})
+
+		// Share session route
+		testRoutes.GET("/share/:connectionID", func(c *gin.Context) {
+			api.HandlerShareSession(c, activeTunnels, redisClient)
 		})
 
 		// Test route to create a browser sandbox pod

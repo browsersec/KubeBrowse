@@ -21,6 +21,7 @@ func DemoDoConnect(request *http.Request, tunnelStore *guac.ActiveTunnelStore, r
 	config := guac.NewGuacamoleConfiguration()
 	var query url.Values
 	uuid := request.URL.Query().Get("uuid")
+	var session redis2.SessionData
 
 	if uuid != "" {
 		val, err := redisClient.Get(context.Background(), "session:"+uuid).Result()
@@ -28,7 +29,6 @@ func DemoDoConnect(request *http.Request, tunnelStore *guac.ActiveTunnelStore, r
 			logrus.Errorf("Failed to get session from Redis for UUID %s: %v", uuid, err)
 			return nil, fmt.Errorf("session not found")
 		}
-		var session redis2.SessionData
 		err = json.Unmarshal([]byte(val), &session)
 		logrus.Debugf("Retrieved session data for UUID %s: %+v", uuid, session)
 		if err != nil {
@@ -104,8 +104,13 @@ func DemoDoConnect(request *http.Request, tunnelStore *guac.ActiveTunnelStore, r
 	}
 
 	sanitisedCfg := config
-	config.ConnectionID = ""
-	sanitisedCfg.Parameters["password"] = "********"
+
+	if session.Share {
+		sanitisedCfg.Parameters["password"] = "********"
+	} else {
+		sanitisedCfg.ConnectionID = ""
+	}
+
 	logrus.Debugf("Starting handshake with config: %#v", sanitisedCfg)
 
 	// err = stream.Handshake(config)
