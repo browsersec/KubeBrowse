@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Upload, Clipboard, ClipboardCheck } from "lucide-react";
+import toast, { Toaster } from "react-hot-toast";
 
 /**
  * A collapsible control panel for WebSocket connection management
@@ -10,6 +11,8 @@ function WebSocketControl({
   onDisconnect,
   connectionId,
   OfficeSession = true,
+  isConnectionUnstable = false,
+  errorMessage = '',
 }) {
   const [expanded, setExpanded] = useState(true);
   const [disconnecting, setDisconnecting] = useState(false);
@@ -23,6 +26,37 @@ function WebSocketControl({
 
   // copied to clipboard state
   const [copiedToClipboard, setCopiedToClipboard] = useState(false);
+
+  // Show toast when connection becomes unstable
+  useEffect(() => {
+    if (isConnectionUnstable) {
+      toast.error("WebSocket connection is unstable", {
+        id: "connection-unstable",
+        duration: 3000,
+        position: "top-right",
+        icon: "⚠️",
+        style: {
+          borderRadius: "10px",
+          background: "#FFF3CD",
+          color: "#856404",
+          border: "1px solid #FFEEBA",
+        },
+      });
+    }
+  }, [isConnectionUnstable]);
+
+  // Show toast when there is a tunnel error
+  useEffect(() => {
+    if (connectionState === 'TUNNEL_ERROR') {
+      toast.error(`Tunnel Error: ${errorMessage || 'Unable to connect'}`, {
+        id: 'connection-error',
+        duration: 3000,
+        position: 'top-right',
+        icon: '❌',
+      });
+    }
+  }, [connectionState, errorMessage]);
+
   // Clear animation timeout on unmount
   useEffect(() => {
     return () => {
@@ -125,136 +159,145 @@ function WebSocketControl({
     connectionState === "CONNECTED" || connectionState === "WAITING";
 
   return (
-    <div
-      className={`fixed bottom-5 right-5 z-50 bg-white rounded-lg shadow-lg overflow-hidden transition-all duration-300 ease-in-out min-w-[50px] max-w-[250px] ${expanded ? "w-[200px] h-auto" : "w-[50px] h-[50px]"
-        }`}
-    >
+    <>
+      <Toaster />
       <div
-        className="flex justify-between items-center p-2.5 cursor-pointer bg-gray-100 border-b border-gray-200 select-none"
-        onClick={toggleExpanded}
+        className={`fixed bottom-5 right-5 z-50 bg-white rounded-lg shadow-lg overflow-hidden transition-all duration-300 ease-in-out min-w-[50px] max-w-[250px] ${
+          expanded ? "w-[200px] h-auto" : "w-[50px] h-[50px]"
+        }`}
       >
-        <div className="flex items-center gap-2">
-          <div
-            className={`w-3 h-3 rounded-full ${disconnecting
-              ? "bg-yellow-500 animate-pulse animate-pulse-glow"
-              : isConnected
-                ? "bg-green-500 shadow-[0_0_5px_#4CAF50]"
-                : "bg-red-500 shadow-[0_0_5px_#f44336]"
+        <div
+          className="flex justify-between items-center p-2.5 cursor-pointer bg-gray-100 border-b border-gray-200 select-none"
+          onClick={toggleExpanded}
+        >
+          <div className="flex items-center gap-2">
+            <div
+              className={`w-3 h-3 rounded-full ${
+                disconnecting
+                  ? "bg-yellow-500 animate-pulse animate-pulse-glow"
+                  : isConnectionUnstable
+                  ? "bg-yellow-500 animate-pulse"
+                  : isConnected
+                  ? "bg-green-500 shadow-[0_0_5px_#4CAF50]"
+                  : "bg-red-500 shadow-[0_0_5px_#f44336]"
               }`}
-          ></div>
-          {expanded && (
-            <span className="text-sm text-gray-800 whitespace-nowrap overflow-hidden text-ellipsis">
-              {disconnecting
-                ? "Disconnecting..."
-                : isConnected
+            ></div>
+            {expanded && (
+              <span className="text-sm text-gray-800 whitespace-nowrap overflow-hidden text-ellipsis">
+                {disconnecting
+                  ? "Disconnecting..."
+                  : isConnectionUnstable
+                  ? "Unstable"
+                  : isConnected
                   ? "Connected"
                   : connectionState}
-            </span>
-          )}
-        </div>
-        <button className="bg-transparent border-none text-gray-600 cursor-pointer text-sm p-0 flex items-center justify-center">
-          {expanded ? "▼" : "▲"}
-        </button>
-      </div>
-
-      {expanded && (
-        <div className="p-2.5">
-          {/* Session share to clipboard */}
-          <div className="mb-2 flex items-center gap-2">
-            <button
-              onClick={handleShareSession}
-              title="Copy connection ID to clipboard"
-              className="p-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors disabled:opacity-50"
-              disabled={copiedToClipboard}
-            >
-              {copiedToClipboard ? (
-                <ClipboardCheck className="w-5 h-5" />
-              ) : (
-                <Clipboard className="w-5 h-5" />
-              )}
-            </button>
+              </span>
+            )}
           </div>
+          <button className="bg-transparent border-none text-gray-600 cursor-pointer text-sm p-0 flex items-center justify-center">
+            {expanded ? "▼" : "▲"}
+          </button>
+        </div>
 
-          {/* Upload UI */}
-          {connectionId && OfficeSession && (
+        {expanded && (
+          <div className="p-2.5">
+            {/* Session share to clipboard */}
             <div className="mb-2 flex items-center gap-2">
               <button
-                onClick={handleFileUploadClick}
+                onClick={handleShareSession}
+                title="Copy connection ID to clipboard"
                 className="p-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors disabled:opacity-50"
-                disabled={uploading}
-                title="Upload File"
+                disabled={copiedToClipboard}
               >
-                <Upload className="w-5 h-5" />
+                {copiedToClipboard ? (
+                  <ClipboardCheck className="w-5 h-5" />
+                ) : (
+                  <Clipboard className="w-5 h-5" />
+                )}
               </button>
-              <input
-                type="file"
-                ref={fileInputRef}
-                style={{ display: "none" }}
-                onChange={handleFileChange}
-                disabled={uploading}
-              />
-              {uploading && (
-                <div className="w-24">
-                  <div className="h-2 bg-gray-200 rounded">
-                    <div
-                      className="h-2 bg-blue-500 rounded transition-all duration-300"
-                      style={{ width: `${uploadProgress}%` }}
-                    ></div>
-                  </div>
-                  <div className="text-xs text-gray-600 mt-1">
-                    {uploadProgress}%
-                  </div>
-                </div>
-              )}
-              {uploadSuccess && (
-                <div className="text-xs text-green-600 animate-pulse">✓</div>
-              )}
-              {uploadError && (
-                <div className="text-xs text-red-600">{uploadError}</div>
-              )}
             </div>
-          )}
-          <button
-            className={`w-full py-2 px-3 rounded text-white border-none transition-colors relative overflow-hidden ${disconnecting
-              ? "bg-yellow-500 cursor-wait"
-              : isConnected
+
+            {/* Upload UI */}
+            {connectionId && OfficeSession && (
+              <div className="mb-2 flex items-center gap-2">
+                <button
+                  onClick={handleFileUploadClick}
+                  className="p-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors disabled:opacity-50"
+                  disabled={uploading}
+                  title="Upload File"
+                >
+                  <Upload className="w-5 h-5" />
+                </button>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  style={{ display: "none" }}
+                  onChange={handleFileChange}
+                  disabled={uploading}
+                />
+                {uploading && (
+                  <div className="w-24">
+                    <div className="h-2 bg-gray-200 rounded">
+                      <div
+                        className="h-2 bg-blue-500 rounded transition-all duration-300"
+                        style={{ width: `${uploadProgress}%` }}
+                      ></div>
+                    </div>
+                    <div className="text-xs text-gray-600 mt-1">
+                      {uploadProgress}%
+                    </div>
+                  </div>
+                )}
+                {uploadSuccess && (
+                  <div className="text-xs text-green-600 animate-pulse">✓</div>
+                )}
+                {uploadError && (
+                  <div className="text-xs text-red-600">{uploadError}</div>
+                )}
+              </div>
+            )}
+            <button
+              className={`w-full py-2 px-3 rounded text-white border-none transition-colors relative overflow-hidden ${disconnecting
+                ? "bg-yellow-500 cursor-wait"
+                : isConnected
                 ? "bg-red-500 hover:bg-red-700 cursor-pointer"
                 : "bg-gray-300 cursor-not-allowed"
               }`}
-            onClick={handleDisconnect}
-            disabled={!isConnected || disconnecting}
-          >
-            {disconnecting && (
-              <span className="absolute inset-0 flex items-center justify-center">
-                <svg
-                  className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  ></circle>
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  ></path>
-                </svg>
+              onClick={handleDisconnect}
+              disabled={!isConnected || disconnecting}
+            >
+              {disconnecting && (
+                <span className="absolute inset-0 flex items-center justify-center">
+                  <svg
+                    className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    ></circle>
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    ></path>
+                  </svg>
+                </span>
+              )}
+              <span className={disconnecting ? "opacity-0" : ""}>
+                {disconnecting ? "Disconnecting..." : "Disconnect"}
               </span>
-            )}
-            <span className={disconnecting ? "opacity-0" : ""}>
-              {disconnecting ? "Disconnecting..." : "Disconnect"}
-            </span>
-          </button>
-        </div>
-      )}
-    </div>
+            </button>
+          </div>
+        )}
+      </div>
+    </>
   );
 }
 

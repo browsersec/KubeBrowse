@@ -6,6 +6,7 @@ import states from '../lib/states';
 import Modal from './Modal';
 import WebSocketControl from './WebSocketControl';
 import useGuacWebSocket from '../hooks/useGuacWebSocket';
+import { Toaster } from 'react-hot-toast';
 
 // Set custom Mouse implementation
 Guacamole.Mouse = GuacMouse.mouse;
@@ -37,7 +38,7 @@ function GuacClient({ query, forceHttp = false, onDisconnect, connectionId , Off
   const queryString = buildQueryString(query);
   
   // Use our custom WebSocket hook for Guacamole
-  const { client, connectionState, errorMessage } = useGuacWebSocket(
+  const { client, connectionState, errorMessage, isConnectionUnstable } = useGuacWebSocket(
     wsUrl, 
     httpUrl, 
     forceHttp, 
@@ -390,7 +391,11 @@ function GuacClient({ query, forceHttp = false, onDisconnect, connectionId , Off
         connectionState={connectionState} 
         onDisconnect={handleDisconnect} 
         connectionId={connectionId}
+        isConnectionUnstable={isConnectionUnstable}
+        errorMessage={errorMessage}
       />
+      
+      <Toaster position="top-right" />
     </div>
   );
 }
