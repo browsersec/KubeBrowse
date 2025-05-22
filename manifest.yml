@@ -253,7 +253,7 @@ spec:
       serviceAccountName: browser-sandbox-sa
       containers:
         - name: api
-          image:  ghcr.io/browsersec/kubebrowse:sha-8dc68f7
+          image:  ghcr.io/browsersec/kubebrowse:sha-c06606f
           imagePullPolicy: Always
           ports:
             - containerPort: 4567

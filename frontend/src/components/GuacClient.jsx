@@ -30,7 +30,7 @@ const buildQueryString = (queryObj) => {
   return params.toString();
 };
 
-function GuacClient({ query, forceHttp = false, onDisconnect, connectionId }) {
+function GuacClient({ query, forceHttp = false, onDisconnect, connectionId , OfficeSession = true }) {
   const [connected, setConnected] = useState(false);
   
   // Convert query object to proper query string
@@ -386,6 +386,7 @@ function GuacClient({ query, forceHttp = false, onDisconnect, connectionId }) {
       <Modal ref={modalRef} onRetry={handleReconnect} />
       
       <WebSocketControl 
+        OfficeSession={OfficeSession}
         connectionState={connectionState} 
         onDisconnect={handleDisconnect} 
         connectionId={connectionId}

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { Chrome , Shredder ,Share } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 
 export default function Sidebar() {
@@ -33,16 +34,40 @@ export default function Sidebar() {
       <nav className="flex-grow overflow-y-auto py-6">
         <div className="mb-6 px-4">
           <NavLink 
-            to="/"
+            to="/browser-session"
             className={({ isActive }) => 
               `flex items-center py-3 px-4 rounded-lg transition-colors ${isActive ? 'bg-blue-700' : 'hover:bg-gray-800'}`
             }
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-3-3v6m9-6a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
+            <Chrome />
+            {expanded && <span className="ml-3">Browser Session</span>}
+          </NavLink>
+        </div>
+      
+        <div className="mb-6 px-4">
+          <NavLink 
+            to="/office-session"
+            className={({ isActive }) => 
+              `flex items-center py-3 px-4 rounded-lg transition-colors ${isActive ? 'bg-blue-700' : 'hover:bg-gray-800'}`
+            }
+          >
+            <Shredder />
             {expanded && <span className="ml-3">Office Session</span>}
           </NavLink>
+        </div>
+
+        {/* share websocket_url connect button  */}
+        <div className='mb-6 px-4'> 
+          <NavLink 
+            to="/share-ws-url"
+            className={({ isActive }) => 
+              `flex items-center py-3 px-4 rounded-lg transition-colors ${isActive ? 'bg-blue-700' : 'hover:bg-gray-800'}`
+            }
+          >
+            <Share />
+            {expanded && <span className="ml-3">Share WS URL</span>}
+          </NavLink>
+
         </div>
       </nav>
 

@@ -13,7 +13,8 @@ import DashboardLayout from './layouts/DashboardLayout'
 import SettingsRoute from './routes/SettingsRoute'
 import NotFoundRoute from './routes/NotFoundRoute'
 import OfficeSessionRoute from './routes/OfficeSessionRoute'
-
+import BrowserSessionRoute from './routes/BrowserSessionRoute'
+import ShareWSRoute from './routes/ShareWSRoute'
 const router = createBrowserRouter([
   {
     path: '/',
@@ -30,6 +31,14 @@ const router = createBrowserRouter([
       {
         path: 'office-session',
         element: <OfficeSessionRoute />
+      },
+      {
+        path: 'browser-session',
+        element: <BrowserSessionRoute />
+      },
+      {
+        path: 'share-ws-url',
+        element: <ShareWSRoute />
       }
     ]
   },

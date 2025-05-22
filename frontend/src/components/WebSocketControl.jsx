@@ -1,12 +1,17 @@
 import { useState, useEffect, useRef } from "react";
-import { Upload } from "lucide-react";
+import { Upload, Clipboard, ClipboardCheck } from "lucide-react";
 
 /**
  * A collapsible control panel for WebSocket connection management
  * positioned in the bottom right of the screen with a high z-index
  */
-function WebSocketControl({ connectionState, onDisconnect, connectionId }) {
-  const [expanded, setExpanded] = useState(false);
+function WebSocketControl({
+  connectionState,
+  onDisconnect,
+  connectionId,
+  OfficeSession = true,
+}) {
+  const [expanded, setExpanded] = useState(true);
   const [disconnecting, setDisconnecting] = useState(false);
   const [animationTimeout, setAnimationTimeout] = useState(null);
   // Upload state
@@ -16,6 +21,8 @@ function WebSocketControl({ connectionState, onDisconnect, connectionId }) {
   const [uploadSuccess, setUploadSuccess] = useState(false);
   const fileInputRef = useRef();
 
+  // copied to clipboard state
+  const [copiedToClipboard, setCopiedToClipboard] = useState(false);
   // Clear animation timeout on unmount
   useEffect(() => {
     return () => {
@@ -89,15 +96,38 @@ function WebSocketControl({ connectionState, onDisconnect, connectionId }) {
     }
   };
 
+  // Share session handler
+  const handleShareSession = async () => {
+    if (!connectionId) return;
+
+    try {
+      const response = await fetch(`/test/share/${connectionId}`, {
+        method: "GET",
+        redirect: "follow",
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const url = data.websocket_url;
+        await navigator.clipboard.writeText(url);
+        setCopiedToClipboard(true);
+        setTimeout(() => setCopiedToClipboard(false), 2000);
+      } else {
+        console.error("Failed to share session");
+      }
+    } catch (error) {
+      console.error("Error sharing session:", error);
+    }
+  };
+
   // Determine connection status for display
   const isConnected =
     connectionState === "CONNECTED" || connectionState === "WAITING";
 
   return (
     <div
-      className={`fixed bottom-5 right-5 z-50 bg-white rounded-lg shadow-lg overflow-hidden transition-all duration-300 ease-in-out min-w-[50px] max-w-[250px] ${
-        expanded ? "w-[200px] h-auto" : "w-[50px] h-[50px]"
-      }`}
+      className={`fixed bottom-5 right-5 z-50 bg-white rounded-lg shadow-lg overflow-hidden transition-all duration-300 ease-in-out min-w-[50px] max-w-[250px] ${expanded ? "w-[200px] h-auto" : "w-[50px] h-[50px]"
+        }`}
     >
       <div
         className="flex justify-between items-center p-2.5 cursor-pointer bg-gray-100 border-b border-gray-200 select-none"
@@ -105,21 +135,20 @@ function WebSocketControl({ connectionState, onDisconnect, connectionId }) {
       >
         <div className="flex items-center gap-2">
           <div
-            className={`w-3 h-3 rounded-full ${
-              disconnecting
-                ? "bg-yellow-500 animate-pulse animate-pulse-glow"
-                : isConnected
+            className={`w-3 h-3 rounded-full ${disconnecting
+              ? "bg-yellow-500 animate-pulse animate-pulse-glow"
+              : isConnected
                 ? "bg-green-500 shadow-[0_0_5px_#4CAF50]"
                 : "bg-red-500 shadow-[0_0_5px_#f44336]"
-            }`}
+              }`}
           ></div>
           {expanded && (
             <span className="text-sm text-gray-800 whitespace-nowrap overflow-hidden text-ellipsis">
               {disconnecting
                 ? "Disconnecting..."
                 : isConnected
-                ? "Connected"
-                : connectionState}
+                  ? "Connected"
+                  : connectionState}
             </span>
           )}
         </div>
@@ -130,8 +159,24 @@ function WebSocketControl({ connectionState, onDisconnect, connectionId }) {
 
       {expanded && (
         <div className="p-2.5">
+          {/* Session share to clipboard */}
+          <div className="mb-2 flex items-center gap-2">
+            <button
+              onClick={handleShareSession}
+              title="Copy connection ID to clipboard"
+              className="p-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors disabled:opacity-50"
+              disabled={copiedToClipboard}
+            >
+              {copiedToClipboard ? (
+                <ClipboardCheck className="w-5 h-5" />
+              ) : (
+                <Clipboard className="w-5 h-5" />
+              )}
+            </button>
+          </div>
+
           {/* Upload UI */}
-          {connectionId && (
+          {connectionId && OfficeSession && (
             <div className="mb-2 flex items-center gap-2">
               <button
                 onClick={handleFileUploadClick}
@@ -170,13 +215,12 @@ function WebSocketControl({ connectionState, onDisconnect, connectionId }) {
             </div>
           )}
           <button
-            className={`w-full py-2 px-3 rounded text-white border-none transition-colors relative overflow-hidden ${
-              disconnecting
-                ? "bg-yellow-500 cursor-wait"
-                : isConnected
+            className={`w-full py-2 px-3 rounded text-white border-none transition-colors relative overflow-hidden ${disconnecting
+              ? "bg-yellow-500 cursor-wait"
+              : isConnected
                 ? "bg-red-500 hover:bg-red-700 cursor-pointer"
                 : "bg-gray-300 cursor-not-allowed"
-            }`}
+              }`}
             onClick={handleDisconnect}
             disabled={!isConnected || disconnecting}
           >
@@ -215,3 +259,4 @@ function WebSocketControl({ connectionState, onDisconnect, connectionId }) {
 }
 
 export default WebSocketControl;
+
