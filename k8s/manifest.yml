@@ -299,6 +299,10 @@ spec:
                 secretKeyRef:
                   name: minio-secret
                   key: secret-key
+            - name: MINIO_BUCKET
+              value: "browser-sandbox"
+            - name: CLAMAV_ADDR
+              value: "http://clamd-api.browser-sandbox.svc.cluster:3000"
             - name: KUBERNETES_NAMESPACE
               value: "browser-sandbox"
           securityContext: {}

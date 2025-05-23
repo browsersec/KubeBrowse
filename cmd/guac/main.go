@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"net"
@@ -11,6 +12,7 @@ import (
 	guac "github.com/browsersec/KubeBrowse"
 	"github.com/browsersec/KubeBrowse/api"
 	"github.com/browsersec/KubeBrowse/docs"
+	"github.com/browsersec/KubeBrowse/internal/minio"
 	redis2 "github.com/browsersec/KubeBrowse/internal/redis"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -31,10 +33,19 @@ var (
 	guacdAddr    = "0.0.0.0:4822"
 	k8sClient    *kubernetes.Clientset
 	k8sNamespace = "browser-sandbox"
+	clamavAddr   = "http://clamd-api.browser-sandbox.svc.cluster:3000"
+	minioAddr    = "minio.browser-sandbox.svc.cluster:9000"
 )
 
 var activeTunnels *guac.ActiveTunnelStore
 var redisClient *redis.Client
+
+type MinioConfig struct {
+	bucketName string
+	minioAddr  string
+	accessKey  string
+	secretKey  string
+}
 
 // GinHandlerAdapter adapts http.Handler to gin.HandlerFunc
 func GinHandlerAdapter(h http.Handler) gin.HandlerFunc {
@@ -45,6 +56,33 @@ func GinHandlerAdapter(h http.Handler) gin.HandlerFunc {
 
 func main() {
 	redisClient = redis2.InitRedis()
+
+	minioConfig := &MinioConfig{
+		bucketName: "kubebrowse-files",
+		minioAddr:  minioAddr,
+		accessKey:  os.Getenv("MINIO_ACCESS_KEY"),
+		secretKey:  os.Getenv("MINIO_SECRET_KEY"),
+	}
+	if minioConfig.accessKey == "" || minioConfig.secretKey == "" {
+		logrus.Fatal("MINIO_ACCESS_KEY and MINIO_SECRET_KEY environment variables must be set")
+	}
+	// Initialize MinIO client
+	minioClient, err := minio.NewMinioClient(minioConfig.minioAddr, minioConfig.accessKey, minioConfig.secretKey, true)
+	if err != nil {
+		logrus.Fatalf("Failed to create MinIO client: %v", err)
+	}
+	// Check if MinIO bucket exists
+	err = minioClient.CreateBucket(context.Background(), "kubebrowse-files", "us-east-1")
+	if err != nil {
+		logrus.Warnf("Failed to create MinIO bucket: %v", err)
+	}
+	// clamav env check
+	if os.Getenv("CLAMAV_ADDRESS") == "" {
+		logrus.Fatal("CLAMAV_ADDRESS environment variable must be set")
+	} else {
+		clamavAddr = os.Getenv("CLAMAV_ADDRESS")
+	}
+
 	// Parse command line flags
 	helpFlag := flag.Bool("h", false, "Display help information")
 	flag.Parse()
@@ -230,7 +268,7 @@ func main() {
 
 		// Tunnel a Pod Rest API to Upload a file to a pod
 		sessionRoutes.POST("/:connectionID/upload", func(c *gin.Context) {
-			api.HandlerUploadFile(c, redisClient, k8sClient)
+			api.HandlerUploadFile(c, redisClient, k8sClient, minioClient.Client, minioConfig.bucketName, clamavAddr, 20)
 		})
 	}
 

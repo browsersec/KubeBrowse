@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	k8s2 "github.com/browsersec/KubeBrowse/internal/k8s"
 	"net"
 	"net/http"
 	"net/url"
@@ -11,7 +12,6 @@ import (
 
 	guac "github.com/browsersec/KubeBrowse"
 	redis2 "github.com/browsersec/KubeBrowse/internal/redis"
-	"github.com/browsersec/KubeBrowse/k8s"
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis/v8"
 	"github.com/google/uuid"
@@ -58,7 +58,7 @@ func DeployOffice(c *gin.Context, k8sClient *kubernetes.Clientset, k8sNamespace 
 	podName := "office-" + uuid.New().String()[0:8]
 
 	// Create an office sandbox pod
-	pod, err := k8s.CreateOfficeSandboxPod(k8sClient, k8sNamespace, podName)
+	pod, err := k8s2.CreateOfficeSandboxPod(k8sClient, k8sNamespace, podName)
 	if err != nil {
 		logrus.Errorf("Failed to create office pod: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -74,7 +74,7 @@ func DeployOffice(c *gin.Context, k8sClient *kubernetes.Clientset, k8sNamespace 
 	connectionID := uuid.New().String()
 
 	// Wait for pod readiness and RDP port
-	err = k8s.WaitForPodReadyAndRDP(k8sClient, k8sNamespace, pod.Name, fqdn, 60*time.Second)
+	err = k8s2.WaitForPodReadyAndRDP(k8sClient, k8sNamespace, pod.Name, fqdn, 60*time.Second)
 	if err != nil {
 		logrus.Errorf("Pod not ready: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Pod not ready for RDP connection"})
@@ -173,7 +173,7 @@ func DeployBrowser(c *gin.Context, k8sClient *kubernetes.Clientset, k8sNamespace
 	podName := "browser-" + uuid.New().String()[0:8]
 
 	// Create an office sandbox pod
-	pod, err := k8s.CreateBrowserSandboxPod(k8sClient, k8sNamespace, podName)
+	pod, err := k8s2.CreateBrowserSandboxPod(k8sClient, k8sNamespace, podName)
 	if err != nil {
 		logrus.Errorf("Failed to create office pod: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -189,7 +189,7 @@ func DeployBrowser(c *gin.Context, k8sClient *kubernetes.Clientset, k8sNamespace
 	connectionID := uuid.New().String()
 
 	// Wait for pod readiness and RDP port
-	err = k8s.WaitForPodReadyAndRDP(k8sClient, k8sNamespace, pod.Name, fqdn, 60*time.Second)
+	err = k8s2.WaitForPodReadyAndRDP(k8sClient, k8sNamespace, pod.Name, fqdn, 60*time.Second)
 	if err != nil {
 		logrus.Errorf("Pod not ready: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Pod not ready for RDP connection"})
@@ -347,7 +347,7 @@ func HandlerBrowserPod(c *gin.Context, activeTunnels *guac.ActiveTunnelStore, k8
 	userID := "test-" + uuid.New().String()[0:8]
 
 	// Create a browser sandbox pod
-	pod, err := k8s.CreateBrowserSandboxPod(k8sClient, k8sNamespace, userID+"-browser")
+	pod, err := k8s2.CreateBrowserSandboxPod(k8sClient, k8sNamespace, userID+"-browser")
 	if err != nil {
 		logrus.Errorf("Failed to create browser pod: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -381,7 +381,7 @@ func HandlerOfficePod(c *gin.Context, activeTunnels *guac.ActiveTunnelStore, k8s
 	userID := "test-" + uuid.New().String()[0:8]
 
 	// Create an office sandbox pod
-	pod, err := k8s.CreateOfficeSandboxPod(k8sClient, k8sNamespace, userID+"-office")
+	pod, err := k8s2.CreateOfficeSandboxPod(k8sClient, k8sNamespace, userID+"-office")
 	if err != nil {
 		logrus.Errorf("Failed to create office pod: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
