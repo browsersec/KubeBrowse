@@ -1,0 +1,77 @@
+---
+# Updated Istio VirtualService for authentication routing
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: browser-sandbox-auth
+  namespace: browser-sandbox
+spec:
+  hosts:
+    - "sandbox.example.com"
+  gateways:
+    - browser-sandbox-gateway
+  http:
+    # Dex IdP routes
+    - match:
+        - uri:
+            prefix: "/dex"
+      route:
+        - destination:
+            host: dex
+            port:
+              number: 5556
+    - match:
+        - uri:
+            prefix: "/auth"
+      route:
+        - destination:
+            host: browser-sandbox-api
+            port:
+              number: 4567
+    # API routes
+    - match:
+        - uri:
+            prefix: "/api"
+      route:
+        - destination:
+            host: browser-sandbox-api
+            port:
+              number: 4567
+    # WebSocket routes
+    - match:
+        - uri:
+            prefix: "/websocket"
+      route:
+        - destination:
+            host: browser-sandbox-api
+            port:
+              number: 4567
+    - match:
+        - uri:
+            prefix: "/tunnel"
+      route:
+        - destination:
+            host: browser-sandbox-api
+            port:
+              number: 4567
+    # Default route for frontend
+    - route:
+        - destination:
+            host: browser-sandbox-frontend
+            port:
+              number: 8000
+---
+# Service for Dex external access (optional)
+apiVersion: v1
+kind: Service
+metadata:
+  name: dex-external
+  namespace: browser-sandbox
+spec:
+  type: NodePort
+  ports:
+    - port: 5556
+      targetPort: 5556
+      nodePort: 30008
+  selector:
+    app: dex

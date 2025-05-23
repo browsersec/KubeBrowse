@@ -12,6 +12,7 @@ import (
 	guac "github.com/browsersec/KubeBrowse"
 	"github.com/browsersec/KubeBrowse/api"
 	"github.com/browsersec/KubeBrowse/docs"
+	"github.com/browsersec/KubeBrowse/internal/auth"
 	"github.com/browsersec/KubeBrowse/internal/minio"
 	redis2 "github.com/browsersec/KubeBrowse/internal/redis"
 	"github.com/gin-contrib/cors"
@@ -104,6 +105,12 @@ func main() {
 	if os.Getenv("CLAMAV_ADDRESS") != "" {
 		clamavAddr = os.Getenv("CLAMAV_ADDRESS")
 		logrus.Infof("Using ClamAV address from environment: %s", clamavAddr)
+	}
+
+	// DexIDP configuration
+	dexServer, err := auth.InitDexServer()
+	if err != nil {
+		logrus.Warnf("Failed to connect to DexIDP")
 	}
 
 	// Parse command line flags
@@ -235,6 +242,13 @@ func main() {
 		logrus.Debugf("Websocket disconnected, removing tunnel: %s", connectionID)
 		activeTunnels.Delete(connectionID, req, tunnel)
 	}
+
+	//  DexIDP Routes
+	router.GET("/auth/login", dexServer.HandleLogin)
+	router.GET("/callback", dexServer.HandleCallback)
+	router.POST("/auth/verify", dexServer.HandleVerifyToken)
+	router.GET("/auth/user", dexServer.AuthMiddleware(), dexServer.HandleGetUser)
+	router.POST("/auth/logout", dexServer.HandleLogout)
 
 	// Setup routes using Gin
 	router.Any("/tunnel", GinHandlerAdapter(servlet))

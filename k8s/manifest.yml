@@ -305,6 +305,20 @@ spec:
               value: "http://clamd-api.browser-sandbox.svc.cluster.local:3000"
             - name: KUBERNETES_NAMESPACE
               value: "browser-sandbox"
+            # Dex IdP Configuration
+            - name: DEX_ISSUER
+              value: "http://dex.browser-sandbox.svc.cluster.local:5556"
+            - name: OAUTH_CLIENT_ID
+              value: "react-app"
+            - name: OAUTH_CLIENT_SECRET
+              value: "ZXhhbXBsZS1hcHAtc2VjcmV0"
+            - name: OAUTH_REDIRECT_URL
+              value: "http://browser-sandbox-api.browser-sandbox.svc.cluster.local:4567/callback"
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: auth-secret
+                  key: jwt-secret
           securityContext: {}
 ---
 # API Service
@@ -474,6 +488,16 @@ data:
   access-key: bWluaW9hY2Nlc3NrZXk= # base64 encoded "minioaccesskey"
   secret-key: bWluaW9zZWNyZXRrZXk= # base64 encoded "miniosecretkey"
 ---
+# Auth Secret for JWT signing
+apiVersion: v1
+kind: Secret
+metadata:
+  name: auth-secret
+  namespace: browser-sandbox
+type: Opaque
+data:
+  jwt-secret: eW91ci1qd3Qtc2VjcmV0LWtleS1oZXJl # base64 encoded "your-jwt-secret-key-here"
+---
 # Frontend Deployment
 apiVersion: apps/v1
 kind: Deployment
@@ -540,4 +564,3 @@ spec:
     - name: rdp
       port: 3389
       targetPort: rdp # Matches the named port "rdp" (3389) in the pod spec
----

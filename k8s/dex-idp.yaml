@@ -1,0 +1,672 @@
+---
+# Dex ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dex-config
+  namespace: browser-sandbox
+data:
+  config.yaml: |
+    issuer: http://dex.browser-sandbox.svc.cluster.local:5556
+    
+    storage:
+      type: postgres
+      config:
+        host: postgres.browser-sandbox.svc.cluster.local
+        port: 5432
+        database: sandbox_db
+        user: $POSTGRES_USER
+        password: $POSTGRES_PASSWORD
+        ssl:
+          mode: disable
+    
+    web:
+      http: 0.0.0.0:5556
+    
+    connectors:
+    - type: github
+      id: github
+      name: GitHub
+      config:
+        clientID: $GITHUB_CLIENT_ID
+        clientSecret: $GITHUB_CLIENT_SECRET
+        redirectURI: http://dex.browser-sandbox.svc.cluster.local:5556/callback
+        loadAllGroups: false
+        teamNameField: slug
+        useLoginAsID: false
+    
+    oauth2:
+      skipApprovalScreen: true
+      responseTypes: ["code", "token", "id_token"]
+    
+    staticClients:
+    - id: kubebrowse
+      redirectURIs:
+      - 'http://localhost:4567/callback'
+      - 'http://browser-sandbox-api.browser-sandbox.svc.cluster.local:4567/callback'
+      - 'https://sandbox.example.com/callback'
+      name: 'KubeBrowse'
+      secret: kubebrowse-secret
+    
+    - id: react-app
+      redirectURIs:
+      - 'http://localhost:8080/callback'
+      - 'http://browser-sandbox-api.browser-sandbox.svc.cluster.local:4567/callback'
+      - 'https://sandbox.example.com/callback'
+      name: 'KubeBrowse React App'
+      secret: ZXhhbXBsZS1hcHAtc2VjcmV0
+    
+    enablePasswordDB: false
+    
+    logger:
+      level: "debug"
+      format: "text"
+---
+# Dex Secret for GitHub OAuth credentials
+apiVersion: v1
+kind: Secret
+metadata:
+  name: dex-github-secret
+  namespace: browser-sandbox
+type: Opaque
+data:
+  # Replace these with your actual base64 encoded GitHub OAuth app credentials
+  # To generate: echo -n "your-github-client-id" | base64
+  github-client-id: eW91ci1naXRodWItY2xpZW50LWlk # base64 encoded "your-github-client-id"
+  github-client-secret: eW91ci1naXRodWItY2xpZW50LXNlY3JldA== # base64 encoded "your-github-client-secret"
+---
+# Dex ServiceAccount
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: dex
+  namespace: browser-sandbox
+---
+# Dex Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dex
+  namespace: browser-sandbox
+  labels:
+    app: dex
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dex
+  template:
+    metadata:
+      labels:
+        app: dex
+    spec:
+      serviceAccountName: dex
+      containers:
+      - name: dex
+        image: ghcr.io/dexidp/dex:v2.37.0
+        args:
+        - dex
+        - serve
+        - /etc/dex/cfg/config.yaml
+        ports:
+        - name: http
+          containerPort: 5556
+        env:
+        - name: GITHUB_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              name: dex-github-secret
+              key: github-client-id
+        - name: GITHUB_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: dex-github-secret
+              key: github-client-secret
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secret
+              key: username
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secret
+              key: password
+        volumeMounts:
+        - name: config
+          mountPath: /etc/dex/cfg
+        readinessProbe:
+          httpGet:
+            path: /healthz/ready
+            port: 5556
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /healthz/live
+            port: 5556
+          initialDelaySeconds: 30
+          periodSeconds: 30
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+      volumes:
+      - name: config
+        configMap:
+          name: dex-config
+          items:
+          - key: config.yaml
+            path: config.yaml
+---
+# Dex Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: dex
+  namespace: browser-sandbox
+  labels:
+    app: dex
+spec:
+  type: ClusterIP
+  selector:
+    app: dex
+  ports:
+  - name: http
+    port: 5556
+    targetPort: 5556
+    protocol: TCP
+---
+# Service for Dex external access (optional for testing)
+apiVersion: v1
+kind: Service
+metadata:
+  name: dex-external
+  namespace: browser-sandbox
+spec:
+  type: NodePort
+  ports:
+    - port: 5556
+      targetPort: 5556
+      nodePort: 30008
+  selector:
+    app: dex
+      volumes:
+      - name: config
+        configMap:
+          name: dex-config
+          items:
+          - key: config.yaml
+            path: config.yaml
+---
+# Dex Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: dex
+  namespace: browser-sandbox
+  labels:
+    app: dex
+spec:
+  type: ClusterIP
+  selector:
+    app: dex
+  ports:
+  - name: http
+    port: 5556
+    targetPort: 5556
+    protocol: TCP
+---
+# Dex CRDs (Custom Resource Definitions)
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: authcodes.dex.coreos.com
+spec:
+  group: dex.coreos.com
+  versions:
+  - name: v1
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            properties:
+              clientID:
+                type: string
+              scopes:
+                type: array
+                items:
+                  type: string
+              redirectURI:
+                type: string
+              nonce:
+                type: string
+              state:
+                type: string
+              forceApprovalPrompt:
+                type: boolean
+              loggedIn:
+                type: boolean
+              claimsUserID:
+                type: string
+              claimsUsername:
+                type: string
+              claimsEmail:
+                type: string
+              claimsEmailVerified:
+                type: boolean
+              claimsGroups:
+                type: array
+                items:
+                  type: string
+              claimsPreferredUsername:
+                type: string
+              connectorID:
+                type: string
+              connectorData:
+                type: object
+                x-kubernetes-preserve-unknown-fields: true
+              expiry:
+                type: string
+                format: date-time
+          status:
+            type: object
+  scope: Namespaced
+  names:
+    plural: authcodes
+    singular: authcode
+    kind: AuthCode
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: authrequests.dex.coreos.com
+spec:
+  group: dex.coreos.com
+  versions:
+  - name: v1
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            properties:
+              clientID:
+                type: string
+              scopes:
+                type: array
+                items:
+                  type: string
+              redirectURI:
+                type: string
+              nonce:
+                type: string
+              state:
+                type: string
+              forceApprovalPrompt:
+                type: boolean
+              loggedIn:
+                type: boolean
+              claimsUserID:
+                type: string
+              claimsUsername:
+                type: string
+              claimsEmail:
+                type: string
+              claimsEmailVerified:
+                type: boolean
+              claimsGroups:
+                type: array
+                items:
+                  type: string
+              claimsPreferredUsername:
+                type: string
+              connectorID:
+                type: string
+              connectorData:
+                type: object
+                x-kubernetes-preserve-unknown-fields: true
+              expiry:
+                type: string
+                format: date-time
+          status:
+            type: object
+  scope: Namespaced
+  names:
+    plural: authrequests
+    singular: authrequest
+    kind: AuthRequest
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: connectors.dex.coreos.com
+spec:
+  group: dex.coreos.com
+  versions:
+  - name: v1
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            properties:
+              type:
+                type: string
+              name:
+                type: string
+              id:
+                type: string
+              config:
+                type: object
+                x-kubernetes-preserve-unknown-fields: true
+          status:
+            type: object
+  scope: Namespaced
+  names:
+    plural: connectors
+    singular: connector
+    kind: Connector
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: devicerequests.dex.coreos.com
+spec:
+  group: dex.coreos.com
+  versions:
+  - name: v1
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            properties:
+              userCode:
+                type: string
+              deviceCode:
+                type: string
+              clientID:
+                type: string
+              scopes:
+                type: array
+                items:
+                  type: string
+              expiry:
+                type: string
+                format: date-time
+          status:
+            type: object
+  scope: Namespaced
+  names:
+    plural: devicerequests
+    singular: devicerequest
+    kind: DeviceRequest
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: devicetokens.dex.coreos.com
+spec:
+  group: dex.coreos.com
+  versions:
+  - name: v1
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            properties:
+              deviceCode:
+                type: string
+              status:
+                type: string
+              token:
+                type: object
+                x-kubernetes-preserve-unknown-fields: true
+              expiry:
+                type: string
+                format: date-time
+              lastRequest:
+                type: string
+                format: date-time
+              pollInterval:
+                type: integer
+          status:
+            type: object
+  scope: Namespaced
+  names:
+    plural: devicetokens
+    singular: devicetoken
+    kind: DeviceToken
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: oauth2clients.dex.coreos.com
+spec:
+  group: dex.coreos.com
+  versions:
+  - name: v1
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            properties:
+              id:
+                type: string
+              secret:
+                type: string
+              redirectURIs:
+                type: array
+                items:
+                  type: string
+              trustedPeers:
+                type: array
+                items:
+                  type: string
+              public:
+                type: boolean
+              name:
+                type: string
+              logoURL:
+                type: string
+          status:
+            type: object
+  scope: Namespaced
+  names:
+    plural: oauth2clients
+    singular: oauth2client
+    kind: OAuth2Client
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: offlinesessionses.dex.coreos.com
+spec:
+  group: dex.coreos.com
+  versions:
+  - name: v1
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            properties:
+              userID:
+                type: string
+              connID:
+                type: string
+              refresh:
+                type: object
+                x-kubernetes-preserve-unknown-fields: true
+              connectorData:
+                type: object
+                x-kubernetes-preserve-unknown-fields: true
+          status:
+            type: object
+  scope: Namespaced
+  names:
+    plural: offlinesessionses
+    singular: offlinesessions
+    kind: OfflineSessions
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: passwords.dex.coreos.com
+spec:
+  group: dex.coreos.com
+  versions:
+  - name: v1
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            properties:
+              email:
+                type: string
+              hash:
+                type: string
+              username:
+                type: string
+              userID:
+                type: string
+          status:
+            type: object
+  scope: Namespaced
+  names:
+    plural: passwords
+    singular: password
+    kind: Password
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: refreshtokens.dex.coreos.com
+spec:
+  group: dex.coreos.com
+  versions:
+  - name: v1
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            properties:
+              clientID:
+                type: string
+              scopes:
+                type: array
+                items:
+                  type: string
+              nonce:
+                type: string
+              claimsUserID:
+                type: string
+              claimsUsername:
+                type: string
+              claimsEmail:
+                type: string
+              claimsEmailVerified:
+                type: boolean
+              claimsGroups:
+                type: array
+                items:
+                  type: string
+              claimsPreferredUsername:
+                type: string
+              connectorID:
+                type: string
+              connectorData:
+                type: object
+                x-kubernetes-preserve-unknown-fields: true
+              token:
+                type: string
+              obsoleteToken:
+                type: string
+              createdAt:
+                type: string
+                format: date-time
+              lastUsed:
+                type: string
+                format: date-time
+          status:
+            type: object
+  scope: Namespaced
+  names:
+    plural: refreshtokens
+    singular: refreshtoken
+    kind: RefreshToken
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: signingkeies.dex.coreos.com
+spec:
+  group: dex.coreos.com
+  versions:
+  - name: v1
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            properties:
+              verificationKeys:
+                type: array
+                items:
+                  type: object
+                  x-kubernetes-preserve-unknown-fields: true
+              signingKey:
+                type: object
+                x-kubernetes-preserve-unknown-fields: true
+              signingKeyPub:
+                type: object
+                x-kubernetes-preserve-unknown-fields: true
+              nextRotation:
+                type: string
+                format: date-time
+          status:
+            type: object
+  scope: Namespaced
+  names:
+    plural: signingkeies
+    singular: signingkey
+    kind: SigningKey
