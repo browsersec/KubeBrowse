@@ -144,31 +144,125 @@ func readFileToBuffer(fileHeader *multipart.FileHeader) (*FileBuffer, error) {
 	}, nil
 }
 
+// HandlerUploadFileWithoutMinio handles file uploads without MinIO storage
+func HandlerUploadFileWithoutMinio(c *gin.Context, redisClient *redis.Client, k8sClient *kubernetes.Clientset, clamavurl string, timeout time.Duration) {
+	start := time.Now()
+
+	// Get connection URL
+	url, err := getFQDNURL(c.Param("connectionID"), redisClient)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if url == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid connection ID"})
+		return
+	}
+
+	// Get uploaded file
+	fileHeader, err := c.FormFile("file")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "file is required"})
+		return
+	}
+
+	// Read file once into memory buffer
+	fileBuffer, err := readFileToBuffer(fileHeader)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to read file: " + err.Error()})
+		return
+	}
+
+	// Create context with timeout for all operations
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	// Perform limited uploads (only to container and ClamAV)
+	results := make([]UploadResult, 2)
+
+	// Upload to Office/Browser container (primary function)
+	results[0] = uploadOfficeContainer(ctx, fileBuffer, url)
+
+	// Try ClamAV scan if URL is provided
+	if clamavurl != "" {
+		// Use a shorter timeout for ClamAV scan
+		scanCtx, scanCancel := context.WithTimeout(ctx, timeout*time.Second)
+		defer scanCancel()
+
+		results[1] = uploadToClamAV(scanCtx, fileBuffer, clamavurl, timeout*time.Second)
+	} else {
+		results[1] = UploadResult{
+			Service: "clamav",
+			Success: false,
+			Error:   "ClamAV service address not configured",
+		}
+	}
+
+	// Determine overall success - only consider container upload for success
+	overallSuccess := results[0].Success
+
+	statusCode := http.StatusOK
+	if !overallSuccess {
+		statusCode = http.StatusMultiStatus // 207
+	}
+
+	response := MultiUploadResponse{
+		Success: overallSuccess,
+		Results: results,
+		Message: fmt.Sprintf("Upload completed in %v", time.Since(start)),
+	}
+
+	c.JSON(statusCode, response)
+}
+
 // performConcurrentUploads executes all uploads concurrently
 func performConcurrentUploads(ctx context.Context, fileBuffer *FileBuffer, officePodUrl string, minioClient *minio.Client, minioBucket string, clamavAddr string, timeout time.Duration) []UploadResult {
 	var wg sync.WaitGroup
 	results := make([]UploadResult, 3)
+	mutex := &sync.Mutex{}
 
-	// Upload to Docker container
+	// Upload to Docker container - this is the primary function
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		results[0] = uploadOfficeContainer(ctx, fileBuffer, officePodUrl)
+		result := uploadOfficeContainer(ctx, fileBuffer, officePodUrl)
+		mutex.Lock()
+		results[0] = result
+		mutex.Unlock()
 	}()
 
-	// Upload to ClamAV
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		results[1] = uploadToClamAV(ctx, fileBuffer, clamavAddr, timeout)
-	}()
+	// Upload to ClamAV - make this optional with its own timeout
+	if clamavAddr != "" {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			// Create a shorter context for ClamAV to prevent blocking other operations
+			scanCtx, scanCancel := context.WithTimeout(ctx, timeout*time.Second)
+			defer scanCancel()
 
-	// Upload to MinIO
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		results[2] = uploadToMinIO(ctx, fileBuffer, minioClient, minioBucket)
-	}()
+			result := uploadToClamAV(scanCtx, fileBuffer, clamavAddr, timeout*time.Second)
+			mutex.Lock()
+			results[1] = result
+			mutex.Unlock()
+		}()
+	} else {
+		results[1] = UploadResult{Service: "clamav", Success: false, Error: "ClamAV service address not configured"}
+	}
+
+	// Upload to MinIO - make sure client and bucket are valid
+	if minioClient != nil && minioBucket != "" {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			result := uploadToMinIO(ctx, fileBuffer, minioClient, minioBucket)
+			mutex.Lock()
+			results[2] = result
+			mutex.Unlock()
+		}()
+	} else {
+		results[2] = UploadResult{Service: "minio", Success: false, Error: "MinIO client or bucket not configured"}
+	}
 
 	wg.Wait()
 	return results
@@ -262,6 +356,8 @@ func uploadToClamAV(ctx context.Context, fileBuffer *FileBuffer, clamavurl strin
 	// Create scan URL
 	scanURL := clamavurl + "/api/v1/scan"
 
+	logrus.Infof("Sending scan request to ClamAV at %s", scanURL)
+
 	// Create request with context
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, scanURL, payload)
 	if err != nil {
@@ -271,11 +367,21 @@ func uploadToClamAV(ctx context.Context, fileBuffer *FileBuffer, clamavurl strin
 	// Set proper headers for multipart/form-data
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 
-	// Send request with timeout
+	// Send request with timeout - use a shorter timeout to prevent blocking other uploads
 	client := &http.Client{Timeout: timeout}
 	resp, err := client.Do(req)
 	if err != nil {
-		return UploadResult{Service: "clamav", Success: false, Error: "scan request failed: " + err.Error()}
+		// Log the error but don't treat ClamAV failure as critical
+		logrus.Warnf("ClamAV scan failed: %v", err)
+		return UploadResult{
+			Service: "clamav",
+			Success: false,
+			Error:   "scan request failed: " + err.Error(),
+			Data: map[string]interface{}{
+				"endpoint": scanURL,
+				"status":   "File upload succeeded but virus scan was skipped",
+			},
+		}
 	}
 	defer func() {
 		if err := resp.Body.Close(); err != nil {

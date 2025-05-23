@@ -33,8 +33,8 @@ var (
 	guacdAddr    = "0.0.0.0:4822"
 	k8sClient    *kubernetes.Clientset
 	k8sNamespace = "browser-sandbox"
-	clamavAddr   = "http://clamd-api.browser-sandbox.svc.cluster:3000"
-	minioAddr    = "minio.browser-sandbox.svc.cluster:9000"
+	clamavAddr   = "http://clamd-api.browser-sandbox.svc.cluster.local:3000"
+	minioAddr    = "minio.browser-sandbox.svc.cluster.local:9000"
 )
 
 var activeTunnels *guac.ActiveTunnelStore
@@ -58,29 +58,52 @@ func main() {
 	redisClient = redis2.InitRedis()
 
 	minioConfig := &MinioConfig{
-		bucketName: "kubebrowse-files",
+		bucketName: os.Getenv("MINIO_BUCKET"),
 		minioAddr:  minioAddr,
 		accessKey:  os.Getenv("MINIO_ACCESS_KEY"),
 		secretKey:  os.Getenv("MINIO_SECRET_KEY"),
 	}
+
+	// Use default bucket name if not set in environment
+	if minioConfig.bucketName == "" {
+		minioConfig.bucketName = "kubebrowse-files"
+		logrus.Info("Using default bucket name: kubebrowse-files")
+	}
+
 	if minioConfig.accessKey == "" || minioConfig.secretKey == "" {
-		logrus.Fatal("MINIO_ACCESS_KEY and MINIO_SECRET_KEY environment variables must be set")
+		logrus.Warn("MINIO_ACCESS_KEY and/or MINIO_SECRET_KEY environment variables not set, MinIO uploads will fail")
 	}
-	// Initialize MinIO client
-	minioClient, err := minio.NewMinioClient(minioConfig.minioAddr, minioConfig.accessKey, minioConfig.secretKey, true)
-	if err != nil {
-		logrus.Fatalf("Failed to create MinIO client: %v", err)
+
+	// Check if MinIO endpoint is overridden in environment
+	if os.Getenv("MINIO_ENDPOINT") != "" {
+		minioConfig.minioAddr = os.Getenv("MINIO_ENDPOINT")
+		logrus.Infof("Using MINIO_ENDPOINT from environment: %s", minioConfig.minioAddr)
 	}
-	// Check if MinIO bucket exists
-	err = minioClient.CreateBucket(context.Background(), "kubebrowse-files", "us-east-1")
-	if err != nil {
-		logrus.Warnf("Failed to create MinIO bucket: %v", err)
+
+	// Initialize MinIO client with more robust error handling
+	var minioClient *minio.MinioClient
+	if minioConfig.accessKey != "" && minioConfig.secretKey != "" {
+		var err error
+		minioClient, err = minio.NewMinioClient(minioConfig.minioAddr, minioConfig.accessKey, minioConfig.secretKey, false)
+		if err != nil {
+			logrus.Warnf("Failed to create MinIO client: %v", err)
+			logrus.Warn("File uploads to MinIO storage will not work")
+		} else {
+			// Check if MinIO bucket exists
+			err = minioClient.CreateBucket(context.Background(), minioConfig.bucketName, "us-east-1")
+			if err != nil {
+				logrus.Warnf("Failed to create MinIO bucket: %v", err)
+				logrus.Warn("Continuing without MinIO bucket creation")
+			} else {
+				logrus.Infof("Successfully connected to MinIO with bucket: %s", minioConfig.bucketName)
+			}
+		}
 	}
-	// clamav env check
-	if os.Getenv("CLAMAV_ADDRESS") == "" {
-		logrus.Fatal("CLAMAV_ADDRESS environment variable must be set")
-	} else {
+
+	// ClamAV configuration
+	if os.Getenv("CLAMAV_ADDRESS") != "" {
 		clamavAddr = os.Getenv("CLAMAV_ADDRESS")
+		logrus.Infof("Using ClamAV address from environment: %s", clamavAddr)
 	}
 
 	// Parse command line flags
@@ -268,7 +291,12 @@ func main() {
 
 		// Tunnel a Pod Rest API to Upload a file to a pod
 		sessionRoutes.POST("/:connectionID/upload", func(c *gin.Context) {
-			api.HandlerUploadFile(c, redisClient, k8sClient, minioClient.Client, minioConfig.bucketName, clamavAddr, 20)
+			// Check if minioClient is nil before passing it to the handler
+			if minioClient == nil {
+				api.HandlerUploadFileWithoutMinio(c, redisClient, k8sClient, clamavAddr, 10)
+			} else {
+				api.HandlerUploadFile(c, redisClient, k8sClient, minioClient.Client, minioConfig.bucketName, clamavAddr, 10)
+			}
 		})
 	}
 
