@@ -253,7 +253,7 @@ spec:
       serviceAccountName: browser-sandbox-sa
       containers:
         - name: api
-          image:  ghcr.io/browsersec/kubebrowse:sha-8899062
+          image:  ghcr.io/browsersec/kubebrowse:sha-101400e
           imagePullPolicy: Always
           ports:
             - containerPort: 4567
@@ -302,7 +302,7 @@ spec:
             - name: MINIO_BUCKET
               value: "browser-sandbox"
             - name: CLAMAV_ADDRESS
-              value: "http://clamd-api.browser-sandbox.svc.cluster:3000"
+              value: "http://clamd-api.browser-sandbox.svc.cluster.local:3000"
             - name: KUBERNETES_NAMESPACE
               value: "browser-sandbox"
           securityContext: {}

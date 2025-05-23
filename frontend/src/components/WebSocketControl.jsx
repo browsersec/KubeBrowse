@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Upload, Clipboard, ClipboardCheck } from "lucide-react";
+import { Upload, Clipboard, ClipboardCheck, Download, X, ChevronDown, ChevronUp } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 
 /**
@@ -22,7 +22,15 @@ function WebSocketControl({
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadError, setUploadError] = useState(null);
   const [uploadSuccess, setUploadSuccess] = useState(false);
+  const [uploadResponse, setUploadResponse] = useState(null);
+  // Track history of all uploads
+  const [uploadHistory, setUploadHistory] = useState([]);
   const fileInputRef = useRef();
+
+  // Modal state
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  // Track which upload logs are expanded in the modal
+  const [expandedLogs, setExpandedLogs] = useState({});
 
   // copied to clipboard state
   const [copiedToClipboard, setCopiedToClipboard] = useState(false);
@@ -99,6 +107,7 @@ function WebSocketControl({
     setUploadProgress(0);
     setUploadError(null);
     setUploadSuccess(false);
+    setUploadResponse(null);
     try {
       const formData = new FormData();
       formData.append("file", file);
@@ -114,6 +123,26 @@ function WebSocketControl({
         setUploading(false);
         if (xhr.status >= 200 && xhr.status < 300) {
           setUploadSuccess(true);
+          
+          // Parse and store the response
+          try {
+            const response = JSON.parse(xhr.responseText);
+            const timestamp = new Date();
+            
+            // Add timestamp and filename to the response
+            const enrichedResponse = {
+              ...response,
+              timestamp,
+              filename: file.name,
+            };
+            
+            // Add the new upload to history
+            setUploadHistory(prevHistory => [enrichedResponse, ...prevHistory]);
+            setUploadResponse(enrichedResponse);
+          } catch (parseErr) {
+            console.error("Failed to parse upload response", parseErr);
+          }
+          
           setTimeout(() => setUploadSuccess(false), 2000);
         } else {
           setUploadError("Upload failed");
@@ -124,6 +153,11 @@ function WebSocketControl({
         setUploadError("Upload failed");
       };
       xhr.send(formData);
+      xhr.onreadystatechange = () => {
+        if (xhr.readyState === XMLHttpRequest.DONE) {
+          console.log(xhr.responseText);
+        }
+      }
     } catch (err) {
       setUploading(false);
       setUploadError("Upload failed");
@@ -154,6 +188,26 @@ function WebSocketControl({
     }
   };
 
+  // Toggle log expansion in the modal
+  const toggleLogExpansion = (index) => {
+    setExpandedLogs(prev => ({
+      ...prev,
+      [index]: !prev[index]
+    }));
+  };
+
+  // Handler for showing upload logs modal
+  const handleShowLogs = () => {
+    if (uploadHistory.length > 0) {
+      setIsModalOpen(true);
+    } else {
+      toast.error("No upload logs available", {
+        duration: 2000,
+        position: "top-right",
+      });
+    }
+  };
+
   // Determine connection status for display
   const isConnected =
     connectionState === "CONNECTED" || connectionState === "WAITING";
@@ -161,6 +215,120 @@ function WebSocketControl({
   return (
     <>
       <Toaster />
+      {/* Upload Logs Modal */}
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60]">
+          <div className="bg-white rounded-lg shadow-lg max-w-3xl w-full max-h-[80vh] overflow-hidden flex flex-col text-gray-800">
+            <div className="flex justify-between items-center p-4 border-b border-gray-200">
+              <h3 className="text-lg font-medium text-gray-900">File Upload History</h3>
+              <button 
+                onClick={() => setIsModalOpen(false)} 
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-4 overflow-y-auto flex-1 text-gray-800">
+              {uploadHistory.length === 0 ? (
+                <div className="text-gray-500 text-center py-8">No upload history available</div>
+              ) : (
+                <div className="space-y-4">
+                  {uploadHistory.map((entry, historyIndex) => (
+                    <div key={historyIndex} className="border border-gray-200 rounded-lg overflow-hidden">
+                      <div 
+                        className="flex justify-between items-center p-3 bg-gray-50 cursor-pointer"
+                        onClick={() => toggleLogExpansion(historyIndex)}
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className={`px-2 py-1 rounded text-white text-xs ${entry.success ? 'bg-green-500' : 'bg-red-500'}`}>
+                            {entry.success ? 'Success' : 'Failed'}
+                          </span>
+                          <span className="font-medium text-gray-900">{entry.filename}</span>
+                          <span className="text-sm text-gray-500">
+                            {new Date(entry.timestamp).toLocaleString()}
+                          </span>
+                        </div>
+                        {expandedLogs[historyIndex] ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                      </div>
+
+                      {expandedLogs[historyIndex] && (
+                        <div className="p-3 border-t border-gray-200">
+                          <div className="text-sm text-gray-700 mb-2">{entry.message}</div>
+                          
+                          <div className="space-y-3">
+                            {entry.results.map((result, resultIndex) => (
+                              <div key={resultIndex} className="border border-gray-200 rounded p-3">
+                                <div className="flex justify-between items-center mb-2">
+                                  <h4 className="font-semibold capitalize text-gray-900">{result.service}</h4>
+                                  <span className={`px-2 py-0.5 text-xs rounded ${result.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                    {result.success ? 'Success' : 'Failed'}
+                                  </span>
+                                </div>
+                                
+                                {result.error && <div className="text-red-500 mb-2">Error: {result.error}</div>}
+                                
+                                {result.data && (
+                                  <div className="text-sm text-gray-700">
+                                    {/* File Upload Service */}
+                                    {result.service === "file_upload" && result.data.status_code && (
+                                      <div>Status Code: {result.data.status_code}</div>
+                                    )}
+                                    
+                                    {/* ClamAV Service */}
+                                    {result.service === "clamav" && result.data.response && (
+                                      <div className="bg-gray-50 p-2 rounded mt-1 text-gray-800">
+                                        {result.data.response.infected !== undefined && (
+                                          <div className={`font-medium ${result.data.response.infected ? 'text-red-600' : 'text-green-600'}`}>
+                                            {result.data.response.infected 
+                                              ? '⚠️ Malware Detected' 
+                                              : '✅ No Malware Detected'}
+                                          </div>
+                                        )}
+                                        {result.data.response.data?.result?.map((file, idx) => (
+                                          <div key={idx} className="mt-1">
+                                            <div>File: {file.name}</div>
+                                            <div>Infected: {file.is_infected ? 'Yes' : 'No'}</div>
+                                            {file.viruses && file.viruses.length > 0 && (
+                                              <div>Threats: {file.viruses.join(', ')}</div>
+                                            )}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+                                    
+                                    {/* MinIO Storage Service */}
+                                    {result.service === "minio" && (
+                                      <div className="text-gray-700">
+                                        <div>Bucket: {result.data.bucket}</div>
+                                        <div>File: {result.data.object_name}</div>
+                                        <div>Size: {formatBytes(result.data.size)}</div>
+                                        <div>ETag: {result.data.etag}</div>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="border-t border-gray-200 p-4">
+              <button 
+                onClick={() => setIsModalOpen(false)} 
+                className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div
         className={`fixed bottom-5 right-5 z-50 bg-white rounded-lg shadow-lg overflow-hidden transition-all duration-300 ease-in-out min-w-[50px] max-w-[250px] ${
           expanded ? "w-[200px] h-auto" : "w-[50px] h-[50px]"
@@ -201,7 +369,7 @@ function WebSocketControl({
 
         {expanded && (
           <div className="p-2.5">
-            {/* Session share to clipboard */}
+            {/* Session share button */}
             <div className="mb-2 flex items-center gap-2">
               <button
                 onClick={handleShareSession}
@@ -228,6 +396,22 @@ function WebSocketControl({
                 >
                   <Upload className="w-5 h-5" />
                 </button>
+                
+                {/* view upload logs button */}
+                <button
+                  onClick={handleShowLogs}
+                  title="View file upload history"
+                  className="p-2 bg-green-500 text-white rounded hover:bg-green-600 transition-colors disabled:opacity-50"
+                  disabled={uploadHistory.length === 0}
+                >
+                  <Download className="w-5 h-5" />
+                  {uploadHistory.length > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
+                      {uploadHistory.length}
+                    </span>
+                  )}
+                </button>
+                
                 <input
                   type="file"
                   ref={fileInputRef}
@@ -235,6 +419,7 @@ function WebSocketControl({
                   onChange={handleFileChange}
                   disabled={uploading}
                 />
+                
                 {uploading && (
                   <div className="w-24">
                     <div className="h-2 bg-gray-200 rounded">
@@ -256,12 +441,14 @@ function WebSocketControl({
                 )}
               </div>
             )}
+            
             <button
-              className={`w-full py-2 px-3 rounded text-white border-none transition-colors relative overflow-hidden ${disconnecting
-                ? "bg-yellow-500 cursor-wait"
-                : isConnected
-                ? "bg-red-500 hover:bg-red-700 cursor-pointer"
-                : "bg-gray-300 cursor-not-allowed"
+              className={`w-full py-2 px-3 rounded text-white border-none transition-colors relative overflow-hidden ${
+                disconnecting
+                  ? "bg-yellow-500 cursor-wait"
+                  : isConnected
+                  ? "bg-red-500 hover:bg-red-700 cursor-pointer"
+                  : "bg-gray-300 cursor-not-allowed"
               }`}
               onClick={handleDisconnect}
               disabled={!isConnected || disconnecting}
@@ -299,6 +486,19 @@ function WebSocketControl({
       </div>
     </>
   );
+}
+
+// Helper function to format bytes
+function formatBytes(bytes, decimals = 2) {
+  if (bytes === 0) return '0 Bytes';
+  
+  const k = 1024;
+  const dm = decimals < 0 ? 0 : decimals;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
+  
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
 }
 
 export default WebSocketControl;
