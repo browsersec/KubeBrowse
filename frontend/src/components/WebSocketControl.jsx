@@ -139,6 +139,9 @@ function WebSocketControl({
             // Add the new upload to history
             setUploadHistory(prevHistory => [enrichedResponse, ...prevHistory]);
             setUploadResponse(enrichedResponse);
+            
+            // Check if malware was detected
+            checkForMalware(enrichedResponse);
           } catch (parseErr) {
             console.error("Failed to parse upload response", parseErr);
           }
@@ -161,6 +164,51 @@ function WebSocketControl({
     } catch (err) {
       setUploading(false);
       setUploadError("Upload failed");
+    }
+  };
+  
+  // function to check for malware in the upload response
+  const checkForMalware = (response) => {
+    try {
+      // Find the ClamAV result
+      const clamavResult = response.results.find(result => result.service === "clamav");
+      
+      if (clamavResult && clamavResult.success && clamavResult.data?.response?.infected) {
+        // Get the viruses list if available
+        const viruses = clamavResult.data.response.viruses || [];
+        const virusNames = viruses.length > 0 ? viruses.join(', ') : 'Unknown threat';
+        
+        // Show a prominent warning toast
+        toast.error(
+          <div>
+            <div className="font-bold">😈 Malware Detected!</div>
+            <div>The file may contain malicious content.</div>
+            {viruses.length > 0 && <div className="text-xs mt-1">Detected: {virusNames}</div>}
+          </div>,
+          {
+            id: 'malware-alert',
+            duration: 6000,
+            position: 'top-center',
+            style: {
+              background: '#FEE2E2',
+              color: '#991B1B',
+              border: '1px solid #F87171',
+              padding: '16px',
+              fontWeight: 'bold',
+            },
+          }
+        );
+        
+        // Also look for the file name in the clamav response
+        const infectedFiles = clamavResult.data.response.data?.result?.filter(file => file.is_infected) || [];
+        
+        if (infectedFiles.length > 0) {
+          // Log detailed information about infected files
+          console.warn('Infected files detected:', infectedFiles);
+        }
+      }
+    } catch (err) {
+      console.error("Error checking for malware:", err);
     }
   };
 
