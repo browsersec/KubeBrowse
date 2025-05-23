@@ -225,33 +225,50 @@ func uploadOfficeContainer(ctx context.Context, fileBuffer *FileBuffer, url stri
 	return UploadResult{Service: "file_upload", Success: false, Error: fmt.Sprintf("HTTP %d", resp.StatusCode)}
 }
 
-// uploadToClamAV uploads file to ClamAV for virus scanning using async/redis endpoint
-func uploadToClamAV(ctx context.Context, fileBuffer *FileBuffer, clamavurl string, timeout time.Duration) UploadResult {
-	var buf bytes.Buffer
-	writer := multipart.NewWriter(&buf)
+// ClamAVScanResult represents the structure of ClamAV scan result
+type ClamAVScanResult struct {
+	Success bool `json:"success"`
+	Data    struct {
+		Result []struct {
+			Name       string   `json:"name"`
+			IsInfected bool     `json:"is_infected"`
+			Viruses    []string `json:"viruses,omitempty"`
+		} `json:"result"`
+	} `json:"data"`
+}
 
-	// Add file for scanning - use "FILES" as the form field name (matching your API)
+// uploadToClamAV uploads file to ClamAV for virus scanning
+func uploadToClamAV(ctx context.Context, fileBuffer *FileBuffer, clamavurl string, timeout time.Duration) UploadResult {
+	// Create multipart form payload
+	payload := &bytes.Buffer{}
+	writer := multipart.NewWriter(payload)
+
+	// Create form file part with "FILES" as the field name
 	part, err := writer.CreateFormFile("FILES", fileBuffer.Filename)
 	if err != nil {
 		return UploadResult{Service: "clamav", Success: false, Error: "failed to create form file: " + err.Error()}
 	}
 
+	// Write file data to the form part
 	if _, err := part.Write(fileBuffer.Data); err != nil {
 		return UploadResult{Service: "clamav", Success: false, Error: "failed to write file data: " + err.Error()}
 	}
 
+	// Close the writer
 	if err := writer.Close(); err != nil {
 		return UploadResult{Service: "clamav", Success: false, Error: "failed to close writer: " + err.Error()}
 	}
 
-	// Create request to the async/redis endpoint
-	scanURL := clamavurl + "/api/v1/scan/async/redis"
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, scanURL, &buf)
+	// Create scan URL
+	scanURL := clamavurl + "/api/v1/scan"
+
+	// Create request with context
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, scanURL, payload)
 	if err != nil {
 		return UploadResult{Service: "clamav", Success: false, Error: "failed to create request: " + err.Error()}
 	}
 
-	// Set proper headers
+	// Set proper headers for multipart/form-data
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 
 	// Send request with timeout
@@ -272,15 +289,44 @@ func uploadToClamAV(ctx context.Context, fileBuffer *FileBuffer, clamavurl strin
 		return UploadResult{Service: "clamav", Success: false, Error: "failed to read response: " + err.Error()}
 	}
 
-	// Try to parse as JSON, but also handle plain text responses
-	var scanResult map[string]interface{}
-	responseStr := string(body)
+	// Parse the ClamAV specific response format
+	var scanResult ClamAVScanResult
+	var responseData map[string]interface{}
 
-	if err := json.Unmarshal(body, &scanResult); err != nil {
-		// If JSON parsing fails, treat as plain text response
-		scanResult = map[string]interface{}{
-			"response": responseStr,
-			"raw_body": responseStr,
+	// Try to parse as structured ClamAV response first
+	err = json.Unmarshal(body, &scanResult)
+	if err != nil {
+		// If parsing as ClamAV format fails, fallback to generic JSON parsing
+		if jsonErr := json.Unmarshal(body, &responseData); jsonErr != nil {
+			// If all JSON parsing fails, treat as plain text
+			responseStr := string(body)
+			responseData = map[string]interface{}{
+				"raw_response": responseStr,
+			}
+		}
+	} else {
+		// Successfully parsed as ClamAV response, convert to map for consistent return format
+		responseData = map[string]interface{}{
+			"success": scanResult.Success,
+			"data": map[string]interface{}{
+				"result": scanResult.Data.Result,
+			},
+		}
+
+		// Check if any viruses were detected
+		infected := false
+		detectedViruses := []string{}
+
+		for _, result := range scanResult.Data.Result {
+			if result.IsInfected {
+				infected = true
+				detectedViruses = append(detectedViruses, result.Viruses...)
+			}
+		}
+
+		responseData["infected"] = infected
+		if infected {
+			responseData["viruses"] = detectedViruses
 		}
 	}
 
@@ -290,7 +336,7 @@ func uploadToClamAV(ctx context.Context, fileBuffer *FileBuffer, clamavurl strin
 			Success: true,
 			Data: map[string]interface{}{
 				"status_code": resp.StatusCode,
-				"response":    scanResult,
+				"response":    responseData,
 				"endpoint":    scanURL,
 			},
 		}
@@ -302,7 +348,7 @@ func uploadToClamAV(ctx context.Context, fileBuffer *FileBuffer, clamavurl strin
 		Error:   fmt.Sprintf("scan failed with HTTP %d", resp.StatusCode),
 		Data: map[string]interface{}{
 			"status_code": resp.StatusCode,
-			"response":    scanResult,
+			"response":    responseData,
 			"endpoint":    scanURL,
 		},
 	}
