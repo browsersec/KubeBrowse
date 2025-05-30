@@ -1,0 +1,119 @@
+# Falco Custom Rules for KubeBrowse
+#
+# These rules are designed to monitor the behavior of KubeBrowse's
+# browser and office session pods.
+#
+# It's assumed that KubeBrowse pods will have a common label,
+# such as `app: browser-sandbox-test` or a more specific one like
+# `kubebrowse-session: true`. Adjust the `kubebrowse_pod` macro accordingly.
+
+# --- MACROS ---
+
+# Macro to identify KubeBrowse session pods.
+# Adjust the label selector as per your KubeBrowse deployment.
+- macro: kubebrowse_pod
+  condition: (k8s.pod.labels contains "app: browser-sandbox-test") # Or specific KubeBrowse pod label
+
+# Macro for whitelisted outbound domains/IPs for browser/office pods.
+# This is a placeholder. Users MUST customize this list based on:
+# 1. Guacamole server / KubeBrowse API endpoint(s) if connections are proxied.
+# 2. Legitimate internal resources users might need to access.
+# 3. Common document/office related domains if using office pods.
+# 4. Potentially CDNs or other essential web resources.
+# It's often better to restrict to a few known internal IPs/services if possible.
+- macro: whitelisted_kubebrowse_network
+  condition: >
+    (fd.sipname = "10.0.0.0/8" or # Example: Allow internal RFC1918 space
+     fd.sipname = "172.16.0.0/12" or
+     fd.sipname = "192.168.0.0/16" or
+     fd.ripname = "guacd.browser-sandbox.svc.cluster.local" or # Guacamole daemon
+     fd.ripname = "browser-sandbox-api.browser-sandbox.svc.cluster.local" or # KubeBrowse API
+     fd.ripname = "postgres.browser-sandbox.svc.cluster.local" or # KubeBrowse DB
+     fd.ripname = "redis.browser-sandbox.svc.cluster.local" or # KubeBrowse Redis
+     fd.ripname = "clamd-api.browser-sandbox.svc.cluster.local" or # ClamAV
+     fd.net_dst_ip startswith "169.254." or # Link-local / metadata services, if needed
+     (fd.sport = 53 or fd.dport = 53) # Allow DNS queries
+    )
+
+# Macro for whitelisted processes in KubeBrowse pods.
+# This list will need significant tuning based on the actual processes
+# running in rdp-chromium and rdp-onlyoffice-lxde containers.
+# Start minimal and add based on legitimate activity.
+- macro: whitelisted_kubebrowse_processes
+  condition: >
+    (proc.name in (
+      "dumb-init", "supervisord", "fluxbox", "xrdp", "xrdp-sesman", "Xorg", "pulseaudio", # Common RDP/LXDE components
+      "chrome", "chromium", "nacl_helper", # Browser components
+      "soffice.bin", "oosplash", # OnlyOffice components
+      "gpg-agent", "dbus-daemon", "dbus-launch", "xclipboard", # Desktop utilities
+      "busybox", # If used for init or utilities
+      "guacdr", "guacd" # Guacamole client components if they run in-pod
+      ) or
+     proc.name startswith "chrome-gnome-s" or
+     proc.name startswith "zeitgeist" or
+     proc.name startswith "gsd-" or
+     proc.name startswith "ibus-" or
+     proc.name startswith "gnome-" or
+     proc.pname in (whitelisted_kubebrowse_processes) # Allow children of whitelisted processes
+    )
+
+# --- RULES ---
+
+- rule: KubeBrowse - Unexpected Outbound Network Connection
+  desc: Detects an outbound network connection from a KubeBrowse pod to a non-whitelisted destination.
+  condition: kubebrowse_pod and evt.type = connect and evt.dir = < and not whitelisted_kubebrowse_network
+  output: "Unexpected outbound connection from KubeBrowse pod (user=%user.name pod=%k8s.pod.name container=%container.id image=%container.image.repository comm=%proc.cmdline connection=%fd.name)"
+  priority: WARNING
+  tags: [kubebrowse, network]
+
+- rule: KubeBrowse - Shell Spawned in Pod
+  desc: Detects a shell process spawned within a KubeBrowse pod.
+  condition: kubebrowse_pod and proc.is_shell and spawned_process and not proc.pname in (supervisord) # Allow supervisord to start initial shell if any
+  output: "Shell spawned in KubeBrowse pod (user=%user.name pod=%k8s.pod.name container=%container.id image=%container.image.repository cmdline=%proc.cmdline parent=%proc.pname)"
+  priority: NOTICE
+  tags: [kubebrowse, process, shell]
+
+- rule: KubeBrowse - Execution of Unexpected Binary
+  desc: Detects execution of a binary not in the KubeBrowse whitelist.
+  condition: kubebrowse_pod and evt.type = execve and not whitelisted_kubebrowse_processes
+  output: "Unexpected binary executed in KubeBrowse pod (user=%user.name pod=%k8s.pod.name container=%container.id image=%container.image.repository cmdline=%proc.cmdline)"
+  priority: WARNING
+  tags: [kubebrowse, process]
+
+- rule: KubeBrowse - Access to Sensitive User Config Files
+  desc: Detects access to common sensitive user configuration files or directories within a KubeBrowse pod.
+  condition: >
+    kubebrowse_pod and (evt.type in (open, openat, openat2) or evt.type C (stat, lstat)) and
+    (fd.name pmatch (user_sensitive_paths) or fd.filename pmatch (user_sensitive_paths)) and
+    not proc.name in (whitelisted_kubebrowse_processes) # Allow browsers to read their own config
+  output: "Access to sensitive user config path in KubeBrowse pod (user=%user.name pod=%k8s.pod.name container=%container.id image=%container.image.repository path=%fd.name cmdline=%proc.cmdline)"
+  priority: INFO
+  tags: [kubebrowse, file, sensitive_config]
+  # Define user_sensitive_paths in falco_rules.local.yaml or via append: true
+  # Example: - list: user_sensitive_paths
+  #            items: [/home/*/.ssh, /home/*/.gitconfig, /home/*/.bash_history, /root/.ssh, /root/.bash_history]
+
+
+- rule: KubeBrowse - Attempt to Modify Binaries or System Libraries
+  desc: Detects attempts to modify binaries or system libraries within a KubeBrowse pod.
+  condition: >
+    kubebrowse_pod and (evt.type in (open, openat, openat2) and evt.is_open_write=true) and
+    (fd.name startswith (/bin/) or
+     fd.name startswith (/sbin/) or
+     fd.name startswith (/usr/bin/) or
+     fd.name startswith (/usr/sbin/) or
+     fd.name startswith (/lib/) or
+     fd.name startswith (/usr/lib/)) and
+    not proc.name in (dpkg, apt, apt-get) # Whitelist package managers if updates are ever allowed (should not be for ephemeral pods)
+  output: "Attempt to modify system binary/library in KubeBrowse pod (user=%user.name pod=%k8s.pod.name container=%container.id image=%container.image.repository path=%fd.name cmdline=%proc.cmdline)"
+  priority: CRITICAL
+  tags: [kubebrowse, file, system_integrity]
+
+- rule: KubeBrowse - Listen on Unexpected Port
+  desc: Detects a process listening on a non-whitelisted port within a KubeBrowse pod.
+  condition: >
+    kubebrowse_pod and evt.type = listen and evt.dir = < and
+    not fd.sport in (3389, 5900) # Whitelist RDP/VNC ports if used internally by the pod setup
+  output: "Process listening on unexpected port in KubeBrowse pod (user=%user.name pod=%k8s.pod.name container=%container.id image=%container.image.repository port=%fd.sport cmdline=%proc.cmdline)"
+  priority: WARNING
+  tags: [kubebrowse, network]
