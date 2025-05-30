@@ -1,0 +1,7 @@
+# Namespace for the application
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Values.namespace.name | default "browser-sandbox" }}
+  labels:
+    {{- include "kubebrowse.labels" . | nindent 4 }}

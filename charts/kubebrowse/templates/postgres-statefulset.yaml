@@ -1,0 +1,71 @@
+# PostgreSQL StatefulSet
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "kubebrowse.fullname" . }}-postgres
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "kubebrowse.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres
+spec:
+  serviceName: {{ .Values.postgres.service.name | default "postgres" }}
+  replicas: {{ .Values.postgres.replicaCount | default 1 }}
+  selector:
+    matchLabels:
+      {{- include "kubebrowse.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: postgres
+  template:
+    metadata:
+      labels:
+        {{- include "kubebrowse.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: postgres
+    spec:
+      serviceAccountName: {{ include "kubebrowse.serviceAccountName" . }}
+      containers:
+        - name: postgres
+          image: "{{ .Values.postgres.image.repository }}:{{ .Values.postgres.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.postgres.image.pullPolicy | default "IfNotPresent" }}
+          ports:
+            - containerPort: {{ .Values.postgres.service.port | default 5432 }}
+              name: postgres
+          resources:
+            {{- toYaml .Values.postgres.resources | nindent 12 }}
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.postgres.secretName | default "postgres-secret" }}
+                  key: username
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.postgres.secretName | default "postgres-secret" }}
+                  key: password
+            - name: POSTGRES_DB
+              value: {{ .Values.postgres.dbName | default "sandbox_db" }}
+          volumeMounts:
+            - name: {{ .Values.postgres.persistence.existingClaim | default (printf "%s-data" (include "kubebrowse.fullname" .)) }}
+              mountPath: /var/lib/postgresql/data
+  {{- if not .Values.postgres.persistence.existingClaim }}
+  volumeClaimTemplates:
+    - metadata:
+        name: {{ printf "%s-data" (include "kubebrowse.fullname" .) }}
+        labels:
+          {{- include "kubebrowse.labels" . | nindent 10 }}
+          app.kubernetes.io/component: postgres
+      spec:
+        accessModes: 
+          {{- range .Values.postgres.persistence.accessModes }}
+          - {{ . | quote }}
+          {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.postgres.persistence.size | quote }}
+        {{- if .Values.postgres.persistence.storageClass }}
+        {{- if (eq "-" .Values.postgres.persistence.storageClass) }}
+        storageClassName: ""
+        {{- else }}
+        storageClassName: "{{ .Values.postgres.persistence.storageClass }}"
+        {{- end }}
+        {{- end }}
+  {{- end }}

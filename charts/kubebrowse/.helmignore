@@ -1,0 +1,5 @@
+# Patterns to ignore when packaging Helm charts.
+*.bak
+*.swp
+*~
+# End ignore patterns

@@ -1,0 +1,20 @@
+# Guacamole Server Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.guacd.service.name | default "guacd" }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "kubebrowse.labels" . | nindent 4 }}
+    app.kubernetes.io/component: guacd
+spec:
+  ports:
+    - port: {{ .Values.guacd.service.port | default 4822 }}
+      targetPort: {{ .Values.guacd.service.port | default 4822 }}
+      {{- if .Values.guacd.service.nodePort }}
+      nodePort: {{ .Values.guacd.service.nodePort }}
+      {{- end }}
+  selector:
+    {{- include "kubebrowse.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: guacd
+  type: {{ .Values.guacd.service.type | default "ClusterIP" }}

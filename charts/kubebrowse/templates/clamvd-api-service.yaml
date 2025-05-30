@@ -1,0 +1,19 @@
+{{- if .Values.clamvdApi.enabled -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.clamvdApi.service.name | default (printf "%s-clamd-api" (include "kubebrowse.fullname" .)) }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "kubebrowse.labels" . | nindent 4 }}
+    app.kubernetes.io/component: clamvd-api
+spec:
+  selector:
+    {{- include "kubebrowse.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: clamvd-api
+  ports:
+    - port: {{ .Values.clamvdApi.service.port | default 3000 }}
+      targetPort: {{ .Values.clamvdApi.service.port | default 3000 }}
+      name: http
+  type: {{ .Values.clamvdApi.service.type | default "ClusterIP" }}
+{{- end }}

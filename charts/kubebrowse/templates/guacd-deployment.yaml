@@ -1,0 +1,31 @@
+# Guacamole Server Deployment (guacd)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "kubebrowse.fullname" . }}-guacd
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "kubebrowse.labels" . | nindent 4 }}
+    app.kubernetes.io/component: guacd
+spec:
+  replicas: {{ .Values.guacd.replicaCount | default 2 }}
+  selector:
+    matchLabels:
+      {{- include "kubebrowse.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: guacd
+  template:
+    metadata:
+      labels:
+        {{- include "kubebrowse.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: guacd
+    spec:
+      serviceAccountName: {{ include "kubebrowse.serviceAccountName" . }}
+      containers:
+        - name: guacd
+          image: "{{ .Values.guacd.image.repository }}:{{ .Values.guacd.image.tag | default "latest" }}"
+          imagePullPolicy: {{ .Values.guacd.image.pullPolicy | default "IfNotPresent" }}
+          ports:
+            - containerPort: {{ .Values.guacd.service.port | default 4822 }}
+              name: guacd
+          resources:
+            {{- toYaml .Values.guacd.resources | nindent 12 }}

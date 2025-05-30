@@ -1,0 +1,21 @@
+# API Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.api.service.name | default "browser-sandbox-api" }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "kubebrowse.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api
+spec:
+  type: {{ .Values.api.service.type | default "NodePort" }}
+  ports:
+    - port: {{ .Values.api.service.port | default 4567 }}
+      targetPort: {{ .Values.api.service.targetPort | default "api" }} # Or an integer
+      {{- if and (eq .Values.api.service.type "NodePort") .Values.api.service.nodePort }}
+      nodePort: {{ .Values.api.service.nodePort }}
+      {{- end }}
+      name: {{ .Values.api.service.portName | default "http" }}
+  selector:
+    {{- include "kubebrowse.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: api

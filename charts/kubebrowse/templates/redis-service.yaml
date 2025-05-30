@@ -1,0 +1,20 @@
+# Redis Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.redis.service.name | default "redis" }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "kubebrowse.labels" . | nindent 4 }}
+    app.kubernetes.io/component: redis
+spec:
+  ports:
+    - port: {{ .Values.redis.service.port | default 6379 }}
+      targetPort: {{ .Values.redis.service.port | default 6379 }}
+      {{- if .Values.redis.service.nodePort }}
+      nodePort: {{ .Values.redis.service.nodePort }}
+      {{- end }}
+  selector:
+    {{- include "kubebrowse.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: redis
+  type: {{ .Values.redis.service.type | default "ClusterIP" }}

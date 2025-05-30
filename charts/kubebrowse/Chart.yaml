@@ -1,0 +1,61 @@
+apiVersion: v2
+name: kubebrowse
+description: A Helm chart for deploying KubeBrowse, a secure browsing and office sandbox environment.
+# A chart can be either an 'application' or a 'library' chart.
+#
+# Application charts are a collection of templates that can be packaged into versioned archives
+# to be deployed.
+#
+# Library charts provide useful utilities or functions for the chart developer. They're included as
+# a dependency of application charts to inject those utilities and functions into the rendering
+# pipeline. Library charts do not define any templates and therefore cannot be deployed.
+type: application
+
+# This is the chart version. This version number should be incremented each time you make changes
+# to the chart and its templates, including the application version.
+# Versions are expected to follow Semantic Versioning (https://semver.org/)
+version: 0.1.0
+
+# This is the version number of the application being deployed. This version number should be
+# incremented each time you make changes to the application. Versions are not expected to
+# follow Semantic Versioning. They should reflect the version the application is using.
+# It is recommended to use it with quotes.
+appVersion: "1.0.0"
+
+# (Optional) Specify the Kubernetes versions that this chart can be deployed to.
+# kubeVersion: ">= 1.20.0-0"
+
+# (Optional) Keywords for the chart
+keywords:
+  - browser
+  - sandbox
+  - office
+  - security
+  - rdp
+  - vnc
+  - isolation
+
+# (Optional) Home URL for the chart
+home: https://github.com/browsersec/kubebrowse
+
+# (Optional) Source URLs for the chart
+sources:
+  - https://github.com/browsersec/kubebrowse
+  # Additional source URLs if any, e.g., for specific components
+
+# (Optional) Maintainer information
+# maintainers:
+#   - name: BrowserSecTeam # Example
+#     email: team@browsersec.com # Example
+#     url: https://github.com/browsersec # Example
+
+# (Optional) Icon URL for the chart
+# icon: https://example.com/kubebrowse-icon.png
+
+# (Optional) Annotations for the chart
+# annotations:
+#   artifacthub.io/changes: |
+#     - kind: added
+#       description: Initial release of KubeBrowse chart.
+#   artifacthub.io/operator: "false"
+#   artifacthub.io/prerelease: "false"

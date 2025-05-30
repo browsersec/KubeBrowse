@@ -1,3 +1,5 @@
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/browsersec/kubebrowse/badge)](https://scorecard.dev/viewer/?uri=github.com/browsersec/kubebrowse)
+
 ### KubeBrowse [WIP] 
 
 ###### currently this project in progess , for more information about this project refer [docs](https://github.com/browsersec/KubeBrowse/tree/main/docs/)

@@ -1,0 +1,18 @@
+{{- if .Values.istio.virtualservice.enabled -}}
+# Istio VirtualService for routing
+apiVersion: networking.istio.io/v1alpha3 # Or v1beta1 depending on Istio version
+kind: VirtualService
+metadata:
+  name: {{ include "kubebrowse.fullname" . }}-vs
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "kubebrowse.labels" . | nindent 4 }}
+    app.kubernetes.io/component: istio-virtualservice
+spec:
+  hosts:
+    {{- toYaml .Values.istio.virtualservice.hosts | nindent 4 }}
+  gateways:
+    {{- toYaml .Values.istio.virtualservice.gateways | nindent 4 }}
+  http:
+    {{- toYaml .Values.istio.virtualservice.http | nindent 4 }}
+{{- end -}}

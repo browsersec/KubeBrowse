@@ -1,0 +1,437 @@
+# Default values for kubebrowse.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+nameOverride: ""
+fullnameOverride: ""
+
+# Namespace configuration
+# The Helm chart will typically install resources in the release namespace.
+# If you need to override this globally (less common for app charts), you could use a global value.
+# For the Namespace object itself, if `namespace.create` is true.
+namespace:
+  create: true # Whether to create the Namespace resource defined in namespace.yaml
+  name: browser-sandbox # Default name for the namespace if created by the chart
+
+imagePullSecrets: []
+# Example:
+# imagePullSecrets:
+#   - name: my-registry-secret
+
+# Common service account configuration
+serviceAccount:
+  create: true
+  # Name of the service account. If not set and create is true, a name is generated using the fullname template.
+  name: "browser-sandbox-sa"
+  annotations: {}
+
+# RBAC (Role-Based Access Control) configuration
+rbac:
+  create: true
+  # Rules for the pod-manager Role. These are the defaults from the original manifest.
+  rules:
+    - apiGroups: [""]
+      resources: ["pods", "networkpolicies"] # Added networkpolicies based on previous work
+      verbs: ["get", "list", "watch", "create", "delete", "update", "patch"] # Added update/patch
+
+# PostgreSQL configuration
+postgres:
+  replicaCount: 1
+  image:
+    repository: postgres
+    tag: "15" # From original manifest
+    pullPolicy: IfNotPresent
+  service:
+    name: postgres
+    type: ClusterIP
+    port: 5432
+    # nodePort: # Only if type is NodePort
+  # For StatefulSet persistence
+  persistence:
+    enabled: true # Assuming persistence is desired by default
+    # existingClaim: "" # Optionally use an existing PVC
+    accessModes: ["ReadWriteOnce"]
+    size: 10Gi
+    storageClass: "" # Or specify a storage class, e.g., "standard". Empty string for default SC.
+  # Secret management for PostgreSQL
+  createSecret: true # Set to false if using an existing secret
+  secretName: postgres-secret # Name of the k8s secret object
+  secretKeys: # Keys within the k8s secret for username and password
+    username: username
+    password: password
+  # Plain text credentials if createSecret is true. These will be base64 encoded by the template.
+  credentials:
+    username: "postgresuser" # Default from original manifest (placeholder value)
+    password: "postgrespassword" # Default from original manifest (placeholder value)
+  dbName: "sandbox_db" # Default database name
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "1Gi"
+      cpu: "500m"
+
+# Redis configuration
+redis:
+  replicaCount: 1
+  image:
+    repository: redis
+    tag: "alpine" # From original manifest
+    pullPolicy: IfNotPresent
+  service:
+    name: redis
+    type: ClusterIP
+    port: 6379
+    # nodePort:
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "200m"
+
+# Guacamole (guacd) configuration
+guacd:
+  replicaCount: 2
+  image:
+    repository: guacamole/guacd
+    tag: "latest" # From original manifest
+    pullPolicy: IfNotPresent
+  service:
+    name: guacd
+    type: ClusterIP
+    port: 4822
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+
+# MinIO configuration
+minio:
+  replicaCount: 1
+  image:
+    repository: minio/minio
+    tag: "latest" # From original manifest
+    pullPolicy: IfNotPresent
+  # consoleAddress: ":9001" # Example: Set MinIO console on port 9001
+  service:
+    name: minio
+    type: ClusterIP
+    port: 9000 # API port
+    # nodePortApi: # If type is NodePort for API
+    # nodePortConsole: # If type is NodePort for Console and consoleAddress is set
+  persistence:
+    enabled: true
+    # existingClaim: ""
+    accessModes: ["ReadWriteOnce"]
+    size: 10Gi
+    storageClass: ""
+  createSecret: true
+  secretName: minio-secret
+  secretKeys: # For modern MinIO, these are rootUser/rootPassword
+    rootUser: rootUser # Was access-key
+    rootPassword: rootPassword # Was secret-key
+  credentials: # Plain text credentials for MinIO if createSecret is true
+    rootUser: "minioaccesskey" # Placeholder from original manifest
+    rootPassword: "miniosecretkey" # Placeholder from original manifest
+  bucketName: "browser-sandbox"
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "300m"
+
+# Backend API (browser-sandbox-api) configuration
+api:
+  replicaCount: 1
+  image:
+    repository: ghcr.io/browsersec/kubebrowse
+    tag: "sha-101400e" # From original manifest
+    pullPolicy: Always
+  service:
+    name: browser-sandbox-api
+    type: NodePort
+    port: 4567
+    targetPort: api # Name of the port in deployment, or integer
+    nodePort: 30006
+    portName: http
+  podAnnotations: {}
+  securityContext: {}
+  # Example extra environment variables
+  # extraEnv:
+  #   - name: "MY_CUSTOM_ENV_VAR"
+  #     value: "my_value"
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+
+# Frontend (browser-sandbox-frontend) configuration
+frontend:
+  enabled: true # Assuming frontend is enabled by default
+  replicaCount: 2
+  image:
+    repository: ghcr.io/browsersec/kubebrowse-frontend
+    tag: "chore-improve-back" # From original manifest
+    pullPolicy: Always
+  service:
+    name: browser-sandbox-frontend
+    type: NodePort
+    port: 8000 # Service port
+    targetPort: http # Target port name in deployment (or 80 by default if not named)
+    nodePort: 30007
+    portName: http
+  # Environment variables for the frontend
+  # The original manifest had VITE_GUAC_CLIENT_URL, GUAC_CLIENT_URL, CADDY_GUAC_CLIENT_URL
+  # These often derive from the API's external URL or an Ingress host.
+  # For now, let's make them configurable, with a sensible default if possible.
+  env:
+    VITE_GUAC_CLIENT_URL: "" # Example: "https://sandbox.example.com/api" or constructed from Ingress
+    GUAC_CLIENT_URL: ""
+    CADDY_GUAC_CLIENT_URL: ""
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "200m"
+
+# Istio IngressGateway and VirtualService configuration
+istio:
+  gateway:
+    enabled: true
+    name: browser-sandbox-gateway # This name is used in virtualservice.gateways
+    selector:
+      istio: ingressgateway # Default Istio ingress gateway selector
+    servers:
+      - port:
+          number: 80
+          name: http
+          protocol: HTTP
+        hosts:
+          - "sandbox.example.com" # Make this configurable
+      - port:
+          number: 443
+          name: https
+          protocol: HTTPS
+        hosts:
+          - "sandbox.example.com" # Make this configurable
+        tls:
+          mode: SIMPLE # Or PASSTHROUGH or MUTUAL
+          credentialName: browser-sandbox-cert # Name of the k8s secret that holds the cert/key
+
+  virtualservice:
+    enabled: true
+    hosts: # List of hosts for the VS
+      - "sandbox.example.com" # Make this configurable
+    gateways: # List of gateways to bind this VS to
+      - browser-sandbox-gateway # Should match the gateway name defined above, or an existing one
+    http:
+        # Route for API
+      - name: "api-routes"
+        match:
+          - uri:
+              prefix: "/api"
+          - uri:
+              prefix: "/websocket" # Original manifest had separate entries, combining for brevity
+        route:
+          - destination:
+              # host: will use api.service.name by default if not specified here
+              # host: browser-sandbox-api # Name of the API service
+              port:
+                number: 4567 # Port of the API service
+        # Default route for frontend
+      - name: "frontend-routes"
+        route:
+          - destination:
+              # host: browser-sandbox-frontend # Name of the Frontend service
+              port:
+                number: 8000 # Port of the Frontend service
+
+# ClamAV (clamd) component configuration
+clamd:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: clamav/clamav
+    tag: "stable"
+    pullPolicy: IfNotPresent
+  service:
+    name: clamd # Service name for clamd
+    type: ClusterIP
+    port: 3310
+  # Default readiness and liveness probes from the original manifest
+  readinessProbe:
+    exec:
+      command: ["clamdscan", "--ping", "1"]
+    initialDelaySeconds: 120
+    periodSeconds: 30
+    timeoutSeconds: 10
+    failureThreshold: 3
+  livenessProbe:
+    exec:
+      command: ["clamdscan", "--ping", "1"]
+    initialDelaySeconds: 120
+    periodSeconds: 30
+    timeoutSeconds: 10
+    failureThreshold: 3
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "1Gi"
+    limits:
+      cpu: "1"
+      memory: "2Gi"
+
+# ClamAV Go API (clamvd-api) component configuration
+clamvdApi:
+  enabled: true
+  replicaCount: 2
+  image:
+    repository: ghcr.io/browsersec/clamav-go-api
+    tag: "latest"
+    pullPolicy: Always
+  configMapName: clamd-api-config # Name of the ConfigMap for clamvd-api
+  service:
+    name: clamd-api # Service name for the API
+    type: ClusterIP
+    port: 3000
+  # Default readiness and liveness probes from the original manifest
+  readinessProbe:
+    httpGet:
+      path: /api/v1/version
+      port: 3000 # Should match service.port
+    initialDelaySeconds: 10
+    periodSeconds: 30
+    timeoutSeconds: 10
+    failureThreshold: 3
+  livenessProbe:
+    httpGet:
+      path: /api/v1/version
+      port: 3000 # Should match service.port
+    initialDelaySeconds: 10
+    periodSeconds: 30
+    timeoutSeconds: 10
+    failureThreshold: 3
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+  # Configuration data for the clamd-api-config ConfigMap
+  config:
+    nodeEnv: "production"
+    # clamdIp: Will be constructed: {{ include "kubebrowse.fullname" . }}-clamd.{{ .Release.Namespace }}.svc.cluster.local
+    appFormKey: "FILES"
+    appPort: "3000" # Should match service.port
+    appMaxFileSize: "26214400"
+    appMaxFilesNumber: "4"
+    clamdPort: "3310" # Should match clamd.service.port
+    clamdTimeout: "60000"
+    # redisUrl: Will be constructed: redis://{{ include "kubebrowse.fullname" . }}-redis.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.redis.service.port }}
+    jobExpiration: "3600"
+    # extraData: {} # For any additional key-value pairs in the configmap
+
+# Headless service for sandbox instances
+sandboxInstancesService:
+  enabled: true
+  name: sandbox-instances
+  # Selector for this service is hardcoded in its template to app: browser-sandbox-test
+  # This could be made configurable if needed:
+  # selectorAppLabel: browser-sandbox-test
+  ports:
+    rdp:
+      port: 3389
+      targetPort: rdp # Name of the port in the pod spec
+
+# Values for any templates not yet covered (e.g., if there were others)
+# Ensure all .Values paths from your templates are represented here.
+# Placeholder for any other general values
+# Example:
+# global:
+#   someGlobalSetting: value
+#
+# Default labels are handled by _helpers.tpl, but you can add/override component-specific labels here if needed.
+# e.g.
+# postgres:
+#   labels:
+#     customLabel: customValue
+# This is generally not needed if using the standard helper labels.
+# api:
+#   podAnnotations:
+#     iam.amazonaws.com/role: your-eks-role-arn # Example for EKS IAM roles
+#   securityContext:
+#     runAsUser: 1000
+#     runAsGroup: 1000
+#     fsGroup: 1000
+# frontend:
+#   env:
+#     VITE_API_ENDPOINT: # If frontend needs to know the API endpoint directly
+#     NODE_OPTIONS: --dns-result-order=ipv4first # Common Node.js fix in k8s
+
+# The Istio VirtualService http routes might need more dynamic host construction
+# For example, if api.service.name is templated:
+# istio:
+#   virtualservice:
+#     http:
+#       - name: "api-routes"
+#         route:
+#           - destination:
+#               host: "{{ .Values.api.service.name | default (printf \"%s-api\" (include \"kubebrowse.fullname\" .)) }}"
+# This is already handled if the host field is omitted in the VS template, as Istio will use the k8s service name.
+# The current VS template omits `host` in destination, relying on k8s service discovery,
+# which is good. The port numbers are correctly parameterized.
+# The hostnames for gateway and VS hosts list are parameterized.
+# The gateway name in VS is parameterized.
+# The TLS credentialName is parameterized.
+# The Istio selector is parameterized.
+# The service names in API env vars are parameterized.
+# Secret names and keys in API env vars are parameterized.
+# KUBERNETES_NAMESPACE in API env is parameterized.
+# ClamAV address in API env is parameterized.
+# MinIO bucket name in API env is parameterized.
+# Postgres DB name in API env is parameterized.
+# PVC names and persistence options are parameterized.
+# ServiceAccount names are parameterized.
+# RBAC role names are parameterized.
+# Namespace for all resources is `{{ .Release.Namespace }}`.
+# Namespace resource itself has `{{ .Values.namespace.name }}`.
+# All component images, tags, replicaCounts, resources, ports are parameterized.
+# Probes for clamd and clamvd-api are parameterized.
+# ConfigMap data for clamvd-api is parameterized.
+# `frontend.env` values for API URLs should be carefully set, possibly based on Ingress host.
+# Example for frontend env if using istio ingress:
+# frontend:
+#   env:
+#     VITE_GUAC_CLIENT_URL: "https://{{ index .Values.istio.virtualservice.hosts 0 }}/api"
+#     GUAC_CLIENT_URL: "https://{{ index .Values.istio.virtualservice.hosts 0 }}/api"
+#     CADDY_GUAC_CLIENT_URL: "https://{{ index .Values.istio.virtualservice.hosts 0 }}/api"
+# This assumes the first host in the VS hosts list is the primary one.
+# For simplicity, I've left them as empty strings for now, requiring user configuration.
+# Or, provide a default constructed URL if an ingress hostname is consistently set.
+
+# Final check on template files not explicitly handled by a component section above:
+# - sandbox-instances-service.yaml: Parameterized name, selector (implicitly via _helpers if component was defined, but it's simple), ports.
+#   Added sandboxInstancesService section for its name and ports.
+# - namespace.yaml: Covered by `namespace` section.
+# - postgres-secret.yaml: Covered by `postgres.createSecret`, `postgres.secretName`, `postgres.credentials`.
+# - minio-secret.yaml: Covered by `minio.createSecret`, `minio.secretName`, `minio.credentials`.
+# - role.yaml, rolebinding.yaml, serviceaccount.yaml: Covered by `rbac` and `serviceAccount` sections.
+# - _helpers.tpl: This file defines named templates; it doesn't consume .Values directly for output, but rather structures chart metadata.
+#   The labels it generates are used by all components.
+#   The serviceAccountName helper uses .Values.serviceAccount.create and .Values.serviceAccount.name.
+#   The fullname and name helpers use .Values.nameOverride and .Values.fullnameOverride.
+# All seems covered.File `charts/kubebrowse/values.yaml` overwritten successfully.

@@ -1,0 +1,41 @@
+{{- if .Values.clamvdApi.enabled -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "kubebrowse.fullname" . }}-clamvd-api
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "kubebrowse.labels" . | nindent 4 }}
+    app.kubernetes.io/component: clamvd-api
+spec:
+  replicas: {{ .Values.clamvdApi.replicaCount | default 2 }}
+  selector:
+    matchLabels:
+      {{- include "kubebrowse.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: clamvd-api
+  template:
+    metadata:
+      labels:
+        {{- include "kubebrowse.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: clamvd-api
+      annotations:
+        {{- toYaml .Values.clamvdApi.podAnnotations | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "kubebrowse.serviceAccountName" . }}
+      containers:
+        - name: clamvd-api
+          image: "{{ .Values.clamvdApi.image.repository }}:{{ .Values.clamvdApi.image.tag | default "latest" }}"
+          imagePullPolicy: {{ .Values.clamvdApi.image.pullPolicy | default "Always" }}
+          ports:
+            - containerPort: {{ .Values.clamvdApi.service.port | default 3000 }}
+              name: http
+          envFrom:
+            - configMapRef:
+                name: {{ .Values.clamvdApi.configMapName | default (printf "%s-clamd-api-config" (include "kubebrowse.fullname" .)) }}
+          readinessProbe:
+            {{- toYaml .Values.clamvdApi.readinessProbe | nindent 12 }}
+          livenessProbe:
+            {{- toYaml .Values.clamvdApi.livenessProbe | nindent 12 }}
+          resources:
+            {{- toYaml .Values.clamvdApi.resources | nindent 12 }}
+{{- end }}

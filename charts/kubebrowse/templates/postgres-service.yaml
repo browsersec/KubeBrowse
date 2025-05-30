@@ -1,0 +1,20 @@
+# PostgreSQL Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.postgres.service.name | default "postgres" }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "kubebrowse.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres
+spec:
+  ports:
+    - port: {{ .Values.postgres.service.port | default 5432 }}
+      targetPort: {{ .Values.postgres.service.port | default 5432 }}
+      {{- if .Values.postgres.service.nodePort }}
+      nodePort: {{ .Values.postgres.service.nodePort }}
+      {{- end }}
+  selector:
+    {{- include "kubebrowse.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres
+  type: {{ .Values.postgres.service.type | default "ClusterIP" }}

@@ -1,0 +1,26 @@
+{{- if not .Values.minio.persistence.existingClaim }}
+# MinIO PVC
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ printf "%s-minio-pvc" (include "kubebrowse.fullname" .) }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "kubebrowse.labels" . | nindent 4 }}
+    app.kubernetes.io/component: minio
+spec:
+  accessModes:
+    {{- range .Values.minio.persistence.accessModes }}
+    - {{ . | quote }}
+    {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.minio.persistence.size | quote }}
+  {{- if .Values.minio.persistence.storageClass }}
+  {{- if (eq "-" .Values.minio.persistence.storageClass) }}
+  storageClassName: ""
+  {{- else }}
+  storageClassName: "{{ .Values.minio.persistence.storageClass }}"
+  {{- end }}
+  {{- end }}
+{{- end }}

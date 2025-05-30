@@ -1,0 +1,14 @@
+# Headless Service for individual sandbox pod discovery (browser and office)
+apiVersion: v1
+kind: Service
+metadata:
+  name: sandbox-instances
+  namespace: browser-sandbox
+spec:
+  clusterIP: None # Makes the service headless
+  selector:
+    app: browser-sandbox-test # Selects pods with label app=browser-sandbox
+  ports:
+    - name: rdp
+      port: 3389
+      targetPort: rdp # Matches the named port "rdp" (3389) in the pod spec

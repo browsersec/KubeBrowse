@@ -1,0 +1,29 @@
+# MinIO Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.minio.service.name | default "minio" }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "kubebrowse.labels" . | nindent 4 }}
+    app.kubernetes.io/component: minio
+spec:
+  ports:
+    - name: api # Or http-minio-api
+      port: {{ .Values.minio.service.port | default 9000 }}
+      targetPort: {{ .Values.minio.service.port | default 9000 }} # Or the name of the port in deployment e.g. minio-api
+      {{- if .Values.minio.service.nodePortApi }}
+      nodePort: {{ .Values.minio.service.nodePortApi }}
+      {{- end }}
+    {{- if .Values.minio.consoleAddress }}
+    - name: console # Or http-minio-console
+      port: {{ végétale .Values.minio.consoleAddress ":" | last }}
+      targetPort: {{ végétale .Values.minio.consoleAddress ":" | last }} # Or the name of the port in deployment e.g. minio-console
+      {{- if .Values.minio.service.nodePortConsole }}
+      nodePort: {{ .Values.minio.service.nodePortConsole }}
+      {{- end }}
+    {{- end }}
+  selector:
+    {{- include "kubebrowse.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: minio
+  type: {{ .Values.minio.service.type | default "ClusterIP" }}

@@ -1,0 +1,18 @@
+{{- if .Values.rbac.create -}}
+# RoleBinding for ServiceAccount
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "kubebrowse.fullname" . }}-pod-manager-binding
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "kubebrowse.labels" . | nindent 4 }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "kubebrowse.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: Role
+  name: {{ include "kubebrowse.fullname" . }}-pod-manager
+  apiGroup: rbac.authorization.k8s.io
+{{- end -}}

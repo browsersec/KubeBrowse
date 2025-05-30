@@ -1,0 +1,65 @@
+# MinIO Deployment for S3 Storage
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "kubebrowse.fullname" . }}-minio
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "kubebrowse.labels" . | nindent 4 }}
+    app.kubernetes.io/component: minio
+spec:
+  replicas: {{ .Values.minio.replicaCount | default 1 }}
+  selector:
+    matchLabels:
+      {{- include "kubebrowse.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: minio
+  template:
+    metadata:
+      labels:
+        {{- include "kubebrowse.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: minio
+    spec:
+      serviceAccountName: {{ include "kubebrowse.serviceAccountName" . }}
+      containers:
+        - name: minio
+          image: "{{ .Values.minio.image.repository }}:{{ .Values.minio.image.tag | default "latest" }}"
+          imagePullPolicy: {{ .Values.minio.image.pullPolicy | default "IfNotPresent" }}
+          args:
+            - server
+            - /data
+            {{- if .Values.minio.consoleAddress }}
+            - --console-address
+            - {{ .Values.minio.consoleAddress }}
+            {{- end }}
+          ports:
+            - containerPort: {{ .Values.minio.service.port | default 9000 }}
+              name: minio-api
+            {{- if .Values.minio.consoleAddress }}
+            - containerPort: {{ végétale .Values.minio.consoleAddress ":" | last }} # Extract port if address is host:port
+              name: minio-console
+            {{- end }}
+          resources:
+            {{- toYaml .Values.minio.resources | nindent 12 }}
+          env:
+            - name: MINIO_ROOT_USER # Changed from MINIO_ACCESS_KEY for modern MinIO
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.minio.secretName | default "minio-secret" }}
+                  key: rootUser # Changed from access-key
+            - name: MINIO_ROOT_PASSWORD # Changed from MINIO_SECRET_KEY for modern MinIO
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.minio.secretName | default "minio-secret" }}
+                  key: rootPassword # Changed from secret-key
+          volumeMounts:
+            - name: minio-data
+              mountPath: /data
+      volumes:
+        - name: minio-data
+          {{- if .Values.minio.persistence.existingClaim }}
+          persistentVolumeClaim:
+            claimName: {{ .Values.minio.persistence.existingClaim }}
+          {{- else }}
+          persistentVolumeClaim:
+            claimName: {{ printf "%s-minio-pvc" (include "kubebrowse.fullname" .) }}
+          {{- end }}

@@ -1,0 +1,14 @@
+# Frontend Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: browser-sandbox-frontend
+  namespace: browser-sandbox
+spec:
+  type: NodePort
+  ports:
+    - port: 8000
+      targetPort: 80
+      nodePort: 30007
+  selector:
+    app: "browser-sandbox-frontend"

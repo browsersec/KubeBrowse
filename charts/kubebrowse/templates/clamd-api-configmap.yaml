@@ -1,0 +1,24 @@
+{{- if .Values.clamvdApi.enabled -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.clamvdApi.configMapName | default (printf "%s-clamd-api-config" (include "kubebrowse.fullname" .)) }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "kubebrowse.labels" . | nindent 4 }}
+    app.kubernetes.io/component: clamvd-api
+data:
+  NODE_ENV: {{ .Values.clamvdApi.config.nodeEnv | default "production" | quote }}
+  CLAMD_IP: {{ .Values.clamvdApi.config.clamdIp | default (printf "%s-clamd.%s.svc.cluster.local" (include "kubebrowse.fullname" .) .Release.Namespace) | quote }}
+  APP_FORM_KEY: {{ .Values.clamvdApi.config.appFormKey | default "FILES" | quote }}
+  APP_PORT: {{ .Values.clamvdApi.config.appPort | default "3000" | quote }}
+  APP_MAX_FILE_SIZE: {{ .Values.clamvdApi.config.appMaxFileSize | default "26214400" | quote }}
+  APP_MAX_FILES_NUMBER: {{ .Values.clamvdApi.config.appMaxFilesNumber | default "4" | quote }}
+  CLAMD_PORT: {{ .Values.clamvdApi.config.clamdPort | default "3310" | quote }}
+  CLAMD_TIMEOUT: {{ .Values.clamvdApi.config.clamdTimeout | default "60000" | quote }}
+  REDIS_URL: {{ .Values.clamvdApi.config.redisUrl | default (printf "redis://%s-redis.%s.svc.cluster.local:%s" (include "kubebrowse.fullname" .) .Release.Namespace ( toString (.Values.redis.service.port | default 6379))) | quote }}
+  JOB_EXPIRATION: {{ .Values.clamvdApi.config.jobExpiration | default "3600" | quote }}
+  {{- range $key, $value := .Values.clamvdApi.config.extraData }}
+  {{ $key }}: {{ $value | quote }}
+  {{- end }}
+{{- end }}

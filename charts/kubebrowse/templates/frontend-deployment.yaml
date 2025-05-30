@@ -1,0 +1,36 @@
+# Frontend Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: browser-sandbox-frontend
+  namespace: browser-sandbox
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: "browser-sandbox-frontend"
+  template:
+    metadata:
+      labels:
+        app: "browser-sandbox-frontend"
+    spec:
+      containers:
+        - name: frontend
+          image: ghcr.io/browsersec/kubebrowse-frontend:chore-improve-back
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"
+          env:
+            - name: VITE_GUAC_CLIENT_URL
+              value: "https://browser-sandbox-api.browser-sandbox.svc.cluster.local:4567"
+            - name: GUAC_CLIENT_URL
+              value: "https://browser-sandbox-api.browser-sandbox.svc.cluster.local:4567"
+            - name: CADDY_GUAC_CLIENT_URL
+              value: "https://browser-sandbox-api.browser-sandbox.svc.cluster.local:4567"

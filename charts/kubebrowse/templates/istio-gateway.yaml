@@ -1,0 +1,16 @@
+{{- if .Values.istio.gateway.enabled -}}
+# Istio Gateway for ingress
+apiVersion: networking.istio.io/v1alpha3 # Or v1beta1 depending on Istio version
+kind: Gateway
+metadata:
+  name: {{ include "kubebrowse.fullname" . }}-gateway
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "kubebrowse.labels" . | nindent 4 }}
+    app.kubernetes.io/component: istio-gateway
+spec:
+  selector:
+    {{- toYaml .Values.istio.gateway.selector | nindent 4 }}
+  servers:
+    {{- toYaml .Values.istio.gateway.servers | nindent 4 }}
+{{- end -}}

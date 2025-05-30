@@ -1,0 +1,36 @@
+{{- if .Values.clamd.enabled -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "kubebrowse.fullname" . }}-clamd
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "kubebrowse.labels" . | nindent 4 }}
+    app.kubernetes.io/component: clamd
+spec:
+  replicas: {{ .Values.clamd.replicaCount | default 1 }}
+  selector:
+    matchLabels:
+      {{- include "kubebrowse.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: clamd
+  template:
+    metadata:
+      labels:
+        {{- include "kubebrowse.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: clamd
+    spec:
+      serviceAccountName: {{ include "kubebrowse.serviceAccountName" . }}
+      containers:
+        - name: clamd
+          image: "{{ .Values.clamd.image.repository }}:{{ .Values.clamd.image.tag | default "stable" }}"
+          imagePullPolicy: {{ .Values.clamd.image.pullPolicy | default "IfNotPresent" }}
+          ports:
+            - containerPort: {{ .Values.clamd.service.port | default 3310 }}
+              name: clamd
+          readinessProbe:
+            {{- toYaml .Values.clamd.readinessProbe | nindent 12 }}
+          livenessProbe:
+            {{- toYaml .Values.clamd.livenessProbe | nindent 12 }}
+          resources:
+            {{- toYaml .Values.clamd.resources | nindent 12 }}
+{{- end }}
