@@ -8,6 +8,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 
@@ -100,5 +101,60 @@ func CreateOfficeSandboxPod(clientset *kubernetes.Clientset, namespace, userID s
 		logrus.Errorf("Error creating pod: %v", err)
 		return nil, err
 	}
+
+	// Define and create the NetworkPolicy
+	policyName := fmt.Sprintf("allow-%s-ingress", podName)
+	networkPolicy := &networkingv1.NetworkPolicy{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      policyName,
+			Namespace: namespace,
+		},
+		Spec: networkingv1.NetworkPolicySpec{
+			PodSelector: metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"app": "browser-sandbox-test",
+				},
+			},
+			PolicyTypes: []networkingv1.PolicyType{
+				networkingv1.PolicyTypeIngress,
+				networkingv1.PolicyTypeEgress,
+			},
+			Ingress: []networkingv1.NetworkPolicyIngressRule{
+				{
+					Ports: []networkingv1.NetworkPolicyPort{
+						{
+							Protocol: ptr.To(corev1.ProtocolTCP),
+							Port:     ptr.To(int32(3389)),
+						},
+						{
+							Protocol: ptr.To(corev1.ProtocolTCP),
+							Port:     ptr.To(int32(8080)),
+						},
+					},
+					From: []networkingv1.NetworkPolicyPeer{
+						{
+							NamespaceSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									"kubernetes.io/metadata.name": "browser-sandbox",
+								},
+							},
+						},
+					},
+				},
+			},
+			// No Egress rules defined, so all egress traffic will be denied by default
+			// because PolicyTypes includes Egress.
+		},
+	}
+
+	_, err = clientset.NetworkingV1().NetworkPolicies(namespace).Create(context.Background(), networkPolicy, metav1.CreateOptions{})
+	if err != nil {
+		logrus.Errorf("Error creating network policy: %v", err)
+		// We might want to clean up the created pod if network policy creation fails.
+		// For now, just return the error.
+		return nil, err
+	}
+
+	logrus.Infof("Successfully created pod %s and network policy %s in namespace %s", result.Name, policyName, namespace)
 	return result, nil
 }
