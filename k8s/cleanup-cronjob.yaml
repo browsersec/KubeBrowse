@@ -12,7 +12,7 @@ spec:
           serviceAccountName: browser-sandbox-cleanup
           containers:
           - name: cleanup
-            image: ghcr.io/browsersec/kubebrowse-cleanup:latest
+            image: ghcr.io/browsersec/kubebrowse-cleanup:sha-c732605250cefad5a6d5e49ca4637a1b5964a875
             env:
             - name: CLEANUP_NAMESPACE
               value: "browser-sandbox"
