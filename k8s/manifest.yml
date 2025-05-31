@@ -370,15 +370,15 @@ spec:
         name: http
         protocol: HTTP
       hosts:
-        - "sandbox.example.com"
+        - "kubebrowse1.ghcat.tech"
     - port:
         number: 443
         name: https
         protocol: HTTPS
       hosts:
-        - "sandbox.example.com"
+        - "kubebrowse1.ghcat.tech"
       tls:
-        mode: SIMPLE
+        mode: PASSTHROUGH
         credentialName: browser-sandbox-cert
 ---
 # Istio VirtualService for routing
@@ -389,7 +389,7 @@ metadata:
   namespace: browser-sandbox
 spec:
   hosts:
-    - "sandbox.example.com"
+    - "kubebrowse1.ghcat.tech"
   gateways:
     - browser-sandbox-gateway
   http:
