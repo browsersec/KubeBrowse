@@ -378,7 +378,7 @@ spec:
       hosts:
         - "kubebrowse1.ghcat.tech"
       tls:
-        mode: PASSTHROUGH
+        mode: SIMPLE
         credentialName: browser-sandbox-cert
 ---
 # Istio VirtualService for routing
@@ -413,7 +413,7 @@ spec:
         - destination:
             host: browser-sandbox-frontend
             port:
-              number: 8000
+              number: 80
 
 # ---
 # Cron Job to cleanup idle sessions
