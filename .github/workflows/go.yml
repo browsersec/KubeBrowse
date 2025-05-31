@@ -5,8 +5,18 @@ on:
     branches: [ main , "chore/improve-back" ]
     tags:
       - 'v*'
+    paths-ignore:
+      - 'cmd/cleanup/**'
+      - 'internal/cleanup/**'
+      - 'Dockerfile.cleanup'
+      - 'deployments/cleanup-cronjob.yaml'
   pull_request:
     branches: [ main ]
+    paths-ignore:
+      - 'cmd/cleanup/**'
+      - 'internal/cleanup/**'
+      - 'Dockerfile.cleanup'
+      - 'deployments/cleanup-cronjob.yaml'
 
 env:
   REGISTRY: ghcr.io
