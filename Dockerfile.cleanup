@@ -2,6 +2,10 @@ FROM golang:1.21-alpine AS builder
 
 WORKDIR /app
 COPY go.mod go.sum ./
+
+# Remove any tool directive referencing lefthook
+RUN sed -i '/^tool github.com\/evilmartians\/lefthook/d' go.mod
+
 RUN go mod download
 
 COPY . .
