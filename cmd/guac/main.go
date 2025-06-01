@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	guac2 "github.com/browsersec/KubeBrowse/internal/guac"
@@ -250,46 +249,53 @@ func main() {
 		ctx := context.Background()
 		sessionKey := fmt.Sprintf("session:%s", uuidParam)
 
-		// First, check what type the key is in Redis
-		keyType, err := redisClient.Type(ctx, sessionKey).Result()
+		// // First, check what type the key is in Redis
+		// keyType, err := redisClient.Type(ctx, sessionKey).Result()
+		// if err != nil {
+		// 	logrus.Errorf("Failed to check Redis key type for session %s: %v", uuidParam, err)
+		// 	return
+		// }
+
+		// var podName string
+
+		// // Extract pod name based on the key type
+		// switch keyType {
+		// case "hash":
+		// 	// If it's a hash, use HGET
+		// 	podName, err = redisClient.HGet(ctx, sessionKey, "pod_name").Result()
+		// 	if err != nil {
+		// 		logrus.Warnf("Failed to get pod_name from hash for session %s: %v", uuidParam, err)
+		// 		// Try getting PodName field as well
+		// 		podName, err = redisClient.HGet(ctx, sessionKey, "PodName").Result()
+		// 	}
+		// case "string":
+		// 	// If it's a string, try to decode it as JSON or extract pod name from the log pattern
+		// 	sessionData, err := redisClient.Get(ctx, sessionKey).Result()
+		// 	if err == nil {
+		// 		// Try to extract pod name from the session data string
+		// 		// Based on the log, it looks like: "PodName:browser-sandbox-browser-7acfd4ab-20250601101159"
+		// 		if strings.Contains(sessionData, "PodName:") {
+		// 			parts := strings.Split(sessionData, "PodName:")
+		// 			if len(parts) > 1 {
+		// 				podNamePart := strings.Split(parts[1], " ")[0]
+		// 				podName = strings.TrimSpace(podNamePart)
+		// 			}
+		// 		}
+		// 	}
+		// default:
+		// 	logrus.Warnf("Unexpected Redis key type '%s' for session %s", keyType, uuidParam)
+		// 	return
+		// }
+
+		sessiondata, err := redis2.GetSessionData(redisClient, uuidParam)
 		if err != nil {
-			logrus.Errorf("Failed to check Redis key type for session %s: %v", uuidParam, err)
+			logrus.Warnf("Failed to get session data for %s: %v", uuidParam, err)
 			return
 		}
-
-		var podName string
-
-		// Extract pod name based on the key type
-		switch keyType {
-		case "hash":
-			// If it's a hash, use HGET
-			podName, err = redisClient.HGet(ctx, sessionKey, "pod_name").Result()
-			if err != nil {
-				logrus.Warnf("Failed to get pod_name from hash for session %s: %v", uuidParam, err)
-				// Try getting PodName field as well
-				podName, err = redisClient.HGet(ctx, sessionKey, "PodName").Result()
-			}
-		case "string":
-			// If it's a string, try to decode it as JSON or extract pod name from the log pattern
-			sessionData, err := redisClient.Get(ctx, sessionKey).Result()
-			if err == nil {
-				// Try to extract pod name from the session data string
-				// Based on the log, it looks like: "PodName:browser-sandbox-browser-7acfd4ab-20250601101159"
-				if strings.Contains(sessionData, "PodName:") {
-					parts := strings.Split(sessionData, "PodName:")
-					if len(parts) > 1 {
-						podNamePart := strings.Split(parts[1], " ")[0]
-						podName = strings.TrimSpace(podNamePart)
-					}
-				}
-			}
-		default:
-			logrus.Warnf("Unexpected Redis key type '%s' for session %s", keyType, uuidParam)
-			return
-		}
+		podName := sessiondata.PodName
 
 		if err != nil || podName == "" {
-			logrus.Warnf("No pod name found for session %s (type: %s): %v", uuidParam, keyType, err)
+			logrus.Warnf("No pod name found for session %s ,  %v", uuidParam, err)
 			return
 		}
 
