@@ -43,6 +43,7 @@ jobs:
 
 
     - name: Test
+      working-directory: ./cmd/guac
       run: go test -race -v .
       
   docker-build-push:
