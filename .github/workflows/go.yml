@@ -7,11 +7,12 @@ on:
       - 'v*'
     paths-ignore:
       - 'cmd/cleanup/**'
+      - 'deployments/**'
   pull_request:
     branches: [ main ]
     paths-ignore:
       - 'cmd/cleanup/**'
-
+      - 'deployments/**'
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
