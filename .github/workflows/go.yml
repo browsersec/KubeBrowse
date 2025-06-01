@@ -7,16 +7,10 @@ on:
       - 'v*'
     paths-ignore:
       - 'cmd/cleanup/**'
-      - 'internal/cleanup/**'
-      - 'Dockerfile.cleanup'
-      - 'deployments/cleanup-cronjob.yaml'
   pull_request:
     branches: [ main ]
     paths-ignore:
       - 'cmd/cleanup/**'
-      - 'internal/cleanup/**'
-      - 'Dockerfile.cleanup'
-      - 'deployments/cleanup-cronjob.yaml'
 
 env:
   REGISTRY: ghcr.io
@@ -30,7 +24,7 @@ jobs:
     - name: Set up Go 1.x
       uses: actions/setup-go@v2
       with:
-        go-version: '^1.23'
+        go-version: '^1.24'
 
     - name: Check out code into the Go module directory
       uses: actions/checkout@v3
@@ -44,7 +38,9 @@ jobs:
         fi
 
     - name: Build
+      working-directory: ./cmd/guac
       run: go build -v .
+
 
     - name: Test
       run: go test -race -v .
