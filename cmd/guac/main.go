@@ -303,7 +303,7 @@ func main() {
 
 		// Set a reconnection window in Redis with expiration
 		reconnectKey := fmt.Sprintf("reconnect:%s", uuidParam)
-		err = redisClient.Set(ctx, reconnectKey, podName, 2*time.Minute).Err()
+		err = redisClient.Set(ctx, reconnectKey, sessiondata, 2*time.Minute).Err()
 		if err != nil {
 			logrus.Errorf("Failed to set reconnection window for session %s: %v", uuidParam, err)
 		} else {
@@ -316,13 +316,18 @@ func main() {
 			time.Sleep(2 * time.Minute)
 
 			// Check if pod still exists in reconnect window
-			exists, err := redisClient.Exists(ctx, reconnectKey).Result()
+			// exists, err := redisClient.Exists(ctx, reconnectKey).Result()
+			// if err != nil {
+			// 	logrus.Errorf("Failed to check reconnection status for %s: %v", uuidParam, err)
+			// 	return
+			// }
+			exists, err := k8s.CheckPodName(k8sClient, k8sNamespace, podName)
 			if err != nil {
-				logrus.Errorf("Failed to check reconnection status for %s: %v", uuidParam, err)
+				logrus.Errorf("Failed to check if pod %s exists: %v", podName, err)
 				return
 			}
 
-			if exists > 0 {
+			if !exists {
 				// No reconnection happened, delete the pod
 				logrus.Infof("No reconnection for session %s after grace period, terminating pod %s", uuidParam, podName)
 				if k8sClient != nil {
