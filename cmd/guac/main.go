@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"net"
@@ -303,7 +304,12 @@ func main() {
 
 		// Set a reconnection window in Redis with expiration
 		reconnectKey := fmt.Sprintf("reconnect:%s", uuidParam)
-		err = redisClient.Set(ctx, reconnectKey, sessiondata, 2*time.Minute).Err()
+		sessionJSON, err := json.Marshal(sessiondata)
+		if err != nil {
+			logrus.Errorf("Failed to marshal session data for %s: %v", uuidParam, err)
+			return
+		}
+		err = redisClient.Set(ctx, reconnectKey, sessionJSON, 2*time.Minute).Err()
 		if err != nil {
 			logrus.Errorf("Failed to set reconnection window for session %s: %v", uuidParam, err)
 		} else {
