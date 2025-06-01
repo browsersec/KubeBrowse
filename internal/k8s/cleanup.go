@@ -24,8 +24,8 @@ type PodInfo struct {
 func GetBrowserSandboxPods(clientset *kubernetes.Clientset, namespace string) ([]PodInfo, error) {
 	ctx := context.Background()
 
-	// List pods with label selector for browser sandbox pods
-	labelSelector := "app=browser-sandbox-test"
+	// List pods with label selector for browser sandbox pods (both browser and office)
+	labelSelector := "app in (browser-sandbox-test, office-sandbox-test)"
 	pods, err := clientset.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{
 		LabelSelector: labelSelector,
 	})
@@ -74,14 +74,14 @@ func IsOrphanedPod(pod PodInfo, gracePeriod time.Duration) bool {
 	return time.Since(pod.CreatedAt) > gracePeriod
 }
 
-// FilterBrowserSandboxPods filters pods that match browser sandbox pattern
+// FilterBrowserSandboxPods filters pods that match browser or office sandbox pattern
 func FilterBrowserSandboxPods(pods []PodInfo) []PodInfo {
-	var browserPods []PodInfo
+	var sandboxPods []PodInfo
 	for _, pod := range pods {
-		// Check if pod name matches browser sandbox pattern
-		if strings.HasPrefix(pod.Name, "browser-sandbox-") {
-			browserPods = append(browserPods, pod)
+		// Check if pod name matches browser or office sandbox pattern
+		if strings.HasPrefix(pod.Name, "browser-sandbox-") || strings.HasPrefix(pod.Name, "office-sandbox-") {
+			sandboxPods = append(sandboxPods, pod)
 		}
 	}
-	return browserPods
+	return sandboxPods
 }

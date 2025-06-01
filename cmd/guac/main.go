@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	guac2 "github.com/browsersec/KubeBrowse/internal/guac"
@@ -241,62 +242,99 @@ func main() {
 		// Extract connection UUID from request parameters
 		uuidParam := req.URL.Query().Get("uuid")
 		if uuidParam == "" {
-			logrus.Warnf("No UUID found in request for connection: %s", connectionID)
+			logrus.Debugf("No UUID found in request for connection: %s", connectionID)
 			return
 		}
 
-		// Check if this session still exists in Redis
+		// Check if this session exists in Redis
 		ctx := context.Background()
 		sessionKey := fmt.Sprintf("session:%s", uuidParam)
-		exists, err := redisClient.Exists(ctx, sessionKey).Result()
+
+		// First, check what type the key is in Redis
+		keyType, err := redisClient.Type(ctx, sessionKey).Result()
 		if err != nil {
-			logrus.Errorf("Failed to check Redis for session %s: %v", uuidParam, err)
+			logrus.Errorf("Failed to check Redis key type for session %s: %v", uuidParam, err)
 			return
 		}
 
-		// If session exists in Redis but connection closed, give it time to reconnect
-		if exists > 0 {
-			// Check if we have a pod name associated with this session
-			podName, err := redisClient.HGet(ctx, sessionKey, "pod_name").Result()
-			if err != nil || podName == "" {
-				logrus.Warnf("No pod name found for session %s: %v", uuidParam, err)
+		var podName string
+
+		// Extract pod name based on the key type
+		switch keyType {
+		case "hash":
+			// If it's a hash, use HGET
+			podName, err = redisClient.HGet(ctx, sessionKey, "pod_name").Result()
+			if err != nil {
+				logrus.Warnf("Failed to get pod_name from hash for session %s: %v", uuidParam, err)
+				// Try getting PodName field as well
+				podName, err = redisClient.HGet(ctx, sessionKey, "PodName").Result()
+			}
+		case "string":
+			// If it's a string, try to decode it as JSON or extract pod name from the log pattern
+			sessionData, err := redisClient.Get(ctx, sessionKey).Result()
+			if err == nil {
+				// Try to extract pod name from the session data string
+				// Based on the log, it looks like: "PodName:browser-sandbox-browser-7acfd4ab-20250601101159"
+				if strings.Contains(sessionData, "PodName:") {
+					parts := strings.Split(sessionData, "PodName:")
+					if len(parts) > 1 {
+						podNamePart := strings.Split(parts[1], " ")[0]
+						podName = strings.TrimSpace(podNamePart)
+					}
+				}
+			}
+		default:
+			logrus.Warnf("Unexpected Redis key type '%s' for session %s", keyType, uuidParam)
+			return
+		}
+
+		if err != nil || podName == "" {
+			logrus.Warnf("No pod name found for session %s (type: %s): %v", uuidParam, keyType, err)
+			return
+		}
+
+		logrus.Infof("Found pod name %s for disconnected session %s", podName, uuidParam)
+
+		// Set a reconnection window in Redis with expiration
+		reconnectKey := fmt.Sprintf("reconnect:%s", uuidParam)
+		err = redisClient.Set(ctx, reconnectKey, podName, 2*time.Minute).Err()
+		if err != nil {
+			logrus.Errorf("Failed to set reconnection window for session %s: %v", uuidParam, err)
+		} else {
+			logrus.Infof("Set 2-minute reconnection window for session %s", uuidParam)
+		}
+
+		// Schedule pod termination after grace period if no reconnection
+		go func() {
+			// Wait for reconnection window (2 minutes)
+			time.Sleep(2 * time.Minute)
+
+			// Check if pod still exists in reconnect window
+			exists, err := redisClient.Exists(ctx, reconnectKey).Result()
+			if err != nil {
+				logrus.Errorf("Failed to check reconnection status for %s: %v", uuidParam, err)
 				return
 			}
 
-			// Set a reconnection window in Redis with expiration
-			reconnectKey := fmt.Sprintf("reconnect:%s", uuidParam)
-			err = redisClient.Set(ctx, reconnectKey, podName, 2*time.Minute).Err()
-			if err != nil {
-				logrus.Errorf("Failed to set reconnection window for session %s: %v", uuidParam, err)
-			}
-
-			// Schedule pod termination after grace period if no reconnection
-			go func() {
-				// Wait for reconnection window (2 minutes)
-				time.Sleep(2 * time.Minute)
-
-				// Check if still exists in reconnect keys (no reconnection happened)
-				exists, err := redisClient.Exists(ctx, reconnectKey).Result()
-				if err != nil {
-					logrus.Errorf("Failed to check reconnection status for %s: %v", uuidParam, err)
-					return
-				}
-
-				if exists > 0 {
-					// No reconnection happened, delete the pod
-					logrus.Infof("No reconnection for session %s after grace period, terminating pod %s", uuidParam, podName)
-					if k8sClient != nil {
-						err = k8s.DeletePodGrace(k8sClient, k8sNamespace, podName)
-						if err != nil {
-							logrus.Errorf("Failed to delete pod %s: %v", podName, err)
-						}
+			if exists > 0 {
+				// No reconnection happened, delete the pod
+				logrus.Infof("No reconnection for session %s after grace period, terminating pod %s", uuidParam, podName)
+				if k8sClient != nil {
+					err = k8s.DeletePodGrace(k8sClient, k8sNamespace, podName)
+					if err != nil {
+						logrus.Errorf("Failed to delete pod %s: %v", podName, err)
+					} else {
+						logrus.Infof("Successfully scheduled pod %s for deletion", podName)
 					}
-
-					// Clean up Redis keys
-					redisClient.Del(ctx, sessionKey, reconnectKey)
 				}
-			}()
-		}
+
+				// Clean up Redis keys
+				redisClient.Del(ctx, sessionKey, reconnectKey)
+				logrus.Infof("Cleaned up Redis keys for session %s", uuidParam)
+			} else {
+				logrus.Infof("Session %s reconnected, pod %s will not be terminated", uuidParam, podName)
+			}
+		}()
 	}
 
 	// Setup routes using Gin

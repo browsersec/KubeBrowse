@@ -65,9 +65,12 @@ func (s *WebsocketServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	defer func() {
 		if err = ws.Close(); err != nil {
-			// Don't log trace for common "connection reset by peer" errors
-			if strings.Contains(err.Error(), "connection reset by peer") {
-				logrus.Debugf("Client disconnected: %v", err)
+			// Don't log excessive detail for common connection close errors
+			if strings.Contains(err.Error(), "connection reset by peer") ||
+				strings.Contains(err.Error(), "broken pipe") ||
+				strings.Contains(err.Error(), "use of closed network connection") ||
+				strings.Contains(err.Error(), "closeNotify alert") {
+				logrus.Debugf("Client connection closed: %v", err)
 			} else {
 				logrus.Traceln("Error closing websocket", err)
 			}
