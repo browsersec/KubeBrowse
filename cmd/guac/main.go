@@ -318,8 +318,8 @@ func main() {
 
 		// Schedule pod termination after grace period if no reconnection
 		go func() {
-			// Wait for reconnection window (2 minutes)
-			time.Sleep(2 * time.Minute)
+			// Wait for reconnection window (30 Seconds)
+			time.Sleep(30 * time.Second)
 
 			// Check if pod still exists in reconnect window
 			// exists, err := redisClient.Exists(ctx, reconnectKey).Result()
@@ -333,7 +333,7 @@ func main() {
 				return
 			}
 
-			if !exists {
+			if exists {
 				// No reconnection happened, delete the pod
 				logrus.Infof("No reconnection for session %s after grace period, terminating pod %s", uuidParam, podName)
 				if k8sClient != nil {
