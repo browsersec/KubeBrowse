@@ -1,88 +1,124 @@
 package cleanup
 
 import (
+	"context"
+	"fmt"
 	"time"
 
+	"github.com/browsersec/KubeBrowse/internal/k8s"
 	"github.com/go-redis/redis/v8"
 	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/kubernetes"
-
-	k8sClient "github.com/browsersec/KubeBrowse/internal/k8s"
-	redisClient "github.com/browsersec/KubeBrowse/internal/redis"
 )
 
-// CleanupService handles the cleanup of orphaned pods
+// CleanupService handles cleaning up orphaned resources
 type CleanupService struct {
-	K8sClient   *kubernetes.Clientset
-	RedisClient *redis.Client
-	Namespace   string
-	GracePeriod time.Duration
+	k8sClient   *kubernetes.Clientset
+	redisClient *redis.Client
+	namespace   string
+	gracePeriod time.Duration
 }
 
 // NewCleanupService creates a new cleanup service
 func NewCleanupService(k8sClient *kubernetes.Clientset, redisClient *redis.Client, namespace string, gracePeriod time.Duration) *CleanupService {
 	return &CleanupService{
-		K8sClient:   k8sClient,
-		RedisClient: redisClient,
-		Namespace:   namespace,
-		GracePeriod: gracePeriod,
+		k8sClient:   k8sClient,
+		redisClient: redisClient,
+		namespace:   namespace,
+		gracePeriod: gracePeriod,
 	}
 }
 
-// CleanupOrphanedPods performs the cleanup of pods without active sessions
-func (cs *CleanupService) CleanupOrphanedPods() error {
-	logrus.Info("Starting cleanup of orphaned browser sandbox pods")
+// CleanupOrphanedPods removes pods that have no active session
+func (s *CleanupService) CleanupOrphanedPods() error {
+	logrus.Info("Starting cleanup of orphaned pods")
 
 	// Get all browser sandbox pods
-	pods, err := k8sClient.GetBrowserSandboxPods(cs.K8sClient, cs.Namespace)
+	pods, err := k8s.GetBrowserSandboxPods(s.k8sClient, s.namespace)
 	if err != nil {
-		logrus.Errorf("Error getting browser sandbox pods: %v", err)
-		return err
+		return fmt.Errorf("failed to get browser sandbox pods: %v", err)
 	}
 
-	logrus.Infof("Found %d browser sandbox pods", len(pods))
+	logrus.Infof("Found %d browser sandbox pods for cleanup evaluation", len(pods))
 
-	// Filter pods that are old enough to be considered for cleanup
-	var candidatePods []k8sClient.PodInfo
+	ctx := context.Background()
+
+	// Check each pod against Redis sessions
 	for _, pod := range pods {
-		if k8sClient.IsOrphanedPod(pod, cs.GracePeriod) {
-			candidatePods = append(candidatePods, pod)
+		// Skip pods that are too new (within grace period)
+		if !k8s.IsOrphanedPod(pod, s.gracePeriod) {
+			logrus.Debugf("Pod %s is within grace period, skipping", pod.Name)
+			continue
 		}
-	}
 
-	logrus.Infof("Found %d candidate pods for cleanup (older than %v)", len(candidatePods), cs.GracePeriod)
+		// Check if pod has an active session in Redis
+		sessionExists := false
+		podName := pod.Name
 
-	// Get all active sessions from Redis
-	activeSessions, err := redisClient.GetAllActiveSessions(cs.RedisClient)
-	if err != nil {
-		logrus.Errorf("Error getting active sessions: %v", err)
-		return err
-	}
-
-	logrus.Infof("Found %d active sessions in Redis", len(activeSessions))
-
-	// Create a map for quick lookup of active sessions
-	activeSessionMap := make(map[string]bool)
-	for _, sessionPod := range activeSessions {
-		activeSessionMap[sessionPod] = true
-	}
-
-	// Delete pods that don't have active sessions
-	var deletedCount int
-	for _, pod := range candidatePods {
-		if !activeSessionMap[pod.Name] {
-			logrus.Infof("Pod %s has no active session, marking for deletion", pod.Name)
-			err := k8sClient.DeletePodGrace(cs.K8sClient, pod.Namespace, pod.Name)
+		// Scan for sessions that reference this pod
+		var cursor uint64
+		for {
+			var keys []string
+			var err error
+			keys, cursor, err = s.redisClient.Scan(ctx, cursor, "session:*", 100).Result()
 			if err != nil {
-				logrus.Errorf("Error deleting pod %s: %v", pod.Name, err)
-				continue
+				logrus.Errorf("Error scanning Redis for sessions: %v", err)
+				break
 			}
-			deletedCount++
+
+			// Check each session to see if it references this pod
+			for _, key := range keys {
+				podNameFromRedis, err := s.redisClient.HGet(ctx, key, "pod_name").Result()
+				if err == nil && podNameFromRedis == podName {
+					sessionExists = true
+					break
+				}
+			}
+
+			if sessionExists || cursor == 0 {
+				break
+			}
+		}
+
+		// Also check reconnection windows
+		if !sessionExists {
+			var cursor uint64
+			for {
+				var keys []string
+				var err error
+				keys, cursor, err = s.redisClient.Scan(ctx, cursor, "reconnect:*", 100).Result()
+				if err != nil {
+					logrus.Errorf("Error scanning Redis for reconnect windows: %v", err)
+					break
+				}
+
+				// Check each reconnect window
+				for _, key := range keys {
+					podNameFromRedis, err := s.redisClient.Get(ctx, key).Result()
+					if err == nil && podNameFromRedis == podName {
+						sessionExists = true
+						break
+					}
+				}
+
+				if sessionExists || cursor == 0 {
+					break
+				}
+			}
+		}
+
+		// If no active session found, delete the pod
+		if !sessionExists {
+			logrus.Infof("No active session for pod %s, terminating", podName)
+			err = k8s.DeletePodGrace(s.k8sClient, s.namespace, podName)
+			if err != nil {
+				logrus.Errorf("Failed to delete orphaned pod %s: %v", podName, err)
+			}
 		} else {
-			logrus.Debugf("Pod %s has active session, keeping alive", pod.Name)
+			logrus.Debugf("Pod %s has an active session, skipping", podName)
 		}
 	}
 
-	logrus.Infof("Cleanup completed. Deleted %d orphaned pods", deletedCount)
+	logrus.Info("Completed cleanup of orphaned pods")
 	return nil
 }

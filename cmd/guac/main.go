@@ -8,8 +8,11 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 
-	guac "github.com/browsersec/KubeBrowse"
+	guac2 "github.com/browsersec/KubeBrowse/internal/guac"
+	"github.com/browsersec/KubeBrowse/internal/k8s"
+
 	"github.com/browsersec/KubeBrowse/api"
 	"github.com/browsersec/KubeBrowse/docs"
 	"github.com/browsersec/KubeBrowse/internal/minio"
@@ -37,7 +40,7 @@ var (
 	minioAddr    = "minio.browser-sandbox.svc.cluster.local:9000"
 )
 
-var activeTunnels *guac.ActiveTunnelStore
+var activeTunnels *guac2.ActiveTunnelStore
 var redisClient *redis.Client
 
 type MinioConfig struct {
@@ -151,7 +154,7 @@ func main() {
 		k8sNamespace = os.Getenv("KUBERNETES_NAMESPACE")
 	}
 
-	activeTunnels = guac.NewActiveTunnelStore()
+	activeTunnels = guac2.NewActiveTunnelStore()
 
 	// Initialize Kubernetes client with fallback for local development
 	config, err := rest.InClusterConfig()
@@ -218,12 +221,12 @@ func main() {
 	// wsServer := guac.NewWebsocketServer(DemoDoConnect) // Same here
 
 	// Pass activeTunnels to DemoDoConnect by wrapping it
-	doConnectWrapper := func(request *http.Request) (guac.Tunnel, error) {
+	doConnectWrapper := func(request *http.Request) (guac2.Tunnel, error) {
 		return api.DemoDoConnect(request, activeTunnels, redisClient, guacdAddr)
 	}
 
-	servlet := guac.NewServer(doConnectWrapper)
-	wsServer := guac.NewWebsocketServer(doConnectWrapper)
+	servlet := guac2.NewServer(doConnectWrapper)
+	wsServer := guac2.NewWebsocketServer(doConnectWrapper)
 
 	// sessions := guac.NewMemorySessionStore() // Old store
 	// wsServer.OnConnect = sessions.Add // Old OnConnect
@@ -231,9 +234,69 @@ func main() {
 
 	// OnConnect is implicitly handled by DemoDoConnect now adding to activeTunnels.
 	// We still need OnDisconnect to remove from the store when a tunnel closes for any reason.
-	wsServer.OnDisconnect = func(connectionID string, req *http.Request, tunnel guac.Tunnel) {
+	wsServer.OnDisconnect = func(connectionID string, req *http.Request, tunnel guac2.Tunnel) {
 		logrus.Debugf("Websocket disconnected, removing tunnel: %s", connectionID)
 		activeTunnels.Delete(connectionID, req, tunnel)
+
+		// Extract connection UUID from request parameters
+		uuidParam := req.URL.Query().Get("uuid")
+		if uuidParam == "" {
+			logrus.Warnf("No UUID found in request for connection: %s", connectionID)
+			return
+		}
+
+		// Check if this session still exists in Redis
+		ctx := context.Background()
+		sessionKey := fmt.Sprintf("session:%s", uuidParam)
+		exists, err := redisClient.Exists(ctx, sessionKey).Result()
+		if err != nil {
+			logrus.Errorf("Failed to check Redis for session %s: %v", uuidParam, err)
+			return
+		}
+
+		// If session exists in Redis but connection closed, give it time to reconnect
+		if exists > 0 {
+			// Check if we have a pod name associated with this session
+			podName, err := redisClient.HGet(ctx, sessionKey, "pod_name").Result()
+			if err != nil || podName == "" {
+				logrus.Warnf("No pod name found for session %s: %v", uuidParam, err)
+				return
+			}
+
+			// Set a reconnection window in Redis with expiration
+			reconnectKey := fmt.Sprintf("reconnect:%s", uuidParam)
+			err = redisClient.Set(ctx, reconnectKey, podName, 2*time.Minute).Err()
+			if err != nil {
+				logrus.Errorf("Failed to set reconnection window for session %s: %v", uuidParam, err)
+			}
+
+			// Schedule pod termination after grace period if no reconnection
+			go func() {
+				// Wait for reconnection window (2 minutes)
+				time.Sleep(2 * time.Minute)
+
+				// Check if still exists in reconnect keys (no reconnection happened)
+				exists, err := redisClient.Exists(ctx, reconnectKey).Result()
+				if err != nil {
+					logrus.Errorf("Failed to check reconnection status for %s: %v", uuidParam, err)
+					return
+				}
+
+				if exists > 0 {
+					// No reconnection happened, delete the pod
+					logrus.Infof("No reconnection for session %s after grace period, terminating pod %s", uuidParam, podName)
+					if k8sClient != nil {
+						err = k8s.DeletePodGrace(k8sClient, k8sNamespace, podName)
+						if err != nil {
+							logrus.Errorf("Failed to delete pod %s: %v", podName, err)
+						}
+					}
+
+					// Clean up Redis keys
+					redisClient.Del(ctx, sessionKey, reconnectKey)
+				}
+			}()
+		}
 	}
 
 	// Setup routes using Gin

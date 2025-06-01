@@ -79,6 +79,64 @@ services:
       - minio_data:/data
     restart: unless-stopped
 
+  clamd:
+    image: clamav/clamav:stable
+    restart: unless-stopped
+    networks:
+      - clam-net
+    healthcheck:
+      test: ["CMD", "clamdscan", "--ping", "1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+
+  redis-clam:
+    image: redis:alpine
+    restart: unless-stopped
+    networks:
+      - clam-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  api:
+    image: ghcr.io/browsersec/clamav-go-api:latest
+    restart: unless-stopped
+    depends_on:
+      clamd:
+        condition: service_healthy
+      redis-clam:
+        condition: service_healthy
+    environment:
+      - NODE_ENV=production
+      - CLAMD_IP=clamd
+      - APP_FORM_KEY=FILES
+      - APP_PORT=3000
+      - APP_MAX_FILE_SIZE=26214400
+      - APP_MAX_FILES_NUMBER=4
+      - CLAMD_PORT=3310
+      - CLAMD_TIMEOUT=60000
+      - REDIS_URL=redis://redis-clam:6379
+      - JOB_EXPIRATION=3600
+    ports:
+      - '3000:3000'
+    networks:
+      - clam-net
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 3000 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+networks:
+  clam-net:
+    driver: bridge
+
 volumes:
   postgres_data: {}
   minio_data: {}

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/gorilla/websocket"
 	"github.com/sirupsen/logrus"
@@ -64,7 +65,12 @@ func (s *WebsocketServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	defer func() {
 		if err = ws.Close(); err != nil {
-			logrus.Traceln("Error closing websocket", err)
+			// Don't log trace for common "connection reset by peer" errors
+			if strings.Contains(err.Error(), "connection reset by peer") {
+				logrus.Debugf("Client disconnected: %v", err)
+			} else {
+				logrus.Traceln("Error closing websocket", err)
+			}
 		}
 	}()
 

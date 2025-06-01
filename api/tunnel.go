@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	guac "github.com/browsersec/KubeBrowse"
+	guac2 "github.com/browsersec/KubeBrowse/internal/guac"
 	redis2 "github.com/browsersec/KubeBrowse/internal/redis"
 	"github.com/go-redis/redis/v8"
 	"github.com/sirupsen/logrus"
@@ -17,8 +17,8 @@ import (
 
 // DemoDoConnect creates the tunnel to the remote machine (via guacd)
 // Now accepts ActiveTunnelStore to register the tunnel
-func DemoDoConnect(request *http.Request, tunnelStore *guac.ActiveTunnelStore, redisClient *redis.Client, guacdAddr string) (guac.Tunnel, error) {
-	config := guac.NewGuacamoleConfiguration()
+func DemoDoConnect(request *http.Request, tunnelStore *guac2.ActiveTunnelStore, redisClient *redis.Client, guacdAddr string) (guac2.Tunnel, error) {
+	config := guac2.NewGuacamoleConfiguration()
 	var query url.Values
 	uuid := request.URL.Query().Get("uuid")
 	var session redis2.SessionData
@@ -95,8 +95,8 @@ func DemoDoConnect(request *http.Request, tunnelStore *guac.ActiveTunnelStore, r
 		return nil, err
 	}
 
-	stream := guac.NewStream(conn, guac.SocketTimeout)
-	logrus.Debugf("TCP connection established, created new stream with timeout %v", guac.SocketTimeout)
+	stream := guac2.NewStream(conn, guac2.SocketTimeout)
+	logrus.Debugf("TCP connection established, created new stream with timeout %v", guac2.SocketTimeout)
 
 	logrus.Debug("Successfully connected to guacd")
 	if request.URL.Query().Get("uuid") != "" {
@@ -148,7 +148,7 @@ func DemoDoConnect(request *http.Request, tunnelStore *guac.ActiveTunnelStore, r
 
 	logrus.Debug("Handshake completed successfully")
 
-	tunnel := guac.NewSimpleTunnel(stream)
+	tunnel := guac2.NewSimpleTunnel(stream)
 
 	// Register the tunnel with its ConnectionID after handshake
 	if tunnel != nil && tunnel.ConnectionID() != "" {

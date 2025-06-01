@@ -2,8 +2,7 @@ package api
 
 import (
 	"context"
-
-	guac "github.com/browsersec/KubeBrowse"
+	"github.com/browsersec/KubeBrowse/internal/guac"
 
 	"encoding/json"
 	"net/http"
