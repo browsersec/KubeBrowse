@@ -294,7 +294,7 @@ func main() {
 		}
 		podName := sessiondata.PodName
 
-		if err != nil || podName == "" {
+		if podName == "" {
 			logrus.Warnf("No pod name found for session %s ,  %v", uuidParam, err)
 			return
 		}
