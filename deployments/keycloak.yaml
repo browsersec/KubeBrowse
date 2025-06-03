@@ -1,0 +1,151 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keycloak
+  namespace: browser-sandbox
+  labels:
+    app: keycloak
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: keycloak
+  template:
+    metadata:
+      labels:
+        app: keycloak
+    spec:
+      volumes: # Add this volumes section
+        - name: keycloak-realm-config-volume
+          configMap:
+            name: keycloak-realm-config
+      containers:
+        - name: keycloak
+          image: quay.io/keycloak/keycloak:23.0
+          args: ["start-dev"] # Ensure start-dev is used, or adjust import path for 'start'
+          env:
+            - name: KC_DB
+              value: postgres
+            - name: KC_DB_URL_HOST
+              value: postgres.browser-sandbox.svc.cluster.local
+            - name: KC_DB_URL_PORT
+              value: "5432"
+            - name: KC_DB_URL_DATABASE
+              value: keycloak_db # You might want to use a different DB name
+            - name: KC_DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret # Assuming Keycloak can use the same PG credentials
+                  key: username
+            - name: KC_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret # Assuming Keycloak can use the same PG credentials
+                  key: password
+            - name: KEYCLOAK_ADMIN
+              value: admin # Default admin username
+            - name: KEYCLOAK_ADMIN_PASSWORD
+              value: admin # Default admin password - CHANGE THIS IN PRODUCTION
+            # Add this for realm import using start-dev
+            - name: KEYCLOAK_IMPORT
+              value: /mnt/realm/keycloak-realm-config.json # Path where the realm file will be mounted
+          ports:
+            - name: http
+              containerPort: 8080
+            - name: https
+              containerPort: 8443
+          readinessProbe:
+            httpGet:
+              path: /realms/master
+              port: 8080
+            initialDelaySeconds: 60
+            periodSeconds: 1
+          volumeMounts: # Add this volumeMounts section
+            - name: keycloak-realm-config-volume
+              mountPath: /mnt/realm # Mount directory for the realm config
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "2Gi"
+              cpu: "1"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak
+  namespace: browser-sandbox
+  labels:
+    app: keycloak
+spec:
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+  selector:
+    app: keycloak
+  type: ClusterIP # Or LoadBalancer/NodePort if you need external access directly to Keycloak
+---
+# Add this ConfigMap definition at the end of the file or in a separate YAML document
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: keycloak-realm-config
+  namespace: browser-sandbox
+data:
+  keycloak-realm-config.json: |
+    {
+      "realm": "kubebrowse-realm",
+      "enabled": true,
+      "sslRequired": "none",
+      "registrationAllowed": true,
+      "loginTheme": "keycloak",
+      "accountTheme": "keycloak",
+      "adminTheme": "keycloak",
+      "emailTheme": "keycloak",
+      "clients": [
+        {
+          "clientId": "kubebrowse-frontend",
+          "name": "KubeBrowse Frontend",
+          "enabled": true,
+          "publicClient": true,
+          "directAccessGrantsEnabled": true,
+          "redirectUris": [
+            "http://localhost:5173/*",
+            "https://kubebrowse1.ghcat.tech/*"
+          ],
+          "webOrigins": [
+            "http://localhost:5173",
+            "https://kubebrowse1.ghcat.tech"
+          ],
+          "protocol": "openid-connect",
+          "attributes": {
+            "post.logout.redirect.uris": "http://localhost:5173/, https://kubebrowse1.ghcat.tech/"
+          }
+        },
+        {
+          "clientId": "kubebrowse-backend",
+          "name": "KubeBrowse Backend",
+          "enabled": true,
+          "bearerOnly": true,
+          "protocol": "openid-connect",
+          "secret": "backend-secret"
+        }
+      ],
+      "users": [
+        {
+          "username": "testuser",
+          "enabled": true,
+          "emailVerified": true,
+          "credentials": [
+            {
+              "type": "password",
+              "value": "testpassword",
+              "temporary": false
+            }
+          ],
+          "realmRoles": ["default-roles-kubebrowse-realm"]
+        }
+      ]
+    }

@@ -1,0 +1,54 @@
+{
+  "realm": "kubebrowse-realm",
+  "enabled": true,
+  "sslRequired": "none",
+  "registrationAllowed": true,
+  "loginTheme": "keycloak",
+  "accountTheme": "keycloak",
+  "adminTheme": "keycloak",
+  "emailTheme": "keycloak",
+  "clients": [
+    {
+      "clientId": "kubebrowse-frontend",
+      "name": "KubeBrowse Frontend",
+      "enabled": true,
+      "publicClient": true,
+      "directAccessGrantsEnabled": true,
+      "redirectUris": [
+        "http://localhost:5173/*",
+        "https://kubebrowse1.ghcat.tech/*"
+      ],
+      "webOrigins": [
+        "http://localhost:5173",
+        "https://kubebrowse1.ghcat.tech"
+      ],
+      "protocol": "openid-connect",
+      "attributes": {
+        "post.logout.redirect.uris": "http://localhost:5173/, https://kubebrowse1.ghcat.tech/"
+      }
+    },
+    {
+      "clientId": "kubebrowse-backend",
+      "name": "KubeBrowse Backend",
+      "enabled": true,
+      "bearerOnly": true,
+      "protocol": "openid-connect",
+      "secret": "backend-secret"
+    }
+  ],
+  "users": [
+    {
+      "username": "testuser",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "testpassword",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["default-roles-kubebrowse-realm"]
+    }
+  ]
+}

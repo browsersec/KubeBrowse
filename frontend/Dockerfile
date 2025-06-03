@@ -3,15 +3,20 @@ FROM node:lts-slim AS build
 
 WORKDIR /app
 
-# Copy package.json first
-COPY package.json ./
-# Use npm install instead of npm ci since there's no package-lock.json
-RUN npm install
+# Install pnpm
+RUN npm install -g pnpm
 
-# Copy the rest of the application code
+# Copy package.json and pnpm-lock.yaml first
+COPY package.json pnpm-lock.yaml ./
+
+# Install dependencies using pnpm
+RUN pnpm install --frozen-lockfile
+
+# Copy the rest of the application code, including .env file
 COPY . .
 
 # Build the application with GUAC_CLIENT_URL as an empty string for relative paths
+# VITE_ variables from .env file will be picked up by Vite during build
 ARG GUAC_CLIENT_URL=""
 ENV GUAC_CLIENT_URL=${GUAC_CLIENT_URL}
 RUN npm run build
