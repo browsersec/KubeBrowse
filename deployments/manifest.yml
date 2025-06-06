@@ -254,7 +254,7 @@ spec:
       containers:
         - name: api
           image:  ghcr.io/browsersec/kubebrowse:sha-09dfa1f
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 4567
           resources:
@@ -493,7 +493,7 @@ spec:
       containers:
         - name: frontend
           image: ghcr.io/browsersec/kubebrowse-frontend:chore-improve-back
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 80
           resources:
