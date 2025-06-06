@@ -17,8 +17,8 @@ This document describes how to use Tilt for local development of the Kubebrowse 
 1.  **Clone the Repository**:
     If you haven't already, clone the project repository:
     ```bash
-    git clone <repository-url>
-    cd <repository-directory>
+    git clone https://github.com/browsersec/KubeBrowse
+    cd KubeBrowse
     ```
 
 2.  **Configure Kubernetes Context (if needed)**:

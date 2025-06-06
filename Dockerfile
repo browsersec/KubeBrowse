@@ -14,7 +14,7 @@ COPY . .
 
 # Initial build of the application to /app/main
 # This path must match what CMD expects and what Tilt's live_update rebuilds.
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -v -o /app/main ./api/main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o guac cmd/guac/main.go
 # Original was: RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o guac cmd/guac/main.go
 # The path ./api/main.go is from the Tiltfile configuration.
 
@@ -28,7 +28,7 @@ RUN apk --no-cache add ca-certificates openssl go bash
 WORKDIR /app
 
 # Copy the built binary from the builder stage.
-COPY --from=builder /app/main /app/main
+COPY --from=builder /app/guac /app/guac
 # Copy templates (if your application uses them from filesystem at runtime)
 # If templates are embedded in Go binary, this is not needed.
 # Assuming ./templates exists and is used, based on original Dockerfile.
@@ -45,7 +45,7 @@ RUN echo "Generating self-signed certificates..." && \
 
 ENV CERT_PATH=/app/certs/certificate.crt
 ENV CERT_KEY_PATH=/app/certs/private.key
-ENV GUACD_ADDRESS=guacd:4822 # This might need to be configurable for local Tilt dev vs k8s
+ENV GUACD_ADDRESS=guacd:4822 
 
 EXPOSE 4567
-CMD ["/app/main"]
+CMD ["/app/guac"]

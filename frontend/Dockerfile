@@ -13,8 +13,11 @@ COPY package.json bun.lockb* vite.config.js tailwind.config.js postcss.config.js
 # Install dependencies using bun
 RUN bun install --frozen-lockfile
 
-# Copy the rest of the application source code
-COPY . .
+# Copy the source code, but exclude node_modules
+COPY src/ ./src/
+COPY public/ ./public/
+COPY index.html ./
+# Copy any other necessary files, but avoid copying node_modules
 
 # Build the application with GUAC_CLIENT_URL as an empty string for relative paths
 ARG GUAC_CLIENT_URL=""
