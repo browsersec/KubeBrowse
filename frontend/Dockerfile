@@ -1,22 +1,30 @@
 # Build stage
 FROM node:lts-slim AS build
 
+# Install bun globally
+RUN npm install -g bun
+
 WORKDIR /app
 
-# Copy package.json first
-COPY package.json ./
-# Use npm install instead of npm ci since there's no package-lock.json
-RUN npm install
+# Copy package.json, bun.lockb, and other relevant config files first
+COPY package.json bun.lockb* vite.config.js tailwind.config.js postcss.config.js ./
+# If other config files (tsconfig.json, etc.) are needed for build, copy them too.
 
-# Copy the rest of the application code
-COPY . .
+# Install dependencies using bun
+RUN bun install --frozen-lockfile
+
+# Copy the source code, but exclude node_modules
+COPY src/ ./src/
+COPY public/ ./public/
+COPY index.html ./
+# Copy any other necessary files, but avoid copying node_modules
 
 # Build the application with GUAC_CLIENT_URL as an empty string for relative paths
 ARG GUAC_CLIENT_URL=""
 ENV GUAC_CLIENT_URL=${GUAC_CLIENT_URL}
-RUN npm run build
+RUN bun run build
 
-# Production stage
+# Production stage (Caddy)
 FROM caddy:alpine
 
 # Copy the Caddyfile
@@ -25,7 +33,5 @@ COPY Caddyfile /etc/caddy/Caddyfile
 # Copy the built application from the build stage to Caddy's default static file directory /srv
 COPY --from=build /app/dist /srv
 
-# Caddy's default port is 80 for HTTP. The Caddyfile also specifies listening on port 80.
-# EXPOSE 80 is already handled by the base caddy image.
-
-# The default CMD for the caddy image will run caddy using the Caddyfile.
+# Caddy's default port is 80. EXPOSE 80 is handled by the base caddy image.
+# Default CMD for caddy image runs Caddy.

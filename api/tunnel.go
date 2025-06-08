@@ -140,7 +140,7 @@ func DemoDoConnect(request *http.Request, tunnelStore *guac2.ActiveTunnelStore, 
 			return nil, err
 		}
 	case <-ctx.Done():
-		logrus.Errorf("Handshake timed out after 45 seconds. Connection details - Local: %s, Remote: %s",
+		logrus.Errorf("Handshake timed out after 40 seconds. Connection details - Local: %s, Remote: %s",
 			conn.LocalAddr().String(),
 			conn.RemoteAddr().String())
 		return nil, fmt.Errorf("handshake timed out: %v", ctx.Err())
