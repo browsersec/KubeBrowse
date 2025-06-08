@@ -313,7 +313,7 @@ func main() {
 		if err != nil {
 			logrus.Errorf("Failed to set reconnection window for session %s: %v", uuidParam, err)
 		} else {
-			logrus.Infof("Set 2-minute reconnection window for session %s", uuidParam)
+			logrus.Infof("Set 30 seconds reconnection window for session %s", uuidParam)
 		}
 
 		// Schedule pod termination after grace period if no reconnection
