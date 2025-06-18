@@ -7,7 +7,7 @@ export function ThemeProvider({ children }) {
   const getInitialTheme = () => {
     const savedTheme = localStorage.getItem('theme');
     
-    if (savedTheme) {
+    if (savedTheme && savedTheme !== 'system') {
       return savedTheme;
     }
     
@@ -44,7 +44,8 @@ export function ThemeProvider({ children }) {
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     
     const handleChange = () => {
-      if (localStorage.getItem('theme') === 'system') {
+      const savedTheme = localStorage.getItem('theme');
+      if (!savedTheme || savedTheme === 'system') {
         setTheme(mediaQuery.matches ? 'dark' : 'light');
       }
     };
@@ -61,4 +62,10 @@ export function ThemeProvider({ children }) {
   );
 }
 
-export const useTheme = () => useContext(ThemeContext); 
+export const useTheme = () => {
+  const context = useContext(ThemeContext);
+  if (context === undefined) {
+    throw new Error('useTheme must be used within a ThemeProvider');
+  }
+  return context;
+}; 

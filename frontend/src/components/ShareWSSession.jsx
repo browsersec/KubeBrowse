@@ -1,5 +1,10 @@
 import { useState } from 'react';
 import GuacClient from './GuacClient';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 
 const isSecure = window.location.protocol === 'https:';
 // const API_BASE = import.meta.env.VITE_GUAC_CLIENT_URL || `${isSecure ? 'https' : 'http'}://${location.host}`;
@@ -77,64 +82,65 @@ const ShareWSSession = () => {
   };
 
   return (
-    <div className="flex flex-col items-center gap-4 p-4">
-      {sessionState.status === 'idle' && (
-        <form onSubmit={handleUrlSubmit} className="flex flex-col w-full max-w-md gap-2">
-          <div className="flex flex-col">
-            <label htmlFor="wsUrl" className="text-sm text-gray-600 mb-1">
-              Enter WebSocket Tunnel URL
-            </label>
-            <input
-              id="wsUrl"
-              type="text"
-              value={inputUrl}
-              onChange={handleInputChange}
-              placeholder="/websocket-tunnel?uuid=..."
-              className="px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 text-black focus:ring-blue-500"
-              required
-            />
-          </div>
-          <button
-            type="submit"
-            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
-          >
-            Connect to Session
-          </button>
-        </form>
-      )}
-      {sessionState.status === 'creating' && (
-        <div className="text-gray-600">
+    <div className="flex flex-col items-center gap-4 p-4">      {sessionState.status === 'idle' && (
+        <Card className="w-full max-w-md">
+          <CardContent className="p-6">
+            <form onSubmit={handleUrlSubmit} className="flex flex-col gap-4">
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="wsUrl">
+                  Enter WebSocket Tunnel URL
+                </Label>
+                <Input
+                  id="wsUrl"
+                  type="text"
+                  value={inputUrl}
+                  onChange={handleInputChange}
+                  placeholder="/websocket-tunnel?uuid=..."
+                  required
+                />
+              </div>
+              <Button type="submit">
+                Connect to Session
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      )}      {sessionState.status === 'creating' && (
+        <div className="text-muted-foreground">
           Connecting to session...
         </div>
       )}
       {sessionState.status === 'error' && (
-        <div className="text-red-500">
+        <div className="text-destructive">
           Error: {sessionState.error}
         </div>
       )}
       {sessionState.status === 'ready' && sessionState.websocketUrl && (
         <div className="w-full">
           <div className="flex justify-between items-center mb-4">
-            <span className="text-green-500">Session Ready</span>
-            <button
+            <Badge variant="default">Session Ready</Badge>
+            <Button
               onClick={handleDisconnect}
-              className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
+              variant="destructive"
             >
              Disconnect
-            </button>
+            </Button>
           </div>
-          <div className="w-full h-[600px] border border-gray-300 rounded">
-            <GuacClient
-              query={{
-                uuid: sessionState.connectionId,
-                width: Math.round(window.innerWidth * (window.devicePixelRatio || 1)),
-                height: Math.round(window.innerHeight * (window.devicePixelRatio || 1))
-              }}
-              connectionId={sessionState.connectionId}
-              onDisconnect={handleDisconnect}
-              OfficeSession={false}
-            />
-          </div>
+          <Card>
+            <CardContent className="p-0">
+              <div className="w-full h-[600px] rounded-lg overflow-hidden">                <GuacClient
+                  query={{
+                    uuid: sessionState.connectionId,
+                    width: Math.round(window.innerWidth * (window.devicePixelRatio || 1)),
+                    height: Math.round(window.innerHeight * (window.devicePixelRatio || 1))
+                  }}
+                  connectionId={sessionState.connectionId}
+                  onDisconnect={handleDisconnect}
+                  OfficeSession={false}
+                />
+              </div>
+            </CardContent>
+          </Card>
         </div>
       )}
     </div>
