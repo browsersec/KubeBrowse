@@ -2,7 +2,7 @@ name: Build and Push Frontend Docker Image
 
 on:
   push:
-    branches: [ main , "chore/improve-back" ]
+    branches: [ main , "chore/improve-back" , "chore/improve-ui" ]
     paths:
       - 'frontend/**'
       - '.github/workflows/frontend-docker.yml'
