@@ -4,15 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	guac2 "github.com/browsersec/KubeBrowse/internal/guac"
-	redis2 "github.com/browsersec/KubeBrowse/internal/redis"
-	"github.com/go-redis/redis/v8"
-	"github.com/sirupsen/logrus"
 	"net"
 	"net/http"
 	"net/url"
 	"strconv"
 	"time"
+
+	guac2 "github.com/browsersec/KubeBrowse/internal/guac"
+	redis2 "github.com/browsersec/KubeBrowse/internal/redis"
+	"github.com/go-redis/redis/v8"
+	"github.com/sirupsen/logrus"
 )
 
 // DemoDoConnect creates the tunnel to the remote machine (via guacd)
@@ -35,9 +36,77 @@ func DemoDoConnect(request *http.Request, tunnelStore *guac2.ActiveTunnelStore, 
 			logrus.Errorf("Failed to unmarshal session data for UUID %s: %v", uuid, err)
 			return nil, fmt.Errorf("failed to unmarshal session data")
 		}
+
+		// Initialize timeout fields if they don't exist (for backward compatibility)
+		if session.CreatedAt.IsZero() {
+			session.CreatedAt = time.Now()
+			session.TimeoutDuration = 10 * time.Minute
+		}
+
+		if session.ExpireAt.IsZero() {
+			// First time: set absolute expiration
+			session.ExpireAt = time.Now().Add(session.TimeoutDuration)
+		}
+
 		query = url.Values{}
 		for k, v := range session.ConnectionParams {
 			query.Set(k, v)
+		}
+
+		// Check if this is a reconnection and clear the reconnect key
+		ctx := context.Background()
+		reconnectKey := fmt.Sprintf("reconnect:%s", uuid)
+		exists, err := redisClient.Exists(ctx, reconnectKey).Result()
+		if err == nil && exists > 0 {
+			// This is a reconnection - clear the reconnect key to signal successful reconnection
+			err = redisClient.Del(ctx, reconnectKey).Err()
+			if err != nil {
+				logrus.Errorf("Failed to clear reconnect key for %s: %v", uuid, err)
+			} else {
+				logrus.Infof("User reconnected to session %s, cleared reconnection window", uuid)
+			}
+
+			// Reset disconnection count but preserve existing timeout
+			session.DisconnectionCount = 0
+
+			// Get the current TTL from Redis (most accurate remaining time)
+			sessionKey := fmt.Sprintf("session:%s", uuid)
+			currentTTL, err := redisClient.TTL(ctx, sessionKey).Result()
+			if err != nil || currentTTL <= 0 {
+				// Fallback to calculating from ExpireAt if TTL fails
+				if !session.ExpireAt.IsZero() {
+					currentTTL = time.Until(session.ExpireAt)
+					logrus.Warnf("Could not get TTL from Redis for session %s, calculated from ExpireAt: %v", uuid, currentTTL)
+				} else {
+					// Last resort fallback
+					currentTTL = 10 * time.Minute
+					logrus.Warnf("Could not determine remaining time for session %s, using default 10 minutes", uuid)
+				}
+			}
+
+			// Ensure we don't use negative TTL
+			if currentTTL <= 0 {
+				currentTTL = 1 * time.Minute // Give at least 1 minute for reconnection
+				logrus.Warnf("Session %s had expired or negative TTL, giving 1 minute grace period", uuid)
+			}
+
+			// Update session in Redis with the preserved TTL
+			err = redis2.SetSessionData(redisClient, uuid, &session, currentTTL)
+			if err != nil {
+				logrus.Errorf("Failed to update session data for reconnection %s: %v", uuid, err)
+			} else {
+				logrus.Infof("Preserved session %s timeout (%v remaining) after reconnection", uuid, currentTTL.Round(time.Second))
+			}
+		} else {
+			// Not a reconnection - use normal timeout logic
+			remaining := redis2.GetRemainingTTL(&session)
+			if remaining <= 0 {
+				remaining = session.TimeoutDuration
+			}
+			err = redis2.SetSessionData(redisClient, uuid, &session, remaining)
+			if err != nil {
+				logrus.Errorf("Failed to update session data for %s: %v", uuid, err)
+			}
 		}
 	} else {
 		query = request.URL.Query()
@@ -71,6 +140,8 @@ func DemoDoConnect(request *http.Request, tunnelStore *guac2.ActiveTunnelStore, 
 	if query.Get("height") != "" {
 		config.OptimalScreenWidth, err = strconv.Atoi(query.Get("height"))
 		if err != nil || config.OptimalScreenWidth == 0 {
+
+			// InitRedis initializes the Redis client
 			logrus.Errorf("Invalid width value '%s': %v", query.Get("height"), err)
 			config.OptimalScreenWidth = 800
 		}

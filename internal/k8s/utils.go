@@ -3,9 +3,10 @@ package k8s
 import (
 	"context"
 	"fmt"
-	log "github.com/sirupsen/logrus"
 	"net"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 
 	corev1 "k8s.io/api/core/v1"
 	// errors
@@ -41,6 +42,37 @@ func WaitForPodReadyAndRDP(k8sClient *kubernetes.Clientset, namespace, podName, 
 		if err != nil {
 			return err
 		}
+
+		// Check for CrashLoopBackOff or other problematic states
+		if pod.Status.Phase == corev1.PodFailed {
+			err := DeletePodGrace(k8sClient, namespace, podName)
+			if err != nil {
+				log.Errorf("Failed to delete pod %s in namespace %s: %v", podName, namespace, err)
+			}
+			return fmt.Errorf("pod %s is in Failed state", podName)
+		}
+
+		// Check container statuses for CrashLoopBackOff
+		for _, containerStatus := range pod.Status.ContainerStatuses {
+			if containerStatus.State.Waiting != nil {
+				if containerStatus.State.Waiting.Reason == "CrashLoopBackOff" {
+					err := DeletePodGrace(k8sClient, namespace, podName)
+					if err != nil {
+						log.Errorf("Failed to delete pod %s in namespace %s: %v", podName, namespace, err)
+					}
+					return fmt.Errorf("pod %s is in CrashLoopBackOff state", podName)
+				}
+				if containerStatus.State.Waiting.Reason == "ImagePullBackOff" ||
+					containerStatus.State.Waiting.Reason == "ErrImagePull" {
+					err := DeletePodGrace(k8sClient, namespace, podName)
+					if err != nil {
+						log.Errorf("Failed to delete pod %s in namespace %s: %v", podName, namespace, err)
+					}
+					return fmt.Errorf("pod %s has image pull issues: %s", podName, containerStatus.State.Waiting.Reason)
+				}
+			}
+		}
+
 		ready := false
 		for _, cond := range pod.Status.Conditions {
 			if cond.Type == corev1.PodReady && cond.Status == corev1.ConditionTrue {
@@ -62,6 +94,11 @@ func WaitForPodReadyAndRDP(k8sClient *kubernetes.Clientset, namespace, podName, 
 			return nil // Success!
 		}
 		time.Sleep(2 * time.Second)
+	}
+
+	err := DeletePodGrace(k8sClient, namespace, podName)
+	if err != nil {
+		log.Errorf("Failed to delete pod %s in namespace %s: %v", podName, namespace, err)
 	}
 	return fmt.Errorf("pod not ready or RDP port not open after %v", timeout)
 }

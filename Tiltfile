@@ -1,5 +1,5 @@
 # Tiltfile for kubebrowse
-
+allow_k8s_contexts( "default")
 print("Tilt starting up...")
 
 # Backend API (Go)

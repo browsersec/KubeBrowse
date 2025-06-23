@@ -41,7 +41,7 @@ var (
 	minioAddr    = "minio.browser-sandbox.svc.cluster.local:9000"
 )
 
-var activeTunnels *guac2.ActiveTunnelStore
+var tunnelStore *guac2.ActiveTunnelStore
 var redisClient *redis.Client
 
 type MinioConfig struct {
@@ -155,7 +155,7 @@ func main() {
 		k8sNamespace = os.Getenv("KUBERNETES_NAMESPACE")
 	}
 
-	activeTunnels = guac2.NewActiveTunnelStore()
+	tunnelStore = guac2.NewActiveTunnelStore()
 
 	// Initialize Kubernetes client with fallback for local development
 	config, err := rest.InClusterConfig()
@@ -221,9 +221,9 @@ func main() {
 	// servlet := guac.NewServer(DemoDoConnect) // We'll adjust this if DemoDoConnect's signature changes, or use a wrapper
 	// wsServer := guac.NewWebsocketServer(DemoDoConnect) // Same here
 
-	// Pass activeTunnels to DemoDoConnect by wrapping it
+	// Pass tunnelStore to DemoDoConnect by wrapping it
 	doConnectWrapper := func(request *http.Request) (guac2.Tunnel, error) {
-		return api.DemoDoConnect(request, activeTunnels, redisClient, guacdAddr)
+		return api.DemoDoConnect(request, tunnelStore, redisClient, guacdAddr)
 	}
 
 	servlet := guac2.NewServer(doConnectWrapper)
@@ -233,11 +233,11 @@ func main() {
 	// wsServer.OnConnect = sessions.Add // Old OnConnect
 	// wsServer.OnDisconnect = sessions.Delete // Old OnDisconnect
 
-	// OnConnect is implicitly handled by DemoDoConnect now adding to activeTunnels.
+	// OnConnect is implicitly handled by DemoDoConnect now adding to tunnelStore.
 	// We still need OnDisconnect to remove from the store when a tunnel closes for any reason.
 	wsServer.OnDisconnect = func(connectionID string, req *http.Request, tunnel guac2.Tunnel) {
 		logrus.Debugf("Websocket disconnected, removing tunnel: %s", connectionID)
-		activeTunnels.Delete(connectionID, req, tunnel)
+		tunnelStore.Delete(connectionID, req, tunnel)
 
 		// Extract connection UUID from request parameters
 		uuidParam := req.URL.Query().Get("uuid")
@@ -246,61 +246,47 @@ func main() {
 			return
 		}
 
-		// Check if this session exists in Redis
-		ctx := context.Background()
+		// Use context with timeout for Redis operations
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
 		sessionKey := fmt.Sprintf("session:%s", uuidParam)
 
-		// // First, check what type the key is in Redis
-		// keyType, err := redisClient.Type(ctx, sessionKey).Result()
-		// if err != nil {
-		// 	logrus.Errorf("Failed to check Redis key type for session %s: %v", uuidParam, err)
-		// 	return
-		// }
-
-		// var podName string
-
-		// // Extract pod name based on the key type
-		// switch keyType {
-		// case "hash":
-		// 	// If it's a hash, use HGET
-		// 	podName, err = redisClient.HGet(ctx, sessionKey, "pod_name").Result()
-		// 	if err != nil {
-		// 		logrus.Warnf("Failed to get pod_name from hash for session %s: %v", uuidParam, err)
-		// 		// Try getting PodName field as well
-		// 		podName, err = redisClient.HGet(ctx, sessionKey, "PodName").Result()
-		// 	}
-		// case "string":
-		// 	// If it's a string, try to decode it as JSON or extract pod name from the log pattern
-		// 	sessionData, err := redisClient.Get(ctx, sessionKey).Result()
-		// 	if err == nil {
-		// 		// Try to extract pod name from the session data string
-		// 		// Based on the log, it looks like: "PodName:browser-sandbox-browser-7acfd4ab-20250601101159"
-		// 		if strings.Contains(sessionData, "PodName:") {
-		// 			parts := strings.Split(sessionData, "PodName:")
-		// 			if len(parts) > 1 {
-		// 				podNamePart := strings.Split(parts[1], " ")[0]
-		// 				podName = strings.TrimSpace(podNamePart)
-		// 			}
-		// 		}
-		// 	}
-		// default:
-		// 	logrus.Warnf("Unexpected Redis key type '%s' for session %s", keyType, uuidParam)
-		// 	return
-		// }
-
-		sessiondata, err := redis2.GetSessionData(redisClient, uuidParam)
+		sessiondata, err := redis2.GetSessionDataWithContext(ctx, redisClient, uuidParam)
 		if err != nil {
 			logrus.Warnf("Failed to get session data for %s: %v", uuidParam, err)
 			return
 		}
-		podName := sessiondata.PodName
 
+		// Get current TTL before modifying session data
+		currentTTL, err := redis2.GetCurrentSessionTTL(ctx, redisClient, uuidParam)
+		if err != nil {
+			logrus.Warnf("Failed to get current TTL for session %s: %v", uuidParam, err)
+			// Fallback to calculating from ExpireAt
+			if !sessiondata.ExpireAt.IsZero() {
+				currentTTL = time.Until(sessiondata.ExpireAt)
+			} else {
+				currentTTL = sessiondata.TimeoutDuration
+			}
+		}
+
+		// Increment disconnection count
+		sessiondata.DisconnectionCount++
+		logrus.Infof("Session %s disconnected %d times", uuidParam, sessiondata.DisconnectionCount)
+
+		// Update session data with preserved TTL (not reset to 10 minutes)
+		err = redis2.SetSessionDataWithContext(ctx, redisClient, uuidParam, sessiondata, currentTTL)
+		if err != nil {
+			logrus.Errorf("Failed to update session data with disconnection count for %s: %v", uuidParam, err)
+		}
+
+		podName := sessiondata.PodName
 		if podName == "" {
-			logrus.Warnf("No pod name found for session %s ,  %v", uuidParam, err)
+			logrus.Warnf("No pod name found for session %s", uuidParam)
 			return
 		}
 
-		logrus.Infof("Found pod name %s for disconnected session %s", podName, uuidParam)
+		logrus.Infof("Found pod name %s for disconnected session %s (TTL: %v)", podName, uuidParam, currentTTL.Round(time.Second))
 
 		// Set a reconnection window in Redis with expiration
 		reconnectKey := fmt.Sprintf("reconnect:%s", uuidParam)
@@ -313,28 +299,26 @@ func main() {
 		if err != nil {
 			logrus.Errorf("Failed to set reconnection window for session %s: %v", uuidParam, err)
 		} else {
-			logrus.Infof("Set 30 seconds reconnection window for session %s", uuidParam)
+			logrus.Infof("Set 120 seconds reconnection window for session %s (preserving %v timeout)", uuidParam, currentTTL.Round(time.Second))
 		}
 
 		// Schedule pod termination after grace period if no reconnection
 		go func() {
-			// Wait for reconnection window (30 Seconds)
-			time.Sleep(30 * time.Second)
+			// Create a new context for the goroutine
+			bgCtx := context.Background()
 
-			// Check if pod still exists in reconnect window
-			// exists, err := redisClient.Exists(ctx, reconnectKey).Result()
-			// if err != nil {
-			// 	logrus.Errorf("Failed to check reconnection status for %s: %v", uuidParam, err)
-			// 	return
-			// }
-			exists, err := k8s.CheckPodName(k8sClient, k8sNamespace, podName)
+			// Wait for reconnection window (120 seconds)
+			time.Sleep(120 * time.Second)
+
+			// Check if reconnection happened by verifying if reconnect key still exists
+			exists, err := redisClient.Exists(bgCtx, reconnectKey).Result()
 			if err != nil {
-				logrus.Errorf("Failed to check if pod %s exists: %v", podName, err)
+				logrus.Errorf("Failed to check reconnection status for %s: %v", uuidParam, err)
 				return
 			}
 
-			if exists {
-				// No reconnection happened, delete the pod
+			if exists > 0 {
+				// No reconnection happened during the grace period, delete the pod
 				logrus.Infof("No reconnection for session %s after grace period, terminating pod %s", uuidParam, podName)
 				if k8sClient != nil {
 					err = k8s.DeletePodGrace(k8sClient, k8sNamespace, podName)
@@ -346,10 +330,10 @@ func main() {
 				}
 
 				// Clean up Redis keys
-				redisClient.Del(ctx, sessionKey, reconnectKey)
+				redisClient.Del(bgCtx, sessionKey, reconnectKey)
 				logrus.Infof("Cleaned up Redis keys for session %s", uuidParam)
 			} else {
-				logrus.Infof("Session %s reconnected, pod %s will not be terminated", uuidParam, podName)
+				logrus.Infof("Session %s reconnected within grace period, pod %s preserved", uuidParam, podName)
 			}
 		}()
 	}
@@ -361,7 +345,7 @@ func main() {
 
 	// Session management handler
 	router.GET("/sessions/", func(c *gin.Context) {
-		api.HandlerSession(c, activeTunnels)
+		api.HandlerSession(c, tunnelStore)
 
 	})
 
@@ -370,32 +354,32 @@ func main() {
 	{
 		// New route for deploying and connecting to office pod with RDP credentials
 		testRoutes.POST("/deploy-office", func(c *gin.Context) {
-			api.DeployOffice(c, k8sClient, k8sNamespace, redisClient, activeTunnels)
+			api.DeployOffice(c, k8sClient, k8sNamespace, redisClient, tunnelStore)
 		})
 
 		// New route for deploying and connecting to browser pod with RDP credentials
 		testRoutes.POST("/deploy-browser", func(c *gin.Context) {
-			api.DeployBrowser(c, k8sClient, k8sNamespace, redisClient, activeTunnels)
+			api.DeployBrowser(c, k8sClient, k8sNamespace, redisClient, tunnelStore)
 		})
 
 		// New endpoint to handle websocket connections using stored parameters
 		testRoutes.GET("/connect/:connectionID", func(c *gin.Context) {
-			api.HandlerConnectionID(c, activeTunnels, redisClient)
+			api.HandlerConnectionID(c, tunnelStore, redisClient)
 		})
 
 		// Share session route
 		testRoutes.GET("/share/:connectionID", func(c *gin.Context) {
-			api.HandlerShareSession(c, activeTunnels, redisClient)
+			api.HandlerShareSession(c, tunnelStore, redisClient)
 		})
 
 		// Test route to create a browser sandbox pod
 		testRoutes.POST("/browser-pod", func(c *gin.Context) {
-			api.HandlerBrowserPod(c, activeTunnels, k8sClient, k8sNamespace)
+			api.HandlerBrowserPod(c, tunnelStore, k8sClient, k8sNamespace)
 		})
 
 		// Test route to create an office sandbox pod
 		testRoutes.POST("/office-pod", func(c *gin.Context) {
-			api.HandlerOfficePod(c, activeTunnels, k8sClient, k8sNamespace)
+			api.HandlerOfficePod(c, tunnelStore, k8sClient, k8sNamespace)
 		})
 	}
 
@@ -405,6 +389,16 @@ func main() {
 		// Endpoint to stop a specific WebSocket session
 		sessionRoutes.DELETE("/:connectionID/stop", func(c *gin.Context) {
 			api.HandlerStopWSSession(c, redisClient, k8sClient)
+		})
+
+		// Endpoint to extend session timeout
+		sessionRoutes.POST("/:connectionID/extend", func(c *gin.Context) {
+			api.HandlerExtendSession(c, redisClient)
+		})
+
+		// Endpoint to get session time remaining
+		sessionRoutes.GET("/:connectionID/time-left", func(c *gin.Context) {
+			api.HandlerGetSessionTimeLeft(c, redisClient)
 		})
 
 		// Tunnel a Pod Rest API to Upload a file to a pod

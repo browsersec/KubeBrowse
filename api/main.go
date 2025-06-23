@@ -38,7 +38,7 @@ type DeploySessionRequest struct {
 // @Failure 503 {object} gin.H{"error":string}
 // @Failure 500 {object} gin.H{"error":string}
 // @Router /test/deploy-office [post]
-func DeployOffice(c *gin.Context, k8sClient *kubernetes.Clientset, k8sNamespace string, redisClient *redis.Client, activeTunnels *guac.ActiveTunnelStore) {
+func DeployOffice(c *gin.Context, k8sClient *kubernetes.Clientset, k8sNamespace string, redisClient *redis.Client, tunnelStore *guac.ActiveTunnelStore) {
 
 	if k8sClient == nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{
@@ -74,10 +74,11 @@ func DeployOffice(c *gin.Context, k8sClient *kubernetes.Clientset, k8sNamespace 
 	connectionID := uuid.New().String()
 
 	// Wait for pod readiness and RDP port
-	err = k8s2.WaitForPodReadyAndRDP(k8sClient, k8sNamespace, pod.Name, fqdn, 60*time.Second)
+	err = k8s2.WaitForPodReadyAndRDP(k8sClient, k8sNamespace, pod.Name, fqdn, 120*time.Second)
 	if err != nil {
 		logrus.Errorf("Pod not ready: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Pod not ready for RDP connection"})
+
 		return
 	}
 	podIP := pod.Status.PodIP
@@ -105,8 +106,8 @@ func DeployOffice(c *gin.Context, k8sClient *kubernetes.Clientset, k8sNamespace 
 	params.Set("ignore-cert", "true")
 	params.Set("uuid", connectionID)
 
-	// Store the parameters in the activeTunnels store
-	activeTunnels.StoreConnectionParams(connectionID, params)
+	// Store the parameters in the tunnelStore store
+	tunnelStore.StoreConnectionParams(connectionID, params)
 
 	// Store session in Redis using the struct from internal/redis
 	session := redis2.SessionData{
@@ -153,7 +154,7 @@ func DeployOffice(c *gin.Context, k8sClient *kubernetes.Clientset, k8sNamespace 
 // @Failure 503 {object} gin.H{"error":string}
 // @Failure 500 {object} gin.H{"error":string}
 // @Router /test/deploy-browser [post]
-func DeployBrowser(c *gin.Context, k8sClient *kubernetes.Clientset, k8sNamespace string, redisClient *redis.Client, activeTunnels *guac.ActiveTunnelStore) {
+func DeployBrowser(c *gin.Context, k8sClient *kubernetes.Clientset, k8sNamespace string, redisClient *redis.Client, tunnelStore *guac.ActiveTunnelStore) {
 
 	if k8sClient == nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{
@@ -189,7 +190,7 @@ func DeployBrowser(c *gin.Context, k8sClient *kubernetes.Clientset, k8sNamespace
 	connectionID := uuid.New().String()
 
 	// Wait for pod readiness and RDP port
-	err = k8s2.WaitForPodReadyAndRDP(k8sClient, k8sNamespace, pod.Name, fqdn, 60*time.Second)
+	err = k8s2.WaitForPodReadyAndRDP(k8sClient, k8sNamespace, pod.Name, fqdn, 120*time.Second)
 	if err != nil {
 		logrus.Errorf("Pod not ready: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Pod not ready for RDP connection"})
@@ -220,8 +221,8 @@ func DeployBrowser(c *gin.Context, k8sClient *kubernetes.Clientset, k8sNamespace
 	params.Set("ignore-cert", "true")
 	params.Set("uuid", connectionID)
 
-	// Store the parameters in the activeTunnels store
-	activeTunnels.StoreConnectionParams(connectionID, params)
+	// Store the parameters in the tunnelStore store
+	tunnelStore.StoreConnectionParams(connectionID, params)
 
 	// Store session in Redis using the struct from internal/redis
 	session := redis2.SessionData{
@@ -256,7 +257,7 @@ func DeployBrowser(c *gin.Context, k8sClient *kubernetes.Clientset, k8sNamespace
 	})
 }
 
-func HandlerConnectionID(c *gin.Context, activeTunnels *guac.ActiveTunnelStore, redisClient *redis.Client) {
+func HandlerConnectionID(c *gin.Context, tunnelStore *guac.ActiveTunnelStore, redisClient *redis.Client) {
 
 	connectionID := c.Param("connectionID")
 
@@ -273,7 +274,7 @@ func HandlerConnectionID(c *gin.Context, activeTunnels *guac.ActiveTunnelStore, 
 	}
 
 	// Get stored parameters
-	_, exists := activeTunnels.GetConnectionParams(connectionID)
+	_, exists := tunnelStore.GetConnectionParams(connectionID)
 	if !exists {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Connection parameters not found"})
 		return
@@ -289,7 +290,7 @@ func HandlerConnectionID(c *gin.Context, activeTunnels *guac.ActiveTunnelStore, 
 	})
 }
 
-func HandlerShareSession(c *gin.Context, activeTunnels *guac.ActiveTunnelStore, redisClient *redis.Client) {
+func HandlerShareSession(c *gin.Context, tunnelStore *guac.ActiveTunnelStore, redisClient *redis.Client) {
 	connectionID := c.Param("connectionID")
 	if connectionID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Connection ID is required"})
@@ -319,7 +320,7 @@ func HandlerShareSession(c *gin.Context, activeTunnels *guac.ActiveTunnelStore, 
 		redisClient.Set(context.Background(), "session:"+connectionID, data, 0)
 	}
 
-	_, exists := activeTunnels.GetConnectionParams(connectionID)
+	_, exists := tunnelStore.GetConnectionParams(connectionID)
 	if !exists {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Connection parameters not found"})
 		return
@@ -335,7 +336,7 @@ func HandlerShareSession(c *gin.Context, activeTunnels *guac.ActiveTunnelStore, 
 	})
 }
 
-func HandlerBrowserPod(c *gin.Context, activeTunnels *guac.ActiveTunnelStore, k8sClient *kubernetes.Clientset, k8sNamespace string) {
+func HandlerBrowserPod(c *gin.Context, tunnelStore *guac.ActiveTunnelStore, k8sClient *kubernetes.Clientset, k8sNamespace string) {
 	if k8sClient == nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{
 			"error": "Kubernetes client not initialized",
@@ -369,7 +370,7 @@ func HandlerBrowserPod(c *gin.Context, activeTunnels *guac.ActiveTunnelStore, k8
 	})
 }
 
-func HandlerOfficePod(c *gin.Context, activeTunnels *guac.ActiveTunnelStore, k8sClient *kubernetes.Clientset, k8sNamespace string) {
+func HandlerOfficePod(c *gin.Context, tunnelStore *guac.ActiveTunnelStore, k8sClient *kubernetes.Clientset, k8sNamespace string) {
 	if k8sClient == nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{
 			"error": "Kubernetes client not initialized",
