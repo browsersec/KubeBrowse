@@ -5,6 +5,7 @@ import GuacMouse from '../lib/GuacMouse';
 import states from '../lib/states';
 import Modal from './Modal';
 import WebSocketControl from './WebSocketControl';
+import SessionCollaborationInfo from './SessionCollaborationInfo';
 import useGuacWebSocket from '../hooks/useGuacWebSocket';
 import { Toaster } from 'react-hot-toast';
 
@@ -31,18 +32,39 @@ const buildQueryString = (queryObj) => {
   return params.toString();
 };
 
-function GuacClient({ query, forceHttp = false, onDisconnect, connectionId , OfficeSession = true }) {
+function GuacClient({ 
+  query, 
+  forceHttp = false, 
+  onDisconnect, 
+  connectionId, 
+  OfficeSession = true, 
+  sessionUUID = null, 
+  enableSharing = false,
+  onConnectionStateChange = null 
+}) {
   const [connected, setConnected] = useState(false);
   
   // Convert query object to proper query string
   const queryString = buildQueryString(query);
-  
-  // Use our custom WebSocket hook for Guacamole
-  const { client, connectionState, errorMessage, isConnectionUnstable } = useGuacWebSocket(
+  // Use our custom WebSocket hook for Guacamole with session sharing support
+  const { 
+    client, 
+    connectionState, 
+    errorMessage, 
+    isConnectionUnstable,
+    reconnectAttempts,
+    sessionInfo,
+    isSessionOwner,
+    enableSessionSharing,
+    getShareUrl,
+    clearSession
+  } = useGuacWebSocket(
     wsUrl, 
     httpUrl, 
     forceHttp, 
-    connected ? queryString : ''
+    connected ? queryString : '',
+    sessionUUID,
+    enableSharing
   );
   
   const displayRef = useRef(null);
@@ -70,10 +92,10 @@ function GuacClient({ query, forceHttp = false, onDisconnect, connectionId , Off
       client.onargv = handleArgv;
     }
   }, [client, connected]);
-
   // Connect to the Guacamole server when query changes
   useEffect(() => {
     if (queryString && !connected) {
+      console.log('Establishing connection with query:', queryString);
       setConnected(true);
     }
     
@@ -84,8 +106,19 @@ function GuacClient({ query, forceHttp = false, onDisconnect, connectionId , Off
     };
   }, [queryString, connected]);
 
-  // Track connection state changes and notify parent component when disconnected
+  // Force connection when sessionUUID is provided (for session restoration)
   useEffect(() => {
+    if (sessionUUID && queryString && !connected) {
+      console.log('Forcing connection for restored session:', sessionUUID);
+      setConnected(true);
+    }
+  }, [sessionUUID, queryString, connected]);// Track connection state changes and notify parent component when disconnected
+  useEffect(() => {
+    // Notify parent of connection state changes for reconnection UI
+    if (onConnectionStateChange) {
+      onConnectionStateChange(connectionState, reconnectAttempts);
+    }
+    
     if (connectionState === states.DISCONNECTED || connectionState === states.CLIENT_ERROR || connectionState === states.TUNNEL_ERROR) {
       if (connected && onDisconnect) {
         // Delay to allow potential reconnect attempts to happen first
@@ -95,7 +128,7 @@ function GuacClient({ query, forceHttp = false, onDisconnect, connectionId , Off
         return () => clearTimeout(timeout);
       }
     }
-  }, [connectionState, connected, onDisconnect]);
+  }, [connectionState, connected, onDisconnect, onConnectionStateChange, reconnectAttempts]);
 
   // Update modal when connection state changes
   useEffect(() => {
@@ -320,7 +353,6 @@ function GuacClient({ query, forceHttp = false, onDisconnect, connectionId , Off
     // Reconnect after a small delay
     setTimeout(() => setConnected(true), 500);
   };
-
   const handleDisconnect = () => {
     if (clientRef.current) {
       // Properly clean up resources
@@ -335,6 +367,11 @@ function GuacClient({ query, forceHttp = false, onDisconnect, connectionId , Off
       
       // Reset necessary state
       displayObjRef.current = null;
+      
+      // Clear session from storage for intentional disconnect
+      if (clearSession) {
+        clearSession();
+      }
       
       // Actually disconnect from the client
       clientRef.current.disconnect();
@@ -375,9 +412,21 @@ function GuacClient({ query, forceHttp = false, onDisconnect, connectionId , Off
       timeouts.forEach(timeout => clearTimeout(timeout));
     };
   }, []); 
-  
-  return (
+    return (
     <div className="relative w-full h-full">
+      {/* Session Collaboration Info - positioned at top of screen for shared sessions */}
+      {enableSharing && sessionInfo.isShared && (
+        <div className="fixed top-4 right-4 z-50 max-w-md">
+          <SessionCollaborationInfo
+            sessionInfo={sessionInfo}
+            connectionState={connectionState}
+            isSessionOwner={isSessionOwner}
+            sessionUUID={sessionUUID}
+            enableSharing={enableSharing}
+          />
+        </div>
+      )}
+      
       <div className="fixed top-0 left-0 w-screen h-screen overflow-hidden bg-black flex justify-center items-center" ref={viewportRef}>
         <div className="guac-display outline-none w-auto h-auto mx-auto" ref={displayRef} tabIndex="0">
           {/* The Guacamole display will be inserted here */}
