@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/go-redis/redis/v8"
@@ -23,6 +24,19 @@ type SessionData struct {
 	LastExtendedAt     time.Time         `json:"last_extended_at"`
 	TimeoutDuration    time.Duration     `json:"timeout_duration"`
 	ExpireAt           time.Time         `json:"expire_at"` // New field to store absolute expiration
+}
+
+var SESSION_TTL int
+
+func init() {
+	timeoutStr := os.Getenv("POD_SESSION_TTL")
+	timeout, err := strconv.Atoi(timeoutStr)
+	if err != nil || timeout <= 0 {
+		SESSION_TTL = 2 // default to 2 minutes if not set or invalid
+		logrus.Warnf("Invalid POD_SESSION_TTL value, defaulting to %d minutes", SESSION_TTL)
+	} else {
+		SESSION_TTL = timeout
+	}
 }
 
 // InitRedis initializes and returns a new Redis client
@@ -204,7 +218,7 @@ func CanExtendSession(client *redis.Client, sessionID string) (bool, time.Durati
 	}
 	// TODO: Handle case where TTL is 9 (session has expired) for testing purposes
 	// Allow extension only within last 9 minutes
-	if ttl <= 9*time.Minute && ttl > 0 {
+	if ttl <= time.Duration(SESSION_TTL)*time.Minute && ttl > 0 {
 		return true, ttl, nil
 	}
 

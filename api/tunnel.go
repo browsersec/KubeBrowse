@@ -7,18 +7,33 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 	"time"
 
+	"github.com/browsersec/KubeBrowse/internal/cleanup"
 	guac2 "github.com/browsersec/KubeBrowse/internal/guac"
 	redis2 "github.com/browsersec/KubeBrowse/internal/redis"
 	"github.com/go-redis/redis/v8"
 	"github.com/sirupsen/logrus"
 )
 
+var SESSION_TIMEOUT int
+
+func init() {
+	timeoutStr := os.Getenv("POD_SESSION_TIMEOUT")
+	timeout, err := strconv.Atoi(timeoutStr)
+	if err != nil || timeout <= 0 {
+		SESSION_TIMEOUT = 10 // default to 10 minutes if not set or invalid
+		logrus.Warnf("Invalid or unset POD_SESSION_TIMEOUT environment variable, defaulting to %d minutes", SESSION_TIMEOUT)
+	} else {
+		SESSION_TIMEOUT = timeout
+	}
+}
+
 // DemoDoConnect creates the tunnel to the remote machine (via guacd)
 // Now accepts ActiveTunnelStore to register the tunnel
-func DemoDoConnect(request *http.Request, tunnelStore *guac2.ActiveTunnelStore, redisClient *redis.Client, guacdAddr string) (guac2.Tunnel, error) {
+func DemoDoConnect(request *http.Request, tunnelStore *guac2.ActiveTunnelStore, redisClient *redis.Client, guacdAddr string, cleanupService *cleanup.SessionCleanupService) (guac2.Tunnel, error) {
 	config := guac2.NewGuacamoleConfiguration()
 	var query url.Values
 	uuid := request.URL.Query().Get("uuid")
@@ -40,7 +55,8 @@ func DemoDoConnect(request *http.Request, tunnelStore *guac2.ActiveTunnelStore, 
 		// Initialize timeout fields if they don't exist (for backward compatibility)
 		if session.CreatedAt.IsZero() {
 			session.CreatedAt = time.Now()
-			session.TimeoutDuration = 10 * time.Minute
+			// TODO: Set a sensible default timeout duration if not set
+			session.TimeoutDuration = time.Duration(SESSION_TIMEOUT) * time.Minute
 		}
 
 		if session.ExpireAt.IsZero() {
@@ -228,6 +244,16 @@ func DemoDoConnect(request *http.Request, tunnelStore *guac2.ActiveTunnelStore, 
 		// For now, passing nil as it's not used by the current Add implementation.
 		tunnelStore.Add(tunnel.ConnectionID(), tunnel, nil)
 		logrus.Debugf("Tunnel %s successfully added to active store", tunnel.ConnectionID())
+
+		// TODO: Register session with cleanup service if available
+		// This would require passing the cleanup service to this function
+		// or accessing it through a global variable
+		cleanupService.RegisterSession(
+			session.ConnectionID,
+			session.PodName,
+			tunnel.ConnectionID(), // Assuming PodName is the user ID
+		)
+
 	} else if tunnel != nil {
 		logrus.Warnf("Tunnel created but ConnectionID is empty. Not adding to store. UUID: %s", tunnel.GetUUID())
 	} else {

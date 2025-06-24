@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/browsersec/KubeBrowse/internal/cleanup"
 	guac2 "github.com/browsersec/KubeBrowse/internal/guac"
 	"github.com/browsersec/KubeBrowse/internal/k8s"
 
@@ -60,6 +61,11 @@ func GinHandlerAdapter(h http.Handler) gin.HandlerFunc {
 
 func main() {
 	redisClient = redis2.InitRedis()
+
+	// session cleanup service - Fix: Pass k8sNamespace and register after k8sClient is initialized
+	// cleanupService := cleanup.NewSessionCleanupService(redisClient, k8sClient)
+	// cleanupService.Start()
+	// defer cleanupService.Stop()
 
 	minioConfig := &MinioConfig{
 		bucketName: os.Getenv("MINIO_BUCKET"),
@@ -197,6 +203,14 @@ func main() {
 		}
 	}
 
+	// Move cleanup service initialization here after k8sClient is ready
+	var cleanupService *cleanup.SessionCleanupService
+	if k8sClient != nil {
+		cleanupService = cleanup.NewSessionCleanupService(redisClient, k8sClient, "browser-sandbox", tunnelStore)
+		cleanupService.Start()
+		defer cleanupService.Stop()
+	}
+
 	// Initialize Gin
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
@@ -223,7 +237,7 @@ func main() {
 
 	// Pass tunnelStore to DemoDoConnect by wrapping it
 	doConnectWrapper := func(request *http.Request) (guac2.Tunnel, error) {
-		return api.DemoDoConnect(request, tunnelStore, redisClient, guacdAddr)
+		return api.DemoDoConnect(request, tunnelStore, redisClient, guacdAddr, cleanupService)
 	}
 
 	servlet := guac2.NewServer(doConnectWrapper)
@@ -393,7 +407,7 @@ func main() {
 
 		// Endpoint to extend session timeout
 		sessionRoutes.POST("/:connectionID/extend", func(c *gin.Context) {
-			api.HandlerExtendSession(c, redisClient)
+			api.HandlerExtendSession(c, redisClient, cleanupService)
 		})
 
 		// Endpoint to get session time remaining

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/browsersec/KubeBrowse/internal/cleanup"
 	redis2 "github.com/browsersec/KubeBrowse/internal/redis"
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis/v8"
@@ -31,7 +32,7 @@ type ExtendSessionResponse struct {
 }
 
 // HandlerExtendSession handles session timeout extension requests
-func HandlerExtendSession(c *gin.Context, redisClient *redis.Client) {
+func HandlerExtendSession(c *gin.Context, redisClient *redis.Client, cleanupService *cleanup.SessionCleanupService) {
 	connectionID := c.Param("connectionID")
 	if connectionID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -85,6 +86,9 @@ func HandlerExtendSession(c *gin.Context, redisClient *redis.Client) {
 		return
 	}
 
+	// If cleanup service is available, we could potentially refresh the monitoring
+	// but the current implementation should handle this automatically
+
 	// Get new time left after extension
 	newTimeLeft, err := redis2.GetSessionTimeLeft(redisClient, connectionID)
 	if err != nil {
@@ -134,5 +138,54 @@ func HandlerGetSessionTimeLeft(c *gin.Context, redisClient *redis.Client) {
 		TimeLeft:     timeLeft.String(),
 		CanExtend:    canExtend,
 		TotalSeconds: int64(timeLeft.Seconds()),
+	})
+}
+
+// HandlerRegisterSession registers a new session for cleanup monitoring
+func HandlerRegisterSession(c *gin.Context, redisClient *redis.Client, cleanupService *cleanup.SessionCleanupService) {
+	sessionID := c.Param("connectionID")
+	podName := c.Query("pod_name")
+	userID := c.Query("user_id")
+
+	if sessionID == "" || podName == "" || userID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Session ID, pod name, and user ID are required",
+		})
+		return
+	}
+
+	// Verify session exists in Redis
+	_, err := redis2.GetSessionTimeLeft(redisClient, sessionID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": "Session not found",
+		})
+		return
+	}
+
+	cleanupService.RegisterSession(sessionID, podName, userID)
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":    "Session registered for cleanup monitoring",
+		"session_id": sessionID,
+		"pod_name":   podName,
+	})
+}
+
+// HandlerUnregisterSession removes a session from cleanup monitoring
+func HandlerUnregisterSession(c *gin.Context, cleanupService *cleanup.SessionCleanupService) {
+	sessionID := c.Param("connectionID")
+	if sessionID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Session ID is required",
+		})
+		return
+	}
+
+	cleanupService.UnregisterSession(sessionID)
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":    "Session unregistered from cleanup monitoring",
+		"session_id": sessionID,
 	})
 }

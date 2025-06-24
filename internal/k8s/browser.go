@@ -27,10 +27,12 @@ func CreateBrowserSandboxPod(clientset *kubernetes.Clientset, namespace, userID 
 				"session-id": podName,
 				"created-at": time.Now().Format("20060102-150405"),
 				"user":       userID,
+				"managed-by": "kubebrowse-cleanup", // Add cleanup label
 			},
 			Annotations: map[string]string{
 				"last-heartbeat":    time.Now().Format("20060102-150405"),
 				"connection-status": "active",
+				"cleanup-enabled":   "true", // Mark for cleanup monitoring
 			},
 		},
 

@@ -62,6 +62,8 @@ k8s_resource(
     port_forwards=['3000:80']
 )
 
+
+
 print("Tiltfile configured successfully.")
 print("This version should be compatible with your older Tilt installation.")
 print("Run `tilt up` to start the development environment.")
