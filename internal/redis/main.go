@@ -16,7 +16,8 @@ type SessionData struct {
 	PodName            string            `json:"podName"`
 	PodIP              string            `json:"podIP"`
 	FQDN               string            `json:"fqdn"`
-	ConnectionID       string            `json:"connection_id"`
+	ConnectionID       string            `json:"connection_id"`        // Session/Pod ID
+	TunnelConnectionID string            `json:"tunnel_connection_id"` // Guacamole tunnel connection ID
 	ConnectionParams   map[string]string `json:"connection_params"`
 	Share              bool              `json:"share"`
 	DisconnectionCount int               `json:"disconnection_count"`
@@ -345,4 +346,49 @@ func PreserveSessionTimeout(ctx context.Context, client *redis.Client, sessionID
 
 	// Update session with preserved TTL
 	return SetSessionDataWithContext(ctx, client, sessionID, sessionData, currentTTL)
+}
+
+func GetTunnelConnectionID(client *redis.Client, sessionID string) (string, bool) {
+	ctx := context.Background()
+
+	sessionData, err := GetSessionDataWithContext(ctx, client, sessionID)
+	if err != nil {
+		return "", false
+	}
+
+	if sessionData.TunnelConnectionID == "" {
+		return "", false
+	}
+
+	return sessionData.TunnelConnectionID, true
+}
+
+// UpdateSessionWithTunnelInfo updates session data with tunnel information and sharing settings
+func UpdateSessionWithTunnelInfo(client *redis.Client, sessionID string, tunnelConnectionID string, share bool) error {
+	ctx := context.Background()
+
+	// Get current session data
+	sessionData, err := GetSessionDataWithContext(ctx, client, sessionID)
+	if err != nil {
+		return fmt.Errorf("failed to get session data: %v", err)
+	}
+
+	// Update the TunnelConnectionID (separate from ConnectionID) and share flag
+	sessionData.TunnelConnectionID = tunnelConnectionID
+	sessionData.Share = share
+	logrus.Infof("Updating session %s with tunnel ConnectionID: %s, sharing enabled: %v",
+		sessionID, tunnelConnectionID, share)
+
+	// Preserve the current TTL
+	ttl, err := GetCurrentSessionTTL(ctx, client, sessionID)
+	if err != nil {
+		logrus.Warnf("Failed to get TTL for session %s: %v, using timeout duration", sessionID, err)
+		ttl = sessionData.TimeoutDuration
+		if ttl <= 0 {
+			ttl = time.Duration(SESSION_TTL) * time.Minute
+		}
+	}
+
+	// Save the updated session data with the same TTL
+	return SetSessionDataWithContext(ctx, client, sessionID, sessionData, ttl)
 }

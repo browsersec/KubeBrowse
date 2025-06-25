@@ -352,10 +352,24 @@ func main() {
 		}()
 	}
 
+	// Shared connection handler
+	doSharedConnectWrapper := func(request *http.Request) (guac2.Tunnel, error) {
+		return api.DoConnectShare(*request, tunnelStore, redisClient, guacdAddr, cleanupService)
+	}
+
+	servletShared := guac2.NewServer(doSharedConnectWrapper)
+	wsServerShared := guac2.NewWebsocketServer(doSharedConnectWrapper)
+
 	// Setup routes using Gin
+	// Regular tunnel routes
 	router.Any("/tunnel", GinHandlerAdapter(servlet))
 	router.Any("/tunnel/*path", GinHandlerAdapter(servlet))
 	router.Any("/websocket-tunnel", GinHandlerAdapter(wsServer))
+
+	// Shared connection routes - use a different base path to avoid conflicts
+	router.Any("/shared-tunnel", GinHandlerAdapter(servletShared))
+	router.Any("/shared-tunnel/*path", GinHandlerAdapter(servletShared))
+	router.GET("/websocket-tunnel/share", GinHandlerAdapter(wsServerShared))
 
 	// Session management handler
 	router.GET("/sessions/", func(c *gin.Context) {

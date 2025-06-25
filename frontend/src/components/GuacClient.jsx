@@ -14,6 +14,7 @@ Guacamole.Mouse = GuacMouse.mouse;
 // Define websocket and HTTP tunnel URLs
 const isSecure = window.location.protocol === 'https:';
 const wsUrl   = `${isSecure ? 'wss' : 'ws'}://${location.host}/websocket-tunnel`;
+const wsSharedUrl = `${isSecure ? 'wss' : 'ws'}://${location.host}/websocket-tunnel/share`;
 const httpUrl = `${isSecure ? 'https' : 'http'}://${location.host}/tunnel`;
 
 // Convert query object to query string
@@ -31,15 +32,21 @@ const buildQueryString = (queryObj) => {
   return params.toString();
 };
 
-function GuacClient({ query, forceHttp = false, onDisconnect, connectionId , OfficeSession = true }) {
+function GuacClient({ query, forceHttp = false, onDisconnect, connectionId , OfficeSession = true , sharing = false }) {
   const [connected, setConnected] = useState(false);
   
   // Convert query object to proper query string
   const queryString = buildQueryString(query);
   
+  // Check if we are sharing a session
+  const wsUrlToUse = sharing ? wsSharedUrl : wsUrl;
+  
+  console.log("GuacClient queryString:", queryString);
+  console.log("GuacClient wsUrlToUse:", wsUrlToUse);
+  
   // Use our custom WebSocket hook for Guacamole
   const { client, connectionState, errorMessage, isConnectionUnstable } = useGuacWebSocket(
-    wsUrl, 
+    wsUrlToUse, 
     httpUrl, 
     forceHttp, 
     connected ? queryString : ''

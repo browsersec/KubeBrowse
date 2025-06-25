@@ -15,6 +15,7 @@ import (
 	guac2 "github.com/browsersec/KubeBrowse/internal/guac"
 	redis2 "github.com/browsersec/KubeBrowse/internal/redis"
 	"github.com/go-redis/redis/v8"
+	uuid2 "github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 )
 
@@ -239,19 +240,31 @@ func DemoDoConnect(request *http.Request, tunnelStore *guac2.ActiveTunnelStore, 
 
 	// Register the tunnel with its ConnectionID after handshake
 	if tunnel != nil && tunnel.ConnectionID() != "" {
-		// The request object 'req' for Add method is 'nil' here.
-		// If it's crucial, it needs to be passed down or handled differently.
-		// For now, passing nil as it's not used by the current Add implementation.
+		// Add tunnel to the store
 		tunnelStore.Add(tunnel.ConnectionID(), tunnel, nil)
 		logrus.Debugf("Tunnel %s successfully added to active store", tunnel.ConnectionID())
 
-		// TODO: Register session with cleanup service if available
-		// This would require passing the cleanup service to this function
-		// or accessing it through a global variable
+		// Store connection parameters for future sharing
+		if len(query) > 0 {
+			tunnelStore.StoreConnectionParams(tunnel.ConnectionID(), query)
+			logrus.Debugf("Stored connection parameters for future sharing of %s", tunnel.ConnectionID())
+		}
+
+		// Update the Redis session with the tunnel's ConnectionID as TunnelConnectionID
+		if uuid != "" {
+			err = redis2.UpdateSessionWithTunnelInfo(redisClient, uuid, tunnel.ConnectionID(), session.Share)
+			if err != nil {
+				logrus.Warnf("Failed to update session with tunnel ConnectionID: %v", err)
+			} else {
+				logrus.Infof("Updated session %s with tunnel ConnectionID %s", uuid, tunnel.ConnectionID())
+			}
+		}
+
+		// Register session with cleanup service
 		cleanupService.RegisterSession(
 			session.ConnectionID,
 			session.PodName,
-			tunnel.ConnectionID(), // Assuming PodName is the user ID
+			tunnel.ConnectionID(), // Pass the tunnel's ConnectionID
 		)
 
 	} else if tunnel != nil {
@@ -259,6 +272,155 @@ func DemoDoConnect(request *http.Request, tunnelStore *guac2.ActiveTunnelStore, 
 	} else {
 		logrus.Error("Failed to create tunnel - tunnel is nil")
 	}
+
+	return tunnel, nil
+}
+
+func DoConnectShare(request http.Request, tunnelStore *guac2.ActiveTunnelStore, redisClient *redis.Client, guacdAddr string, cleanupService *cleanup.SessionCleanupService) (guac2.Tunnel, error) {
+	config := guac2.ExistingGuacamoleConfiguration()
+	var query url.Values
+	uuid := request.URL.Query().Get("uuid")
+	var storedConnectionID string
+	var exists bool
+
+	// Check if UUID is provided
+	if uuid == "" {
+		logrus.Warn("No UUID provided for shared connection")
+		return nil, fmt.Errorf("no UUID provided")
+	}
+
+	// Get the stored connection ID
+	if storedConnectionID, exists = redis2.GetTunnelConnectionID(redisClient, uuid); !exists {
+		logrus.Debugf("No stored connection ID found for UUID %s", uuid)
+		return nil, fmt.Errorf("no stored connection ID found for UUID %s", uuid)
+	}
+
+	// Validate that the connection ID still exists in the tunnel store
+	if _, exists = tunnelStore.Get(storedConnectionID); !exists {
+		logrus.Warnf("Shared connection %s no longer exists in tunnel store", storedConnectionID)
+		return nil, fmt.Errorf("shared connection is no longer available")
+	}
+
+	// Get stored connection parameters
+	query, exists = tunnelStore.GetConnectionParams(uuid)
+	if !exists {
+		logrus.Debugf("No stored parameters found for UUID %s", uuid)
+		return nil, fmt.Errorf("no stored parameters found for UUID %s", uuid)
+	}
+
+	logrus.Debugf("Found existing connection ID %s for UUID %s", storedConnectionID, uuid)
+
+	config.Protocol = "rdp"
+	config.Parameters = map[string]string{}
+	for k, v := range query {
+		if k == "uuid" {
+			config.Parameters[k] = uuid2.New().String()
+			continue
+		}
+		config.Parameters[k] = v[0]
+	}
+
+	// Validate essential parameters
+	if config.Protocol == "" {
+		logrus.Error("Protocol not specified in connection parameters")
+		return nil, fmt.Errorf("protocol not specified")
+	}
+
+	if query.Get("width") != "" {
+		config.OptimalScreenHeight, _ = strconv.Atoi(query.Get("width"))
+		if config.OptimalScreenHeight == 0 {
+			config.OptimalScreenHeight = 600 // Default height
+		}
+	}
+	if query.Get("height") != "" {
+		config.OptimalScreenWidth, _ = strconv.Atoi(query.Get("height"))
+		if config.OptimalScreenWidth == 0 {
+			config.OptimalScreenWidth = 800 // Default width
+		}
+	}
+
+	config.AudioMimetypes = []string{"audio/L16", "rate=44100", "channels=2"}
+
+	logrus.Debugf("Attempting to connect to shared guacd at %s", guacdAddr)
+	addr, err := net.ResolveTCPAddr("tcp", guacdAddr)
+	if err != nil {
+		logrus.Errorf("Failed to resolve guacd address: %v", err)
+		return nil, err
+	}
+
+	// Set connection timeout
+	dialer := net.Dialer{
+		Timeout: 60 * time.Second,
+	}
+	logrus.Debugf("Attempting to establish TCP connection to guacd at %s with timeout %v", addr.String(), dialer.Timeout)
+
+	conn, err := dialer.Dial("tcp", addr.String())
+	if err != nil {
+		logrus.Errorf("Failed to establish TCP connection to guacd: %v", err)
+		return nil, err
+	}
+
+	stream := guac2.NewStream(conn, guac2.SocketTimeout)
+	logrus.Debugf("TCP connection established, created new stream with timeout %v", guac2.SocketTimeout)
+
+	logrus.Debug("Successfully connected to guacd for shared connection")
+
+	// Set the connection ID for joining existing session
+	config.ConnectionID = storedConnectionID
+
+	logrus.Debugf("Starting handshake for shared connection with ID: %s", config.ConnectionID)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+	defer cancel()
+
+	// Create a channel to handle the handshake
+	handshakeDone := make(chan error, 1)
+	go func() {
+		err := stream.Handshake(config)
+		if err != nil {
+			logrus.Errorf("Handshake error details: %v", err)
+			// If handshake fails, the shared connection might be invalid
+			if storedConnectionID != "" {
+				logrus.Warnf("Shared connection %s appears to be invalid, removing from store", storedConnectionID)
+				// tunnelStore.Remove(storedConnectionID)
+			}
+		}
+		handshakeDone <- err
+	}()
+
+	select {
+	case err := <-handshakeDone:
+		if err != nil {
+			err := conn.Close()
+			if err != nil {
+				logrus.Errorf("Failed to close connection after handshake error: %v", err)
+			}
+			logrus.Errorf("Failed to complete handshake for shared connection: %v", err)
+			return nil, fmt.Errorf("failed to join shared connection: %v", err)
+		}
+		logrus.Debug("Handshake completed successfully for shared connection")
+	case <-ctx.Done():
+		err := conn.Close()
+		if err != nil {
+			logrus.Errorf("Failed to close connection after handshake error: %v", err)
+		}
+		logrus.Warn("Handshake timed out for shared connection")
+		return nil, fmt.Errorf("handshake timed out for shared connection")
+	}
+
+	// Create the tunnel
+	tunnel := guac2.NewSimpleTunnel(stream)
+
+	if tunnel == nil {
+		err := conn.Close()
+		if err != nil {
+			logrus.Errorf("Failed to close connection after creating shared tunnel: %v", err)
+		}
+		logrus.Error("Failed to create shared tunnel")
+		return nil, fmt.Errorf("failed to create shared tunnel")
+	}
+
+	logrus.Infof("Successfully created shared tunnel for connection ID: %s", storedConnectionID)
 
 	return tunnel, nil
 }

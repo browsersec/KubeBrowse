@@ -4,12 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/browsersec/KubeBrowse/internal/guac"
-	k8s2 "github.com/browsersec/KubeBrowse/internal/k8s"
 	"net"
 	"net/http"
 	"net/url"
 	"time"
+
+	"github.com/browsersec/KubeBrowse/internal/guac"
+	k8s2 "github.com/browsersec/KubeBrowse/internal/k8s"
 
 	redis2 "github.com/browsersec/KubeBrowse/internal/redis"
 	"github.com/gin-gonic/gin"
@@ -297,42 +298,83 @@ func HandlerShareSession(c *gin.Context, tunnelStore *guac.ActiveTunnelStore, re
 		return
 	}
 
-	// Check if the connectionID is valid in redis
-	_, err := redisClient.Get(context.Background(), "session:"+connectionID).Result()
+	ctx := context.Background()
+	sessionKey := fmt.Sprintf("session:%s", connectionID)
+
+	// Get current session data and TTL
+	sessionJSON, err := redisClient.Get(ctx, sessionKey).Result()
 	if err != nil {
+		logrus.Errorf("Failed to get session data for %s: %v", connectionID, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get session data"})
 		return
-	} else {
-		// Update the redis session store
-		session, err := redisClient.Get(context.Background(), "session:"+connectionID).Result()
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get session data"})
-			return
-		}
-		var sessionData redis2.SessionData
-		err = json.Unmarshal([]byte(session), &sessionData)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unmarshal session data"})
-			return
-		}
-		sessionData.Share = true
-		data, _ := json.Marshal(sessionData)
-		redisClient.Set(context.Background(), "session:"+connectionID, data, 0)
 	}
 
+	// Get current TTL before modifying the session
+	currentTTL, err := redisClient.TTL(ctx, sessionKey).Result()
+	if err != nil {
+		logrus.Errorf("Failed to get TTL for session %s: %v", connectionID, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get session TTL"})
+		return
+	}
+
+	// If TTL is -1 (no expiration) or -2 (key doesn't exist), handle appropriately
+	if currentTTL == -2*time.Second {
+		logrus.Errorf("Session %s does not exist", connectionID)
+		c.JSON(http.StatusNotFound, gin.H{"error": "Session not found"})
+		return
+	}
+	if currentTTL == -1*time.Second {
+		// Session has no expiration, set a default timeout
+		currentTTL = 10 * time.Minute
+		logrus.Warnf("Session %s has no TTL, setting default 10 minutes", connectionID)
+	}
+
+	// Parse session data
+	var sessionData redis2.SessionData
+	err = json.Unmarshal([]byte(sessionJSON), &sessionData)
+	if err != nil {
+		logrus.Errorf("Failed to unmarshal session data for %s: %v", connectionID, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unmarshal session data"})
+		return
+	}
+
+	// Update the share flag
+	sessionData.Share = true
+	logrus.Infof("Enabling sharing for session %s (TTL: %v)", connectionID, currentTTL.Round(time.Second))
+
+	// Marshal updated session data
+	updatedData, err := json.Marshal(sessionData)
+	if err != nil {
+		logrus.Errorf("Failed to marshal updated session data for %s: %v", connectionID, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to marshal session data"})
+		return
+	}
+
+	// Update Redis with preserved TTL
+	err = redisClient.Set(ctx, sessionKey, updatedData, currentTTL).Err()
+	if err != nil {
+		logrus.Errorf("Failed to update session data for %s: %v", connectionID, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update session data"})
+		return
+	}
+
+	logrus.Infof("Successfully enabled sharing for session %s with preserved TTL %v", connectionID, currentTTL.Round(time.Second))
+
+	// Check if connection parameters exist
 	_, exists := tunnelStore.GetConnectionParams(connectionID)
 	if !exists {
+		logrus.Errorf("Connection parameters not found for %s", connectionID)
 		c.JSON(http.StatusNotFound, gin.H{"error": "Connection parameters not found"})
 		return
 	}
 
 	// Construct the websocket URL with only the connection ID
-	wsURL := fmt.Sprintf("/websocket-tunnel?uuid=%s", connectionID)
+	wsURL := fmt.Sprintf("/websocket-tunnel/share?uuid=%s", connectionID)
 
 	c.JSON(http.StatusOK, gin.H{
 		"websocket_url": wsURL,
 		"status":        "ready",
-		"message":       "Connection parameters retrieved successfully",
+		"message":       "Session sharing enabled successfully",
 	})
 }
 
