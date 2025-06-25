@@ -338,6 +338,16 @@ func HandlerShareSession(c *gin.Context, tunnelStore *guac.ActiveTunnelStore, re
 		return
 	}
 
+	if sessionData.Share {
+		logrus.Warnf("Session %s is already shared, skipping update", connectionID)
+		c.JSON(http.StatusOK, gin.H{
+			"message":       "Session is already shared",
+			"status":        "ready",
+			"websocket_url": fmt.Sprintf("/websocket-tunnel/share?uuid=%s", connectionID),
+		})
+		return
+	}
+
 	// Update the share flag
 	sessionData.Share = true
 	logrus.Infof("Enabling sharing for session %s (TTL: %v)", connectionID, currentTTL.Round(time.Second))

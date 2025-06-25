@@ -251,7 +251,6 @@ func main() {
 	// We still need OnDisconnect to remove from the store when a tunnel closes for any reason.
 	wsServer.OnDisconnect = func(connectionID string, req *http.Request, tunnel guac2.Tunnel) {
 		logrus.Debugf("Websocket disconnected, removing tunnel: %s", connectionID)
-		tunnelStore.Delete(connectionID, req, tunnel)
 
 		// Extract connection UUID from request parameters
 		uuidParam := req.URL.Query().Get("uuid")
@@ -336,6 +335,7 @@ func main() {
 				logrus.Infof("No reconnection for session %s after grace period, terminating pod %s", uuidParam, podName)
 				if k8sClient != nil {
 					err = k8s.DeletePodGrace(k8sClient, k8sNamespace, podName)
+					tunnelStore.Delete(connectionID, req, tunnel)
 					if err != nil {
 						logrus.Errorf("Failed to delete pod %s: %v", podName, err)
 					} else {
