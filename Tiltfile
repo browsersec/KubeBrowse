@@ -1,5 +1,5 @@
 # Tiltfile for kubebrowse
-
+allow_k8s_contexts( "default")
 print("Tilt starting up...")
 
 # Backend API (Go)
@@ -16,32 +16,45 @@ docker_build(
         run(
             'cd /app && go build -v -o /app/main ./api/main.go',
             trigger=['./api', './cmd', './internal', 'go.mod', 'go.sum']
-        )
+        ),
+        # Clean up after build to save space
+        run('docker system prune -f --filter "until=1h"', trigger=['./api', './cmd', './internal'])
     ]
 )
 
 # Frontend (React/Vite)
-docker_build(
-    'ghcr.io/browsersec/kubebrowse-frontend',
-    './frontend',
-    dockerfile='./frontend/Dockerfile',
-    live_update=[
-        sync('./frontend/src', '/app/src'),
-        sync('./frontend/public', '/app/public'),
-        sync('./frontend/index.html', '/app/index.html'),
-        sync('./frontend/vite.config.js', '/app/vite.config.js'),
-        sync('./frontend/tailwind.config.js', '/app/tailwind.config.js'),
-        sync('./frontend/package.json', '/app/package.json'),
-        sync('./frontend/bun.lockb', '/app/bun.lockb'),
-        run(
-            'cd /app && bun install',
-            trigger=['./frontend/package.json', './frontend/bun.lockb']
-        ),
-        run(
-            'cd /app && bun run build',
-            trigger=['./frontend/src', './frontend/public', './frontend/index.html', './frontend/vite.config.js', './frontend/tailwind.config.js']
-        )
-    ]
+# docker_build(
+#     'ghcr.io/browsersec/kubebrowse-frontend',
+#     './frontend',
+#     dockerfile='./frontend/Dockerfile',
+#     live_update=[
+#         sync('./frontend/src', '/app/src'),
+#         sync('./frontend/public', '/app/public'),
+#         sync('./frontend/index.html', '/app/index.html'),
+#         sync('./frontend/vite.config.js', '/app/vite.config.js'),
+#         sync('./frontend/tailwind.config.js', '/app/tailwind.config.js'),
+#         sync('./frontend/package.json', '/app/package.json'),
+#         sync('./frontend/bun.lockb', '/app/bun.lockb'),
+#         run(
+#             'cd /app && bun install',
+#             trigger=['./frontend/package.json', './frontend/bun.lockb']
+#         ),
+#         run(
+#             'cd /app && bun run build',
+#             trigger=['./frontend/src', './frontend/public', './frontend/index.html', './frontend/vite.config.js', './frontend/tailwind.config.js']
+#         ),
+#         # Clean up after build to save space
+#         run('docker system prune -f --filter "until=1h"', trigger=['./frontend/src', './frontend/public'])
+#     ]
+# )
+
+# Clean up dangling images and build cache periodically
+local_resource(
+    'docker-cleanup',
+    cmd='docker system prune -f && docker image prune -f',
+    deps=[],
+    # Run cleanup every time Tilt starts
+    auto_init=True
 )
 
 # Load Kubernetes manifests.
@@ -61,6 +74,8 @@ k8s_resource(
     'browser-sandbox-frontend',
     port_forwards=['3000:80']
 )
+
+
 
 print("Tiltfile configured successfully.")
 print("This version should be compatible with your older Tilt installation.")
