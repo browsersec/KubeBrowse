@@ -26,6 +26,7 @@ export default function Sidebar() {
           variant="ghost"
           size="icon"
           onClick={() => setExpanded(!expanded)}
+          aria-label={expanded ? "Collapse sidebar" : "Expand sidebar"}
         >
           {expanded ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
         </Button>
