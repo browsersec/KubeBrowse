@@ -6,7 +6,7 @@ import states from '../lib/states';
 import Modal from './Modal';
 import WebSocketControl from './WebSocketControl';
 import useGuacWebSocket from '../hooks/useGuacWebSocket';
-import { Toaster } from 'react-hot-toast';
+import { Toaster } from '@/components/ui/toaster';
 
 // Set custom Mouse implementation
 Guacamole.Mouse = GuacMouse.mouse;

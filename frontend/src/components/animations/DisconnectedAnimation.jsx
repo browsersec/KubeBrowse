@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
-
+import { Button } from '@/components/ui/button';
 
 export default function DisconnectedAnimation() {
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
@@ -74,14 +74,18 @@ export default function DisconnectedAnimation() {
           </motion.div>
           <p className="text-white text-xl font-semibold">Disconnected</p>
           <p className="text-white/70 mt-2">Connection to the server has been lost</p>
-          <motion.button
-            className="mt-6 px-6 py-2 bg-white/20 hover:bg-white/30 text-white rounded-full font-medium"
+          <motion.div
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            onClick={handleReturn}
           >
-            Return to Dashboard
-          </motion.button>
+            <Button
+              variant="outline"
+              className="mt-6 bg-white/20 hover:bg-white/30 text-white border-white/30"
+              onClick={handleReturn}
+            >
+              Return to Dashboard
+            </Button>
+          </motion.div>
         </div>
       </motion.div>
     </div>

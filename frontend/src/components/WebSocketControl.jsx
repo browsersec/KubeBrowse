@@ -1,6 +1,12 @@
 import { useState, useEffect, useRef } from "react";
-import { Upload, Clipboard, ClipboardCheck, Download, X, ChevronDown, ChevronUp } from "lucide-react";
-import toast, { Toaster } from "react-hot-toast";
+import { Upload, Clipboard, ClipboardCheck, Download, X, ChevronDown, ChevronUp, AlertTriangle } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
 
 /**
  * A collapsible control panel for WebSocket connection management
@@ -35,35 +41,29 @@ function WebSocketControl({
   // copied to clipboard state
   const [copiedToClipboard, setCopiedToClipboard] = useState(false);
 
+  const { toast } = useToast();
+
   // Show toast when connection becomes unstable
   useEffect(() => {
     if (isConnectionUnstable) {
-      toast.error("WebSocket connection is unstable", {
-        id: "connection-unstable",
-        duration: 3000,
-        position: "top-right",
-        icon: "⚠️",
-        style: {
-          borderRadius: "10px",
-          background: "#FFF3CD",
-          color: "#856404",
-          border: "1px solid #FFEEBA",
-        },
+      toast({
+        title: "Connection Unstable",
+        description: "WebSocket connection is unstable",
+        variant: "destructive",
       });
     }
-  }, [isConnectionUnstable]);
+  }, [isConnectionUnstable, toast]);
 
   // Show toast when there is a tunnel error
   useEffect(() => {
     if (connectionState === 'TUNNEL_ERROR') {
-      toast.error(`Tunnel Error: ${errorMessage || 'Unable to connect'}`, {
-        id: 'connection-error',
-        duration: 3000,
-        position: 'top-right',
-        icon: '❌',
+      toast({
+        title: "Tunnel Error",
+        description: errorMessage || 'Unable to connect',
+        variant: "destructive",
       });
     }
-  }, [connectionState, errorMessage]);
+  }, [connectionState, errorMessage, toast]);
 
   // Clear animation timeout on unmount
   useEffect(() => {
@@ -179,83 +179,53 @@ function WebSocketControl({
         const virusNames = viruses.length > 0 ? viruses.join(', ') : 'Unknown threat';
         
         // Show a prominent warning toast
-        toast.error(
-          <div>
-            <div className="font-bold">😈 Malware Detected!</div>
-            <div>The file may contain malicious content.</div>
-            {viruses.length > 0 && <div className="text-xs mt-1">Detected: {virusNames}</div>}
-          </div>,
-          {
-            id: 'malware-alert',
-            duration: 6000,
-            position: 'top-center',
-            style: {
-              background: '#FEE2E2',
-              color: '#991B1B',
-              border: '1px solid #F87171',
-              padding: '16px',
-              fontWeight: 'bold',
-            },
-          }
-        );
-        
-        // Also look for the file name in the clamav response
-        const infectedFiles = clamavResult.data.response.data?.result?.filter(file => file.is_infected) || [];
-        
-        if (infectedFiles.length > 0) {
-          // Log detailed information about infected files
-          console.warn('Infected files detected:', infectedFiles);
-        }
-      }
-    } catch (err) {
-      console.error("Error checking for malware:", err);
-    }
-  };
-
-  // Share session handler
-  const handleShareSession = async () => {
-    if (!connectionId) return;
-
-    try {
-      const response = await fetch(`/test/share/${connectionId}`, {
-        method: "GET",
-        redirect: "follow",
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        const url = data.websocket_url;
-        // Copy the full URL including the base URL for sharing
-        const fullUrl = `${window.location.origin}${url}`;
-        await navigator.clipboard.writeText(fullUrl);
-        setCopiedToClipboard(true);
-        
-        // Show success toast
-        toast.success("Sharing URL copied to clipboard!", {
-          duration: 3000,
-          position: "top-right",
-          icon: "🔗",
+        toast({
+          title: "😈 Malware Detected!",
+          description: (
+            <div>
+              <div>The file may contain malicious content.</div>
+              {viruses.length > 0 && <div className="text-xs mt-1">Detected: {virusNames}</div>}
+            </div>
+          ),
+          variant: "destructive",
         });
-        
-        setTimeout(() => setCopiedToClipboard(false), 2000);
       } else {
-        const errorData = await response.json();
-        toast.error(`Failed to share session: ${errorData.error || 'Unknown error'}`, {
-          duration: 3000,
-          position: "top-right",
+        // Show success toast
+        toast({
+          title: "File Uploaded Successfully",
+          description: "File has been scanned and is safe",
         });
-        console.error("Failed to share session:", errorData);
       }
     } catch (error) {
-      toast.error("Error sharing session", {
-        duration: 3000,
-        position: "top-right",
+      console.error("Error checking for malware:", error);
+      toast({
+        title: "Upload Complete",
+        description: "File uploaded but scan results unavailable",
       });
-      console.error("Error sharing session:", error);
     }
   };
 
-  // Toggle log expansion in the modal
+  const handleShareSession = async () => {
+    if (!connectionId) return;
+    
+    try {
+      await navigator.clipboard.writeText(connectionId);
+      setCopiedToClipboard(true);
+      toast({
+        title: "Connection ID Copied",
+        description: "Connection ID has been copied to clipboard",
+      });
+      setTimeout(() => setCopiedToClipboard(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy to clipboard:", err);
+      toast({
+        title: "Copy Failed",
+        description: "Failed to copy connection ID to clipboard",
+        variant: "destructive",
+      });
+    }
+  };
+
   const toggleLogExpansion = (index) => {
     setExpandedLogs(prev => ({
       ...prev,
@@ -263,221 +233,202 @@ function WebSocketControl({
     }));
   };
 
-  // Handler for showing upload logs modal
   const handleShowLogs = () => {
-    if (uploadHistory.length > 0) {
-      setIsModalOpen(true);
-    } else {
-      toast.error("No upload logs available", {
-        duration: 2000,
-        position: "top-right",
-      });
-    }
+    setIsModalOpen(true);
   };
 
-  // Determine connection status for display
-  const isConnected =
-    connectionState === "CONNECTED" || connectionState === "WAITING";
+  const isConnected = connectionState === 'CONNECTED';
 
   return (
     <>
-      <Toaster />
-      {/* Upload Logs Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60]">
-          <div className="bg-white rounded-lg shadow-lg max-w-3xl w-full max-h-[80vh] overflow-hidden flex flex-col text-gray-800">
-            <div className="flex justify-between items-center p-4 border-b border-gray-200">
-              <h3 className="text-lg font-medium text-gray-900">File Upload History</h3>
-              <button 
-                onClick={() => setIsModalOpen(false)} 
-                className="text-gray-500 hover:text-gray-700"
-              >
-                <X size={20} />
-              </button>
-            </div>
-            <div className="p-4 overflow-y-auto flex-1 text-gray-800">
-              {uploadHistory.length === 0 ? (
-                <div className="text-gray-500 text-center py-8">No upload history available</div>
-              ) : (
-                <div className="space-y-4">
-                  {uploadHistory.map((entry, historyIndex) => (
-                    <div key={historyIndex} className="border border-gray-200 rounded-lg overflow-hidden">
-                      <div 
-                        className="flex justify-between items-center p-3 bg-gray-50 cursor-pointer"
-                        onClick={() => toggleLogExpansion(historyIndex)}
-                      >
-                        <div className="flex items-center gap-3">
-                          <span className={`px-2 py-1 rounded text-white text-xs ${entry.success ? 'bg-green-500' : 'bg-red-500'}`}>
-                            {entry.success ? 'Success' : 'Failed'}
-                          </span>
-                          <span className="font-medium text-gray-900">{entry.filename}</span>
-                          <span className="text-sm text-gray-500">
-                            {new Date(entry.timestamp).toLocaleString()}
-                          </span>
-                        </div>
-                        {expandedLogs[historyIndex] ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+      {/* Upload History Modal */}
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>File Upload History</DialogTitle>
+            <DialogDescription>
+              View details of all uploaded files and their scan results
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            {uploadHistory.length === 0 ? (
+              <div className="text-center text-muted-foreground py-8">
+                No upload history available
+              </div>
+            ) : (
+              uploadHistory.map((upload, index) => (
+                <Card key={index}>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <CardTitle className="text-lg">{upload.filename}</CardTitle>
+                        <Badge variant={upload.results?.some(r => r.success && r.data?.response?.infected) ? "destructive" : "default"}>
+                          {upload.results?.some(r => r.success && r.data?.response?.infected) ? "Infected" : "Clean"}
+                        </Badge>
                       </div>
-
-                      {expandedLogs[historyIndex] && (
-                        <div className="p-3 border-t border-gray-200">
-                          <div className="text-sm text-gray-700 mb-2">{entry.message}</div>
-                          
-                          <div className="space-y-3">
-                            {entry.results.map((result, resultIndex) => (
-                              <div key={resultIndex} className="border border-gray-200 rounded p-3">
-                                <div className="flex justify-between items-center mb-2">
-                                  <h4 className="font-semibold capitalize text-gray-900">{result.service}</h4>
-                                  <span className={`px-2 py-0.5 text-xs rounded ${result.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                                    {result.success ? 'Success' : 'Failed'}
-                                  </span>
-                                </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => toggleLogExpansion(index)}
+                      >
+                        {expandedLogs[index] ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                      </Button>
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      {upload.timestamp.toLocaleString()}
+                    </div>
+                  </CardHeader>
+                  
+                  {expandedLogs[index] && (
+                    <CardContent>
+                      <div className="space-y-3">
+                        {upload.results?.map((result, resultIndex) => (
+                          <div key={resultIndex} className="border rounded-lg p-3">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="font-medium">{result.service}</span>
+                              <Badge variant={result.success ? "default" : "destructive"}>
+                                {result.success ? "Success" : "Failed"}
+                              </Badge>
+                            </div>
+                            
+                            {result.success && result.data && (
+                              <div className="space-y-2 text-sm">
+                                {result.data.response?.infected && (
+                                  <div className="flex items-center gap-2 text-destructive">
+                                    <AlertTriangle className="h-4 w-4" />
+                                    <span>Malware detected!</span>
+                                  </div>
+                                )}
                                 
-                                {result.error && <div className="text-red-500 mb-2">Error: {result.error}</div>}
+                                {result.data.response?.viruses && result.data.response.viruses.length > 0 && (
+                                  <div>
+                                    <span className="font-medium">Detected threats:</span>
+                                    <ul className="list-disc list-inside ml-2">
+                                      {result.data.response.viruses.map((virus, virusIndex) => (
+                                        <li key={virusIndex}>{virus}</li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                )}
                                 
-                                {result.data && (
-                                  <div className="text-sm text-gray-700">
-                                    {/* File Upload Service */}
-                                    {result.service === "file_upload" && result.data.status_code && (
-                                      <div>Status Code: {result.data.status_code}</div>
-                                    )}
-                                    
-                                    {/* ClamAV Service */}
-                                    {result.service === "clamav" && result.data.response && (
-                                      <div className="bg-gray-50 p-2 rounded mt-1 text-gray-800">
-                                        {result.data.response.infected !== undefined && (
-                                          <div className={`font-medium ${result.data.response.infected ? 'text-red-600' : 'text-green-600'}`}>
-                                            {result.data.response.infected 
-                                              ? '⚠️ Malware Detected' 
-                                              : '✅ No Malware Detected'}
-                                          </div>
-                                        )}
-                                        {result.data.response.data?.result?.map((file, idx) => (
-                                          <div key={idx} className="mt-1">
-                                            <div>File: {file.name}</div>
-                                            <div>Infected: {file.is_infected ? 'Yes' : 'No'}</div>
-                                            {file.viruses && file.viruses.length > 0 && (
-                                              <div>Threats: {file.viruses.join(', ')}</div>
-                                            )}
-                                          </div>
-                                        ))}
-                                      </div>
-                                    )}
-                                    
-                                    {/* MinIO Storage Service */}
-                                    {result.service === "minio" && (
-                                      <div className="text-gray-700">
-                                        <div>Bucket: {result.data.bucket}</div>
-                                        <div>File: {result.data.object_name}</div>
-                                        <div>Size: {formatBytes(result.data.size)}</div>
-                                        <div>ETag: {result.data.etag}</div>
-                                      </div>
-                                    )}
+                                {result.data.response?.size && (
+                                  <div>
+                                    <span className="font-medium">File size:</span> {formatBytes(result.data.response.size)}
+                                  </div>
+                                )}
+                                
+                                {result.data.response?.scan_time && (
+                                  <div>
+                                    <span className="font-medium">Scan time:</span> {result.data.response.scan_time}ms
                                   </div>
                                 )}
                               </div>
-                            ))}
+                            )}
+                            
+                            {!result.success && result.error && (
+                              <div className="text-sm text-destructive">
+                                Error: {result.error}
+                              </div>
+                            )}
                           </div>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div className="border-t border-gray-200 p-4">
-              <button 
-                onClick={() => setIsModalOpen(false)} 
-                className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div
-        className={`fixed bottom-5 right-5 z-50 bg-white rounded-lg shadow-lg overflow-hidden transition-all duration-300 ease-in-out min-w-[50px] max-w-[250px] ${
-          expanded ? "w-[200px] h-auto" : "w-[50px] h-[50px]"
-        }`}
-      >
-        <div
-          className="flex justify-between items-center p-2.5 cursor-pointer bg-gray-100 border-b border-gray-200 select-none"
-          onClick={toggleExpanded}
-        >
-          <div className="flex items-center gap-2">
-            <div
-              className={`w-3 h-3 rounded-full ${
-                disconnecting
-                  ? "bg-yellow-500 animate-pulse animate-pulse-glow"
-                  : isConnectionUnstable
-                  ? "bg-yellow-500 animate-pulse"
-                  : isConnected
-                  ? "bg-green-500 shadow-[0_0_5px_#4CAF50]"
-                  : "bg-red-500 shadow-[0_0_5px_#f44336]"
-              }`}
-            ></div>
-            {expanded && (
-              <span className="text-sm text-gray-800 whitespace-nowrap overflow-hidden text-ellipsis">
-                {disconnecting
-                  ? "Disconnecting..."
-                  : isConnectionUnstable
-                  ? "Unstable"
-                  : isConnected
-                  ? "Connected"
-                  : connectionState}
-              </span>
+                        ))}
+                      </div>
+                    </CardContent>
+                  )}
+                </Card>
+              ))
             )}
           </div>
-          <button className="bg-transparent border-none text-gray-600 cursor-pointer text-sm p-0 flex items-center justify-center">
-            {expanded ? "▼" : "▲"}
-          </button>
-        </div>
+        </DialogContent>
+      </Dialog>
+
+      <Card
+        className={cn(
+          "fixed bottom-5 right-5 z-50 transition-all duration-300 ease-in-out",
+          expanded ? "w-[200px]" : "w-[50px]"
+        )}
+      >
+        <CardHeader className="p-2.5 cursor-pointer select-none" onClick={toggleExpanded}>
+          <div className="flex justify-between items-center">
+            <div className="flex items-center gap-2">
+              <div
+                className={cn(
+                  "w-3 h-3 rounded-full",
+                  disconnecting
+                    ? "bg-yellow-500 animate-pulse"
+                    : isConnectionUnstable
+                    ? "bg-yellow-500 animate-pulse"
+                    : isConnected
+                    ? "bg-green-500"
+                    : "bg-red-500"
+                )}
+              />
+              {expanded && (
+                <span className="text-sm whitespace-nowrap overflow-hidden text-ellipsis">
+                  {disconnecting
+                    ? "Disconnecting..."
+                    : isConnectionUnstable
+                    ? "Unstable"
+                    : isConnected
+                    ? "Connected"
+                    : connectionState}
+                </span>
+              )}
+            </div>
+            <Button variant="ghost" size="sm" className="p-0 h-auto">
+              {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+            </Button>
+          </div>
+        </CardHeader>
 
         {expanded && (
-          <div className="p-2.5">
+          <CardContent className="p-2.5 space-y-2">
             {/* Session share button */}
-            <div className="mb-2 flex items-center gap-2">
-              <button
-                onClick={handleShareSession}
-                title="Copy connection ID to clipboard"
-                className="p-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors disabled:opacity-50"
-                disabled={copiedToClipboard}
-              >
-                {copiedToClipboard ? (
-                  <ClipboardCheck className="w-5 h-5" />
-                ) : (
-                  <Clipboard className="w-5 h-5" />
-                )}
-              </button>
-            </div>
+            <Button
+              onClick={handleShareSession}
+              title="Copy connection ID to clipboard"
+              variant="outline"
+              size="sm"
+              disabled={copiedToClipboard}
+              className="w-full"
+            >
+              {copiedToClipboard ? (
+                <ClipboardCheck className="w-4 h-4" />
+              ) : (
+                <Clipboard className="w-4 h-4" />
+              )}
+            </Button>
 
             {/* Upload UI */}
             {connectionId && OfficeSession && (
-              <div className="mb-2 flex items-center gap-2">
-                <button
+              <div className="space-y-2">
+                <Button
                   onClick={handleFileUploadClick}
-                  className="p-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors disabled:opacity-50"
+                  variant="outline"
+                  size="sm"
                   disabled={uploading}
                   title="Upload File"
+                  className="w-full"
                 >
-                  <Upload className="w-5 h-5" />
-                </button>
+                  <Upload className="w-4 h-4" />
+                </Button>
                 
-                {/* view upload logs button */}
-                <button
+                <Button
                   onClick={handleShowLogs}
                   title="View file upload history"
-                  className="p-2 bg-green-500 text-white rounded hover:bg-green-600 transition-colors disabled:opacity-50"
+                  variant="outline"
+                  size="sm"
                   disabled={uploadHistory.length === 0}
+                  className="w-full relative"
                 >
-                  <Download className="w-5 h-5" />
+                  <Download className="w-4 h-4" />
                   {uploadHistory.length > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
+                    <Badge variant="destructive" className="absolute -top-1 -right-1 h-4 w-4 p-0 text-xs">
                       {uploadHistory.length}
-                    </span>
+                    </Badge>
                   )}
-                </button>
+                </Button>
                 
                 <input
                   type="file"
@@ -488,69 +439,36 @@ function WebSocketControl({
                 />
                 
                 {uploading && (
-                  <div className="w-24">
-                    <div className="h-2 bg-gray-200 rounded">
-                      <div
-                        className="h-2 bg-blue-500 rounded transition-all duration-300"
-                        style={{ width: `${uploadProgress}%` }}
-                      ></div>
-                    </div>
-                    <div className="text-xs text-gray-600 mt-1">
+                  <div className="space-y-1">
+                    <Progress value={uploadProgress} className="h-2" />
+                    <div className="text-xs text-muted-foreground text-center">
                       {uploadProgress}%
                     </div>
                   </div>
                 )}
+                
                 {uploadSuccess && (
-                  <div className="text-xs text-green-600 animate-pulse">✓</div>
+                  <div className="text-xs text-green-600 text-center animate-pulse">✓ Upload Complete</div>
                 )}
+                
                 {uploadError && (
-                  <div className="text-xs text-red-600">{uploadError}</div>
+                  <div className="text-xs text-red-600 text-center">{uploadError}</div>
                 )}
               </div>
             )}
             
-            <button
-              className={`w-full py-2 px-3 rounded text-white border-none transition-colors relative overflow-hidden ${
-                disconnecting
-                  ? "bg-yellow-500 cursor-wait"
-                  : isConnected
-                  ? "bg-red-500 hover:bg-red-700 cursor-pointer"
-                  : "bg-gray-300 cursor-not-allowed"
-              }`}
+            <Button
+              variant={disconnecting ? "secondary" : isConnected ? "destructive" : "secondary"}
+              size="sm"
               onClick={handleDisconnect}
               disabled={!isConnected || disconnecting}
+              className="w-full"
             >
-              {disconnecting && (
-                <span className="absolute inset-0 flex items-center justify-center">
-                  <svg
-                    className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    ></circle>
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    ></path>
-                  </svg>
-                </span>
-              )}
-              <span className={disconnecting ? "opacity-0" : ""}>
-                {disconnecting ? "Disconnecting..." : "Disconnect"}
-              </span>
-            </button>
-          </div>
+              {disconnecting ? "Disconnecting..." : "Disconnect"}
+            </Button>
+          </CardContent>
         )}
-      </div>
+      </Card>
     </>
   );
 }

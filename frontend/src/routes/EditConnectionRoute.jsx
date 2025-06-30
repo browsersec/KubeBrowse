@@ -1,6 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { AlertTriangle } from 'lucide-react';
 
 export default function EditConnectionRoute() {
   const navigate = useNavigate();
@@ -49,16 +56,20 @@ export default function EditConnectionRoute() {
   if (notFound) {
     return (
       <div className="p-8 flex items-center justify-center">
-        <div className="max-w-md p-6 bg-white rounded-lg shadow-lg text-center">
-          <h2 className="text-2xl font-bold text-red-600 mb-4">Connection Not Found</h2>
-          <p className="text-gray-700 mb-6">The connection you are trying to edit does not exist.</p>
-          <button
-            onClick={() => navigate('/')}
-            className="w-full py-2 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            Return to Dashboard
-          </button>
-        </div>
+        <Card className="max-w-md text-center">
+          <CardContent className="pt-6">
+            <div className="w-12 h-12 bg-destructive/10 rounded-full flex items-center justify-center mx-auto mb-4">
+              <AlertTriangle className="h-6 w-6 text-destructive" />
+            </div>
+            <CardTitle className="text-2xl text-destructive mb-4">Connection Not Found</CardTitle>
+            <CardDescription className="mb-6">
+              The connection you are trying to edit does not exist.
+            </CardDescription>
+            <Button onClick={() => navigate('/')} className="w-full">
+              Return to Dashboard
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -66,127 +77,120 @@ export default function EditConnectionRoute() {
   return (
     <div className="p-8">
       <motion.div 
-        className="max-w-2xl mx-auto bg-white rounded-xl shadow-sm p-8"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
-        <h1 className="text-2xl font-bold text-gray-800 mb-6">Edit Connection</h1>
-        
-        <form onSubmit={handleSubmit}>
-          <div className="mb-4">
-            <label htmlFor="name" className="block text-gray-700 mb-1 font-medium">Connection Name</label>
-            <input 
-              type="text" 
-              id="name" 
-              value={formData.name} 
-              onChange={handleInputChange} 
-              placeholder="My Connection"
-              className="w-full px-3 py-2 bg-gray-50 text-gray-800 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-              required
-            />
-          </div>
-          
-          <div className="mb-4">
-            <label htmlFor="scheme" className="block text-gray-700 mb-1 font-medium">Scheme/Protocol</label>
-            <select 
-              id="scheme" 
-              value={formData.scheme} 
-              onChange={handleInputChange} 
-              className="w-full px-3 py-2 bg-gray-50 text-gray-800 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-            >
-              <option value="rdp">RDP</option>
-              <option value="vnc">VNC</option>
-              <option value="ssh">SSH</option>
-              <option value="telnet">Telnet</option>
-            </select>
-          </div>
+        <Card className="max-w-2xl mx-auto">
+          <CardHeader>
+            <CardTitle>Edit Connection</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="name">Connection Name</Label>
+                <Input 
+                  type="text" 
+                  id="name" 
+                  value={formData.name} 
+                  onChange={handleInputChange} 
+                  placeholder="My Connection"
+                  required
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="scheme">Scheme/Protocol</Label>
+                <Select value={formData.scheme} onValueChange={(value) => setFormData({...formData, scheme: value})}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="rdp">RDP</SelectItem>
+                    <SelectItem value="vnc">VNC</SelectItem>
+                    <SelectItem value="ssh">SSH</SelectItem>
+                    <SelectItem value="telnet">Telnet</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-          <div className="mb-4">
-            <label htmlFor="hostname" className="block text-gray-700 mb-1 font-medium">Hostname or IP Address</label>
-            <input 
-              type="text" 
-              id="hostname" 
-              value={formData.hostname} 
-              onChange={handleInputChange} 
-              className="w-full px-3 py-2 bg-gray-50 text-gray-800 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-              required
-            />
-          </div>
+              <div className="space-y-2">
+                <Label htmlFor="hostname">Hostname or IP Address</Label>
+                <Input 
+                  type="text" 
+                  id="hostname" 
+                  value={formData.hostname} 
+                  onChange={handleInputChange} 
+                  required
+                />
+              </div>
 
-          <div className="mb-4">
-            <label htmlFor="port" className="block text-gray-700 mb-1 font-medium">Port (if not default)</label>
-            <input 
-              type="text" 
-              id="port" 
-              value={formData.port} 
-              onChange={handleInputChange} 
-              className="w-full px-3 py-2 bg-gray-50 text-gray-800 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-            />
-          </div>
+              <div className="space-y-2">
+                <Label htmlFor="port">Port (if not default)</Label>
+                <Input 
+                  type="text" 
+                  id="port" 
+                  value={formData.port} 
+                  onChange={handleInputChange} 
+                />
+              </div>
 
-          <div className="mb-4">
-            <label htmlFor="username" className="block text-gray-700 mb-1 font-medium">Username</label>
-            <input 
-              type="text" 
-              id="username" 
-              value={formData.username} 
-              onChange={handleInputChange} 
-              className="w-full px-3 py-2 bg-gray-50 text-gray-800 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-            />
-          </div>
+              <div className="space-y-2">
+                <Label htmlFor="username">Username</Label>
+                <Input 
+                  type="text" 
+                  id="username" 
+                  value={formData.username} 
+                  onChange={handleInputChange} 
+                />
+              </div>
 
-          <div className="mb-4">
-            <label htmlFor="password" className="block text-gray-700 mb-1 font-medium">Password</label>
-            <input 
-              type="password" 
-              id="password" 
-              value={formData.password || ''} 
-              onChange={handleInputChange} 
-              placeholder="Leave empty to keep current password"
-              className="w-full px-3 py-2 bg-gray-50 text-gray-800 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-            />
-          </div>
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <Input 
+                  type="password" 
+                  id="password" 
+                  value={formData.password || ''} 
+                  onChange={handleInputChange} 
+                  placeholder="Leave empty to keep current password"
+                />
+              </div>
 
-          <div className="mb-4 flex items-center">
-            <input 
-              type="checkbox" 
-              id="ignoreCert" 
-              checked={formData.ignoreCert} 
-              onChange={handleInputChange} 
-              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-            />
-            <label htmlFor="ignoreCert" className="ml-2 text-gray-700">Ignore Certificate</label>
-          </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox 
+                  id="ignoreCert" 
+                  checked={formData.ignoreCert} 
+                  onCheckedChange={(checked) => setFormData({...formData, ignoreCert: checked})}
+                />
+                <Label htmlFor="ignoreCert">Ignore Certificate</Label>
+              </div>
 
-          <div className="mb-6">
-            <label htmlFor="security" className="block text-gray-700 mb-1 font-medium">Security</label>
-            <input 
-              type="text" 
-              id="security" 
-              value={formData.security} 
-              onChange={handleInputChange} 
-              placeholder="e.g., nla for Network Level Authentication" 
-              className="w-full px-3 py-2 bg-gray-50 text-gray-800 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-            />
-          </div>
+              <div className="space-y-2">
+                <Label htmlFor="security">Security</Label>
+                <Input 
+                  type="text" 
+                  id="security" 
+                  value={formData.security} 
+                  onChange={handleInputChange} 
+                  placeholder="e.g., nla for Network Level Authentication" 
+                />
+              </div>
 
-          <div className="flex justify-end space-x-3">
-            <button
-              type="button"
-              onClick={() => navigate('/')}
-              className="px-5 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              Update Connection
-            </button>
-          </div>
-        </form>
+              <div className="flex justify-end space-x-3 pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => navigate('/')}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit">
+                  Update Connection
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
       </motion.div>
     </div>
   );

@@ -1,6 +1,12 @@
 import { useState, useEffect } from 'react';
 import GuacClient from './components/GuacClient';
 import OfficeSession from './components/OfficeSession';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 
 function App() {
   const [activeTab, setActiveTab] = useState('office'); // 'office' or 'manual'
@@ -116,152 +122,126 @@ function App() {
 
   return (
     <div className="w-full max-w-4xl mx-auto p-4">
-      <div className="flex justify-center mb-6">
-        <div className="inline-flex rounded-lg border border-gray-700 bg-gray-800 p-1">
-          <button
-            className={`px-4 py-2 rounded-md text-sm font-medium ${
-              activeTab === 'office'
-                ? 'bg-blue-600 text-white'
-                : 'text-gray-300 hover:text-white'
-            }`}
-            onClick={() => setActiveTab('office')}
-          >
-            Office Session
-          </button>
-          <button
-            className={`px-4 py-2 rounded-md text-sm font-medium ${
-              activeTab === 'manual'
-                ? 'bg-blue-600 text-white'
-                : 'text-gray-300 hover:text-white'
-            }`}
-            onClick={() => setActiveTab('manual')}
-          >
-            Manual Connection
-          </button>
-        </div>
-      </div>
-
-      <div className={`transition-opacity duration-300 ${transitioning ? 'opacity-0' : 'opacity-100'}`}>
-        {activeTab === 'office' ? (
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="office">Office Session</TabsTrigger>
+          <TabsTrigger value="manual">Manual Connection</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="office" className="mt-6">
           <OfficeSession />
-        ) : !connect ? (
-          <div className="bg-gray-800 rounded-lg p-6 shadow-lg">
-            <h1 className="text-3xl font-bold mb-4 text-center text-white">React Guacamole client example</h1>
-            <p className="mb-6 text-center text-gray-300">Enter connection information to connect</p>
+        </TabsContent>
+        
+        <TabsContent value="manual" className="mt-6">
+          {!connect ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>React Guacamole client example</CardTitle>
+                <CardDescription>Enter connection information to connect</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="scheme">Scheme/Protocol</Label>
+                  <Input 
+                    type="text" 
+                    id="scheme" 
+                    value={formData.scheme} 
+                    onChange={handleInputChange} 
+                  />
+                </div>
 
-            <div className="mb-4">
-              <label htmlFor="scheme" className="block text-gray-300 mb-1">Scheme/Protocol</label>
-              <input 
-                type="text" 
-                id="scheme" 
-                value={formData.scheme} 
-                onChange={handleInputChange} 
-                className="w-full px-3 py-2 bg-gray-700 rounded border border-gray-600 text-white"
-              />
-            </div>
+                <div className="space-y-2">
+                  <Label htmlFor="hostname">Hostname or IP Address</Label>
+                  <Input 
+                    type="text" 
+                    id="hostname" 
+                    value={formData.hostname} 
+                    onChange={handleInputChange} 
+                  />
+                </div>
 
-            <div className="mb-4">
-              <label htmlFor="hostname" className="block text-gray-300 mb-1">Hostname or IP Address</label>
-              <input 
-                type="text" 
-                id="hostname" 
-                value={formData.hostname} 
-                onChange={handleInputChange} 
-                className="w-full px-3 py-2 bg-gray-700 rounded border border-gray-600 text-white"
-              />
-            </div>
+                <div className="space-y-2">
+                  <Label htmlFor="port">Port (if not default)</Label>
+                  <Input 
+                    type="text" 
+                    id="port" 
+                    value={formData.port} 
+                    onChange={handleInputChange} 
+                  />
+                </div>
 
-            <div className="mb-4">
-              <label htmlFor="port" className="block text-gray-300 mb-1">Port (if not default)</label>
-              <input 
-                type="text" 
-                id="port" 
-                value={formData.port} 
-                onChange={handleInputChange} 
-                className="w-full px-3 py-2 bg-gray-700 rounded border border-gray-600 text-white"
-              />
-            </div>
+                <div className="space-y-2">
+                  <Label htmlFor="user">User name</Label>
+                  <Input 
+                    type="text" 
+                    id="user" 
+                    value={formData.user} 
+                    onChange={handleInputChange} 
+                  />
+                </div>
 
-            <div className="mb-4">
-              <label htmlFor="user" className="block text-gray-300 mb-1">User name</label>
-              <input 
-                type="text" 
-                id="user" 
-                value={formData.user} 
-                onChange={handleInputChange} 
-                className="w-full px-3 py-2 bg-gray-700 rounded border border-gray-600 text-white"
-              />
-            </div>
+                <div className="space-y-2">
+                  <Label htmlFor="pass">Password</Label>
+                  <Input 
+                    type="password" 
+                    id="pass" 
+                    value={formData.pass} 
+                    onChange={handleInputChange} 
+                  />
+                </div>
 
-            <div className="mb-4">
-              <label htmlFor="pass" className="block text-gray-300 mb-1">Password</label>
-              <input 
-                type="password" 
-                id="pass" 
-                value={formData.pass} 
-                onChange={handleInputChange} 
-                className="w-full px-3 py-2 bg-gray-700 rounded border border-gray-600 text-white"
-              />
-            </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    id="ignoreCert" 
+                    checked={formData.ignoreCert} 
+                    onCheckedChange={(checked) => setFormData({...formData, ignoreCert: checked})}
+                  />
+                  <Label htmlFor="ignoreCert">Ignore Certificate</Label>
+                </div>
 
-            <div className="mb-4 flex items-center">
-              <label htmlFor="ignoreCert" className="text-gray-300 mr-2">Ignore Certificate</label>
-              <input 
-                type="checkbox" 
-                id="ignoreCert" 
-                checked={formData.ignoreCert} 
-                onChange={handleInputChange} 
-                className="h-4 w-4 accent-blue-500"
-              />
-            </div>
+                <div className="space-y-2">
+                  <Label htmlFor="security">Security</Label>
+                  <Input 
+                    type="text" 
+                    id="security" 
+                    value={formData.security} 
+                    onChange={handleInputChange} 
+                    placeholder="type nla here for Network Level Authentication" 
+                  />
+                </div>
 
-            <div className="mb-4">
-              <label htmlFor="security" className="block text-gray-300 mb-1">Security</label>
-              <input 
-                type="text" 
-                id="security" 
-                value={formData.security} 
-                onChange={handleInputChange} 
-                placeholder="type nla here for Network Level Authentication" 
-                className="w-full px-3 py-2 bg-gray-700 rounded border border-gray-600 text-white"
-              />
-            </div>
+                <div className="space-y-2">
+                  <Label>Query string</Label>
+                  <div className="p-2 bg-muted rounded text-sm font-mono overflow-x-auto whitespace-pre">
+                    {getScrubbedQuery()}
+                  </div>
+                </div>
 
-            <div className="mb-4">
-              <label className="block text-gray-300 mb-1">Query string</label>
-              <span className="block p-2 bg-gray-700 rounded text-gray-300 overflow-x-auto whitespace-pre font-mono text-sm">
-                {getScrubbedQuery()}
-              </span>
-            </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    id="forceHttp" 
+                    checked={formData.forceHttp} 
+                    onCheckedChange={(checked) => setFormData({...formData, forceHttp: checked})}
+                  />
+                  <Label htmlFor="forceHttp">Force HTTP Tunnel</Label>
+                </div>
 
-            <div className="mb-4 flex items-center">
-              <label htmlFor="forceHttp" className="text-gray-300 mr-2">Force HTTP Tunnel</label>
-              <input 
-                type="checkbox" 
-                id="forceHttp" 
-                checked={formData.forceHttp} 
-                onChange={handleInputChange} 
-                className="h-4 w-4 accent-blue-500"
-              />
-            </div>
-
-            <div className="text-center mt-6">
-              <button 
-                className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded transition-colors" 
-                onClick={handleConnect}
-              >
-                Connect
-              </button>
-            </div>
-          </div>
-        ) : (
-          <GuacClient 
-            query={buildQueryString()} 
-            forceHttp={formData.forceHttp} 
-            onDisconnected={handleDisconnected}
-          />
-        )}
-      </div>
+                <div className="flex justify-center pt-4">
+                  <Button onClick={handleConnect}>
+                    Connect
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <GuacClient 
+              query={buildQueryString()} 
+              forceHttp={formData.forceHttp} 
+              onDisconnected={handleDisconnected}
+            />
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

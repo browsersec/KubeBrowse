@@ -1,5 +1,7 @@
 import { useState, useImperativeHandle, forwardRef } from 'react';
 import states from '../lib/states';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 
 const Modal = forwardRef(({ onRetry }, ref) => {
   const [status, setStatus] = useState(null);
@@ -33,23 +35,22 @@ const Modal = forwardRef(({ onRetry }, ref) => {
     }
   }));
 
-  if (!status) {
-    return null;
-  }
-
   return (
-    <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 rounded-md p-4 bg-gray-400 z-40">
-      <h2 className="text-xl font-semibold text-gray-800 mb-2">{titles[status]}</h2>
-      <p className="text-gray-700 mb-3">{message || texts[status]}</p>
-      {canReconnect && (
-        <span 
-          className="underline cursor-pointer text-blue-600 hover:text-blue-800" 
-          onClick={onRetry}
-        >
-          Reconnect
-        </span>
-      )}
-    </div>
+    <Dialog open={!!status} onOpenChange={() => setStatus(null)}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{titles[status]}</DialogTitle>
+          <DialogDescription>
+            {message || texts[status]}
+          </DialogDescription>
+        </DialogHeader>
+        {canReconnect && (
+          <Button onClick={onRetry} variant="outline">
+            Reconnect
+          </Button>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 });
 
