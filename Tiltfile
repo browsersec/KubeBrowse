@@ -14,13 +14,14 @@ docker_build(
         sync('./go.mod', '/app/go.mod'),
         sync('./go.sum', '/app/go.sum'),
         run(
-            'cd /app && go build -v -o /app/main ./api/main.go',
+            'cd /app && CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o guac cmd/guac/main.go',
             trigger=['./api', './cmd', './internal', 'go.mod', 'go.sum']
         ),
         # Clean up after build to save space
         run('docker system prune -f --filter "until=1h"', trigger=['./api', './cmd', './internal'])
     ]
 )
+
 
 # Frontend (React/Vite)
 # docker_build(
