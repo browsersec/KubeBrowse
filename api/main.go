@@ -4,12 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/browsersec/KubeBrowse/internal/guac"
-	k8s2 "github.com/browsersec/KubeBrowse/internal/k8s"
 	"net"
 	"net/http"
 	"net/url"
 	"time"
+
+	"github.com/browsersec/KubeBrowse/internal/guac"
+	k8s2 "github.com/browsersec/KubeBrowse/internal/k8s"
 
 	redis2 "github.com/browsersec/KubeBrowse/internal/redis"
 	"github.com/gin-gonic/gin"
@@ -38,7 +39,7 @@ type DeploySessionRequest struct {
 // @Failure 503 {object} gin.H{"error":string}
 // @Failure 500 {object} gin.H{"error":string}
 // @Router /test/deploy-office [post]
-func DeployOffice(c *gin.Context, k8sClient *kubernetes.Clientset, k8sNamespace string, redisClient *redis.Client, activeTunnels *guac.ActiveTunnelStore) {
+func DeployOffice(c *gin.Context, k8sClient *kubernetes.Clientset, k8sNamespace string, redisClient *redis.Client, tunnelStore *guac.ActiveTunnelStore) {
 
 	if k8sClient == nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{
@@ -74,10 +75,11 @@ func DeployOffice(c *gin.Context, k8sClient *kubernetes.Clientset, k8sNamespace 
 	connectionID := uuid.New().String()
 
 	// Wait for pod readiness and RDP port
-	err = k8s2.WaitForPodReadyAndRDP(k8sClient, k8sNamespace, pod.Name, fqdn, 60*time.Second)
+	err = k8s2.WaitForPodReadyAndRDP(k8sClient, k8sNamespace, pod.Name, fqdn, 120*time.Second)
 	if err != nil {
 		logrus.Errorf("Pod not ready: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Pod not ready for RDP connection"})
+
 		return
 	}
 	podIP := pod.Status.PodIP
@@ -105,8 +107,8 @@ func DeployOffice(c *gin.Context, k8sClient *kubernetes.Clientset, k8sNamespace 
 	params.Set("ignore-cert", "true")
 	params.Set("uuid", connectionID)
 
-	// Store the parameters in the activeTunnels store
-	activeTunnels.StoreConnectionParams(connectionID, params)
+	// Store the parameters in the tunnelStore store
+	tunnelStore.StoreConnectionParams(connectionID, params)
 
 	// Store session in Redis using the struct from internal/redis
 	session := redis2.SessionData{
@@ -153,7 +155,7 @@ func DeployOffice(c *gin.Context, k8sClient *kubernetes.Clientset, k8sNamespace 
 // @Failure 503 {object} gin.H{"error":string}
 // @Failure 500 {object} gin.H{"error":string}
 // @Router /test/deploy-browser [post]
-func DeployBrowser(c *gin.Context, k8sClient *kubernetes.Clientset, k8sNamespace string, redisClient *redis.Client, activeTunnels *guac.ActiveTunnelStore) {
+func DeployBrowser(c *gin.Context, k8sClient *kubernetes.Clientset, k8sNamespace string, redisClient *redis.Client, tunnelStore *guac.ActiveTunnelStore) {
 
 	if k8sClient == nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{
@@ -189,7 +191,7 @@ func DeployBrowser(c *gin.Context, k8sClient *kubernetes.Clientset, k8sNamespace
 	connectionID := uuid.New().String()
 
 	// Wait for pod readiness and RDP port
-	err = k8s2.WaitForPodReadyAndRDP(k8sClient, k8sNamespace, pod.Name, fqdn, 60*time.Second)
+	err = k8s2.WaitForPodReadyAndRDP(k8sClient, k8sNamespace, pod.Name, fqdn, 120*time.Second)
 	if err != nil {
 		logrus.Errorf("Pod not ready: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Pod not ready for RDP connection"})
@@ -220,8 +222,8 @@ func DeployBrowser(c *gin.Context, k8sClient *kubernetes.Clientset, k8sNamespace
 	params.Set("ignore-cert", "true")
 	params.Set("uuid", connectionID)
 
-	// Store the parameters in the activeTunnels store
-	activeTunnels.StoreConnectionParams(connectionID, params)
+	// Store the parameters in the tunnelStore store
+	tunnelStore.StoreConnectionParams(connectionID, params)
 
 	// Store session in Redis using the struct from internal/redis
 	session := redis2.SessionData{
@@ -256,7 +258,7 @@ func DeployBrowser(c *gin.Context, k8sClient *kubernetes.Clientset, k8sNamespace
 	})
 }
 
-func HandlerConnectionID(c *gin.Context, activeTunnels *guac.ActiveTunnelStore, redisClient *redis.Client) {
+func HandlerConnectionID(c *gin.Context, tunnelStore *guac.ActiveTunnelStore, redisClient *redis.Client) {
 
 	connectionID := c.Param("connectionID")
 
@@ -273,7 +275,7 @@ func HandlerConnectionID(c *gin.Context, activeTunnels *guac.ActiveTunnelStore, 
 	}
 
 	// Get stored parameters
-	_, exists := activeTunnels.GetConnectionParams(connectionID)
+	_, exists := tunnelStore.GetConnectionParams(connectionID)
 	if !exists {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Connection parameters not found"})
 		return
@@ -289,53 +291,104 @@ func HandlerConnectionID(c *gin.Context, activeTunnels *guac.ActiveTunnelStore, 
 	})
 }
 
-func HandlerShareSession(c *gin.Context, activeTunnels *guac.ActiveTunnelStore, redisClient *redis.Client) {
+func HandlerShareSession(c *gin.Context, tunnelStore *guac.ActiveTunnelStore, redisClient *redis.Client) {
 	connectionID := c.Param("connectionID")
 	if connectionID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Connection ID is required"})
 		return
 	}
 
-	// Check if the connectionID is valid in redis
-	_, err := redisClient.Get(context.Background(), "session:"+connectionID).Result()
+	ctx := context.Background()
+	sessionKey := fmt.Sprintf("session:%s", connectionID)
+
+	// Get current session data and TTL
+	sessionJSON, err := redisClient.Get(ctx, sessionKey).Result()
 	if err != nil {
+		logrus.Errorf("Failed to get session data for %s: %v", connectionID, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get session data"})
 		return
-	} else {
-		// Update the redis session store
-		session, err := redisClient.Get(context.Background(), "session:"+connectionID).Result()
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get session data"})
-			return
-		}
-		var sessionData redis2.SessionData
-		err = json.Unmarshal([]byte(session), &sessionData)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unmarshal session data"})
-			return
-		}
-		sessionData.Share = true
-		data, _ := json.Marshal(sessionData)
-		redisClient.Set(context.Background(), "session:"+connectionID, data, 0)
 	}
 
-	_, exists := activeTunnels.GetConnectionParams(connectionID)
+	// Get current TTL before modifying the session
+	currentTTL, err := redisClient.TTL(ctx, sessionKey).Result()
+	if err != nil {
+		logrus.Errorf("Failed to get TTL for session %s: %v", connectionID, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get session TTL"})
+		return
+	}
+
+	// If TTL is -1 (no expiration) or -2 (key doesn't exist), handle appropriately
+	if currentTTL == -2*time.Second {
+		logrus.Errorf("Session %s does not exist", connectionID)
+		c.JSON(http.StatusNotFound, gin.H{"error": "Session not found"})
+		return
+	}
+	if currentTTL == -1*time.Second {
+		// Session has no expiration, set a default timeout
+		currentTTL = 10 * time.Minute
+		logrus.Warnf("Session %s has no TTL, setting default 10 minutes", connectionID)
+	}
+
+	// Parse session data
+	var sessionData redis2.SessionData
+	err = json.Unmarshal([]byte(sessionJSON), &sessionData)
+	if err != nil {
+		logrus.Errorf("Failed to unmarshal session data for %s: %v", connectionID, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unmarshal session data"})
+		return
+	}
+
+	if sessionData.Share {
+		logrus.Warnf("Session %s is already shared, skipping update", connectionID)
+		c.JSON(http.StatusOK, gin.H{
+			"message":       "Session is already shared",
+			"status":        "ready",
+			"websocket_url": fmt.Sprintf("/websocket-tunnel/share?uuid=%s", connectionID),
+		})
+		return
+	}
+
+	// Update the share flag
+	sessionData.Share = true
+	logrus.Infof("Enabling sharing for session %s (TTL: %v)", connectionID, currentTTL.Round(time.Second))
+
+	// Marshal updated session data
+	updatedData, err := json.Marshal(sessionData)
+	if err != nil {
+		logrus.Errorf("Failed to marshal updated session data for %s: %v", connectionID, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to marshal session data"})
+		return
+	}
+
+	// Update Redis with preserved TTL
+	err = redisClient.Set(ctx, sessionKey, updatedData, currentTTL).Err()
+	if err != nil {
+		logrus.Errorf("Failed to update session data for %s: %v", connectionID, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update session data"})
+		return
+	}
+
+	logrus.Infof("Successfully enabled sharing for session %s with preserved TTL %v", connectionID, currentTTL.Round(time.Second))
+
+	// Check if connection parameters exist
+	_, exists := tunnelStore.GetConnectionParams(connectionID)
 	if !exists {
+		logrus.Errorf("Connection parameters not found for %s", connectionID)
 		c.JSON(http.StatusNotFound, gin.H{"error": "Connection parameters not found"})
 		return
 	}
 
 	// Construct the websocket URL with only the connection ID
-	wsURL := fmt.Sprintf("/websocket-tunnel?uuid=%s", connectionID)
+	wsURL := fmt.Sprintf("/websocket-tunnel/share?uuid=%s", connectionID)
 
 	c.JSON(http.StatusOK, gin.H{
 		"websocket_url": wsURL,
 		"status":        "ready",
-		"message":       "Connection parameters retrieved successfully",
+		"message":       "Session sharing enabled successfully",
 	})
 }
 
-func HandlerBrowserPod(c *gin.Context, activeTunnels *guac.ActiveTunnelStore, k8sClient *kubernetes.Clientset, k8sNamespace string) {
+func HandlerBrowserPod(c *gin.Context, tunnelStore *guac.ActiveTunnelStore, k8sClient *kubernetes.Clientset, k8sNamespace string) {
 	if k8sClient == nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{
 			"error": "Kubernetes client not initialized",
@@ -369,7 +422,7 @@ func HandlerBrowserPod(c *gin.Context, activeTunnels *guac.ActiveTunnelStore, k8
 	})
 }
 
-func HandlerOfficePod(c *gin.Context, activeTunnels *guac.ActiveTunnelStore, k8sClient *kubernetes.Clientset, k8sNamespace string) {
+func HandlerOfficePod(c *gin.Context, tunnelStore *guac.ActiveTunnelStore, k8sClient *kubernetes.Clientset, k8sNamespace string) {
 	if k8sClient == nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{
 			"error": "Kubernetes client not initialized",

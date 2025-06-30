@@ -63,6 +63,7 @@ func (s *WebsocketServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		logrus.Error("Failed to upgrade websocket", err)
 		return
 	}
+	// TODO: Here is the place to check the error if the connection is closed
 	defer func() {
 		if err = ws.Close(); err != nil {
 			// Don't log excessive detail for common connection close errors

@@ -1,0 +1,59 @@
+# Istio Gateway for ingress
+apiVersion: networking.istio.io/v1alpha3
+kind: Gateway
+metadata:
+  name: browser-sandbox-gateway
+  namespace: browser-sandbox
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+    - port:
+        number: 80
+        name: http
+        protocol: HTTP
+      hosts:
+        - "kubebrowse1.ghcat.tech"
+    - port:
+        number: 443
+        name: https
+        protocol: HTTPS
+      hosts:
+        - "kubebrowse1.ghcat.tech"
+      tls:
+        mode: SIMPLE
+        credentialName: browser-sandbox-cert
+---
+# Istio VirtualService for routing
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: browser-sandbox
+  namespace: browser-sandbox
+spec:
+  hosts:
+    - "kubebrowse1.ghcat.tech"
+  gateways:
+    - browser-sandbox-gateway
+  http:
+    - match:
+        - uri:
+            prefix: "/api"
+      route:
+        - destination:
+            host: browser-sandbox-api
+            port:
+              number: 4567
+    - match:
+        - uri:
+            prefix: "/websocket"
+      route:
+        - destination:
+            host: browser-sandbox-api
+            port:
+              number: 4567
+    - route:  # Default route for frontend
+        - destination:
+            host: browser-sandbox-frontend
+            port:
+              number: 80

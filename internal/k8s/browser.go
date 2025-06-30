@@ -23,8 +23,16 @@ func CreateBrowserSandboxPod(clientset *kubernetes.Clientset, namespace, userID 
 		ObjectMeta: metav1.ObjectMeta{
 			Name: podName,
 			Labels: map[string]string{
-				"app":  "browser-sandbox-test",
-				"user": userID,
+				"app":        "browser-sandbox-test",
+				"session-id": podName,
+				"created-at": time.Now().Format("20060102-150405"),
+				"user":       userID,
+				"managed-by": "kubebrowse-cleanup", // Add cleanup label
+			},
+			Annotations: map[string]string{
+				"last-heartbeat":    time.Now().Format("20060102-150405"),
+				"connection-status": "active",
+				"cleanup-enabled":   "true", // Mark for cleanup monitoring
 			},
 		},
 
@@ -59,7 +67,7 @@ func CreateBrowserSandboxPod(clientset *kubernetes.Clientset, namespace, userID 
 			Containers: []corev1.Container{
 				{
 					Name:  "rdp-chromium",
-					Image: "ghcr.io/browsersec/rdp-chromium:sha-64ed77a",
+					Image: "ghcr.io/browsersec/rdp-chromium:sha-b551f92",
 					Ports: []corev1.ContainerPort{
 						{
 							Name:          "rdp",

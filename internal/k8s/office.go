@@ -23,8 +23,14 @@ func CreateOfficeSandboxPod(clientset *kubernetes.Clientset, namespace, userID s
 		ObjectMeta: metav1.ObjectMeta{
 			Name: podName,
 			Labels: map[string]string{
-				"app":  "browser-sandbox-test",
-				"user": userID,
+				"app":        "browser-sandbox-test",
+				"session-id": podName,
+				"created-at": time.Now().Format("20060102-150405"),
+				"user":       userID,
+			},
+			Annotations: map[string]string{
+				"last-heartbeat":    time.Now().Format("20060102-150405"),
+				"connection-status": "active",
 			},
 		},
 

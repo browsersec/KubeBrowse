@@ -230,13 +230,32 @@ function WebSocketControl({
       if (response.ok) {
         const data = await response.json();
         const url = data.websocket_url;
-        await navigator.clipboard.writeText(url);
+        // Copy the full URL including the base URL for sharing
+        const fullUrl = `${window.location.origin}${url}`;
+        await navigator.clipboard.writeText(fullUrl);
         setCopiedToClipboard(true);
+        
+        // Show success toast
+        toast.success("Sharing URL copied to clipboard!", {
+          duration: 3000,
+          position: "top-right",
+          icon: "🔗",
+        });
+        
         setTimeout(() => setCopiedToClipboard(false), 2000);
       } else {
-        console.error("Failed to share session");
+        const errorData = await response.json();
+        toast.error(`Failed to share session: ${errorData.error || 'Unknown error'}`, {
+          duration: 3000,
+          position: "top-right",
+        });
+        console.error("Failed to share session:", errorData);
       }
     } catch (error) {
+      toast.error("Error sharing session", {
+        duration: 3000,
+        position: "top-right",
+      });
       console.error("Error sharing session:", error);
     }
   };

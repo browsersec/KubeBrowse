@@ -70,10 +70,10 @@ k8s_resource(
     port_forwards=['4567:4567']
 )
 
-k8s_resource(
-    'browser-sandbox-frontend',
-    port_forwards=['3000:80']
-)
+# k8s_resource(
+#     'browser-sandbox-frontend',
+#     port_forwards=['3000:80']
+# )
 
 
 

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/go-redis/redis/v8"
@@ -12,12 +13,31 @@ import (
 )
 
 type SessionData struct {
-	PodName          string            `json:"podName"`
-	PodIP            string            `json:"podIP"`
-	FQDN             string            `json:"fqdn"`
-	ConnectionID     string            `json:"connection_id"`
-	ConnectionParams map[string]string `json:"connection_params"`
-	Share            bool              `json:"share"`
+	PodName            string            `json:"podName"`
+	PodIP              string            `json:"podIP"`
+	FQDN               string            `json:"fqdn"`
+	ConnectionID       string            `json:"connection_id"`        // Session/Pod ID
+	TunnelConnectionID string            `json:"tunnel_connection_id"` // Guacamole tunnel connection ID
+	ConnectionParams   map[string]string `json:"connection_params"`
+	Share              bool              `json:"share"`
+	DisconnectionCount int               `json:"disconnection_count"`
+	CreatedAt          time.Time         `json:"created_at"`
+	LastExtendedAt     time.Time         `json:"last_extended_at"`
+	TimeoutDuration    time.Duration     `json:"timeout_duration"`
+	ExpireAt           time.Time         `json:"expire_at"` // New field to store absolute expiration
+}
+
+var SESSION_TTL int
+
+func init() {
+	timeoutStr := os.Getenv("POD_SESSION_TTL")
+	timeout, err := strconv.Atoi(timeoutStr)
+	if err != nil || timeout <= 0 {
+		SESSION_TTL = 2 // default to 2 minutes if not set or invalid
+		logrus.Warnf("Invalid POD_SESSION_TTL value, defaulting to %d minutes", SESSION_TTL)
+	} else {
+		SESSION_TTL = timeout
+	}
 }
 
 // InitRedis initializes and returns a new Redis client
@@ -87,6 +107,11 @@ func GetSessionData(client *redis.Client, podName string) (*SessionData, error) 
 	return &sessionData, nil
 }
 
+// GetRemainingTTL calculates how much time is left based on ExpireAt
+func GetRemainingTTL(session *SessionData) time.Duration {
+	return time.Until(session.ExpireAt)
+}
+
 // SetSessionData stores session data for a given pod with TTL
 func SetSessionData(client *redis.Client, podName string, sessionData *SessionData, ttl time.Duration) error {
 	ctx := context.Background()
@@ -103,6 +128,43 @@ func SetSessionData(client *redis.Client, podName string, sessionData *SessionDa
 	}
 
 	return nil
+}
+
+// SetSessionDataWithContext stores session data with context for better timeout control
+func SetSessionDataWithContext(ctx context.Context, client *redis.Client, podName string, sessionData *SessionData, ttl time.Duration) error {
+	sessionJSON, err := json.Marshal(sessionData)
+	if err != nil {
+		return fmt.Errorf("error marshaling session data: %v", err)
+	}
+
+	sessionKey := fmt.Sprintf("session:%s", podName)
+	err = client.Set(ctx, sessionKey, sessionJSON, ttl).Err()
+	if err != nil {
+		return fmt.Errorf("error setting session data: %v", err)
+	}
+
+	return nil
+}
+
+// GetSessionExpireTime returns the absolute expiration time for a session
+func GetSessionExpireTime(client *redis.Client, sessionID string) (time.Time, error) {
+	ttl, err := GetSessionTimeLeft(client, sessionID)
+	if err != nil {
+		return time.Time{}, err
+	}
+
+	return time.Now().Add(ttl), nil
+}
+
+// SetSessionWithExpireTime sets session data with an absolute expire time
+func SetSessionWithExpireTime(client *redis.Client, podName string, sessionData *SessionData, expireTime time.Time) error {
+	// Calculate TTL from absolute expiration time
+	ttl := time.Until(expireTime)
+	if ttl <= 0 {
+		return fmt.Errorf("expiration time must be in the future")
+	}
+
+	return SetSessionData(client, podName, sessionData, ttl)
 }
 
 // DeleteSession removes a session for a given pod
@@ -136,4 +198,197 @@ func GetAllActiveSessions(client *redis.Client) ([]string, error) {
 	logrus.Infof("Found %d active sessions in Redis: %v", len(podNames), podNames)
 
 	return podNames, nil
+}
+
+// CanExtendSession checks if a session can be extended (within last 2 minutes of timeout)
+func CanExtendSession(client *redis.Client, sessionID string) (bool, time.Duration, error) {
+	ctx := context.Background()
+
+	// Get current TTL from Redis (most accurate)
+	sessionKey := fmt.Sprintf("session:%s", sessionID)
+	ttl, err := client.TTL(ctx, sessionKey).Result()
+	if err != nil {
+		return false, 0, fmt.Errorf("error getting session TTL: %v", err)
+	}
+
+	if ttl == -2 {
+		return false, 0, fmt.Errorf("session does not exist")
+	}
+	if ttl == -1 {
+		return false, 0, fmt.Errorf("session has no expiration")
+	}
+	// TODO: Handle case where TTL is 9 (session has expired) for testing purposes
+	// Allow extension only within last 9 minutes
+	if ttl <= time.Duration(SESSION_TTL)*time.Minute && ttl > 0 {
+		return true, ttl, nil
+	}
+
+	return false, ttl, nil
+}
+
+// ExtendSession extends the session timeout by the specified duration
+func ExtendSession(client *redis.Client, sessionID string, extensionDuration time.Duration) error {
+	// ctx := context.Background()
+
+	// Check if extension is allowed
+	canExtend, timeLeft, err := CanExtendSession(client, sessionID)
+	if err != nil {
+		return fmt.Errorf("error checking if session can be extended: %v", err)
+	}
+
+	if !canExtend {
+		if timeLeft <= 0 {
+			return fmt.Errorf("session has already expired")
+		}
+		return fmt.Errorf("session can only be extended within the last 2 minutes (time left: %v)", timeLeft)
+	}
+
+	// Get current session data
+	sessionData, err := GetSessionData(client, sessionID)
+	if err != nil {
+		return fmt.Errorf("error retrieving session data: %v", err)
+	}
+
+	// Update last extended timestamp
+	sessionData.LastExtendedAt = time.Now()
+
+	// Calculate new TTL for Redis key (add extension to current time left)
+	newTTL := timeLeft + extensionDuration
+
+	// Update session in Redis with new TTL
+	err = SetSessionData(client, sessionID, sessionData, newTTL)
+	if err != nil {
+		return fmt.Errorf("error updating session with extended timeout: %v", err)
+	}
+
+	logrus.Infof("Extended session %s by %v, new total time: %v", sessionID, extensionDuration, newTTL)
+	return nil
+}
+
+// GetSessionTimeLeft returns the remaining time for a session
+func GetSessionTimeLeft(client *redis.Client, sessionID string) (time.Duration, error) {
+	ctx := context.Background()
+
+	sessionKey := fmt.Sprintf("session:%s", sessionID)
+	ttl, err := client.TTL(ctx, sessionKey).Result()
+	if err != nil {
+		return 0, fmt.Errorf("error getting session TTL: %v", err)
+	}
+
+	if ttl == -1 {
+		return 0, fmt.Errorf("session has no expiration")
+	}
+	if ttl == -2 {
+		return 0, fmt.Errorf("session does not exist")
+	}
+
+	return ttl, nil
+}
+
+// GetSessionDataWithContext retrieves session data with context
+func GetSessionDataWithContext(ctx context.Context, client *redis.Client, podName string) (*SessionData, error) {
+	sessionKey := fmt.Sprintf("session:%s", podName)
+	sessionJSON, err := client.Get(ctx, sessionKey).Result()
+	if err == redis.Nil {
+		return nil, fmt.Errorf("session not found for pod: %s", podName)
+	} else if err != nil {
+		return nil, fmt.Errorf("error retrieving session: %v", err)
+	}
+
+	var sessionData SessionData
+	err = json.Unmarshal([]byte(sessionJSON), &sessionData)
+	if err != nil {
+		return nil, fmt.Errorf("error unmarshaling session data: %v", err)
+	}
+
+	return &sessionData, nil
+}
+
+// GetCurrentSessionTTL gets the actual TTL from Redis for a session
+func GetCurrentSessionTTL(ctx context.Context, client *redis.Client, sessionID string) (time.Duration, error) {
+	sessionKey := fmt.Sprintf("session:%s", sessionID)
+	ttl, err := client.TTL(ctx, sessionKey).Result()
+	if err != nil {
+		return 0, fmt.Errorf("error getting session TTL from Redis: %v", err)
+	}
+
+	if ttl == -2 {
+		return 0, fmt.Errorf("session does not exist")
+	}
+	if ttl == -1 {
+		return 0, fmt.Errorf("session has no expiration")
+	}
+
+	return ttl, nil
+}
+
+// PreserveSessionTimeout preserves the current session timeout during reconnection
+func PreserveSessionTimeout(ctx context.Context, client *redis.Client, sessionID string, sessionData *SessionData) error {
+	// Get current TTL from Redis
+	currentTTL, err := GetCurrentSessionTTL(ctx, client, sessionID)
+	if err != nil {
+		// Fallback to ExpireAt calculation if Redis TTL fails
+		if !sessionData.ExpireAt.IsZero() {
+			currentTTL = time.Until(sessionData.ExpireAt)
+			logrus.Warnf("Redis TTL failed for session %s, using ExpireAt calculation: %v", sessionID, currentTTL)
+		} else {
+			// Last resort - use TimeoutDuration
+			currentTTL = sessionData.TimeoutDuration
+			logrus.Warnf("No TTL or ExpireAt for session %s, using TimeoutDuration: %v", sessionID, currentTTL)
+		}
+	}
+
+	// Ensure we have a reasonable minimum time
+	if currentTTL <= 0 {
+		currentTTL = 1 * time.Minute
+		logrus.Warnf("Session %s had non-positive TTL, setting to 1 minute grace period", sessionID)
+	}
+
+	// Update session with preserved TTL
+	return SetSessionDataWithContext(ctx, client, sessionID, sessionData, currentTTL)
+}
+
+func GetTunnelConnectionID(client *redis.Client, sessionID string) (string, bool) {
+	ctx := context.Background()
+
+	sessionData, err := GetSessionDataWithContext(ctx, client, sessionID)
+	if err != nil {
+		return "", false
+	}
+
+	if sessionData.TunnelConnectionID == "" {
+		return "", false
+	}
+
+	return sessionData.TunnelConnectionID, true
+}
+
+// UpdateSessionWithTunnelInfo updates session data with tunnel information and sharing settings
+func UpdateSessionWithTunnelInfo(client *redis.Client, sessionID string, tunnelConnectionID string, share bool) error {
+	ctx := context.Background()
+
+	// Get current session data
+	sessionData, err := GetSessionDataWithContext(ctx, client, sessionID)
+	if err != nil {
+		return fmt.Errorf("failed to get session data: %v", err)
+	}
+
+	// Update the TunnelConnectionID (separate from ConnectionID) and share flag
+	sessionData.TunnelConnectionID = tunnelConnectionID
+	sessionData.Share = share
+	logrus.Infof("Updating session %s with tunnel ConnectionID: %s, sharing enabled: %v",
+		sessionID, tunnelConnectionID, share)
+
+	// Preserve the current TTL
+	ttl, err := GetCurrentSessionTTL(ctx, client, sessionID)
+	if err != nil {
+		logrus.Warnf("Failed to get TTL for session %s: %v, using timeout duration", sessionID, err)
+		ttl = sessionData.TimeoutDuration
+		if ttl <= 0 {
+			ttl = time.Duration(SESSION_TTL) * time.Minute
+		}
+	}
+
+	// Save the updated session data with the same TTL
+	return SetSessionDataWithContext(ctx, client, sessionID, sessionData, ttl)
 }

@@ -35,3 +35,17 @@ func NewGuacamoleConfiguration() *Config {
 		ImageMimetypes:      make([]string, 0, 1),
 	}
 }
+
+func ExistingGuacamoleConfiguration() *Config {
+	return &Config{
+		ConnectionID:        "",
+		Protocol:            "rdp",
+		Parameters:          map[string]string{},
+		OptimalScreenWidth:  1024,
+		OptimalScreenHeight: 768,
+		OptimalResolution:   96,
+		AudioMimetypes:      []string{"audio/L16", "rate=44100", "channels=2"},
+		VideoMimetypes:      make([]string, 0, 1),
+		ImageMimetypes:      make([]string, 0, 1),
+	}
+}
