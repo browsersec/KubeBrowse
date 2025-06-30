@@ -14,7 +14,7 @@ docker_build(
         sync('./go.mod', '/app/go.mod'),
         sync('./go.sum', '/app/go.sum'),
         run(
-            'cd /app && go build -v -o /app/main ./api/main.go',
+            'cd /app && CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o guac cmd/guac/main.go',
             trigger=['./api', './cmd', './internal', 'go.mod', 'go.sum']
         ),
         # Clean up after build to save space
@@ -22,31 +22,32 @@ docker_build(
     ]
 )
 
+
 # Frontend (React/Vite)
-docker_build(
-    'ghcr.io/browsersec/kubebrowse-frontend',
-    './frontend',
-    dockerfile='./frontend/Dockerfile',
-    live_update=[
-        sync('./frontend/src', '/app/src'),
-        sync('./frontend/public', '/app/public'),
-        sync('./frontend/index.html', '/app/index.html'),
-        sync('./frontend/vite.config.js', '/app/vite.config.js'),
-        sync('./frontend/tailwind.config.js', '/app/tailwind.config.js'),
-        sync('./frontend/package.json', '/app/package.json'),
-        sync('./frontend/bun.lockb', '/app/bun.lockb'),
-        run(
-            'cd /app && bun install',
-            trigger=['./frontend/package.json', './frontend/bun.lockb']
-        ),
-        run(
-            'cd /app && bun run build',
-            trigger=['./frontend/src', './frontend/public', './frontend/index.html', './frontend/vite.config.js', './frontend/tailwind.config.js']
-        ),
-        # Clean up after build to save space
-        run('docker system prune -f --filter "until=1h"', trigger=['./frontend/src', './frontend/public'])
-    ]
-)
+# docker_build(
+#     'ghcr.io/browsersec/kubebrowse-frontend',
+#     './frontend',
+#     dockerfile='./frontend/Dockerfile',
+#     live_update=[
+#         sync('./frontend/src', '/app/src'),
+#         sync('./frontend/public', '/app/public'),
+#         sync('./frontend/index.html', '/app/index.html'),
+#         sync('./frontend/vite.config.js', '/app/vite.config.js'),
+#         sync('./frontend/tailwind.config.js', '/app/tailwind.config.js'),
+#         sync('./frontend/package.json', '/app/package.json'),
+#         sync('./frontend/bun.lockb', '/app/bun.lockb'),
+#         run(
+#             'cd /app && bun install',
+#             trigger=['./frontend/package.json', './frontend/bun.lockb']
+#         ),
+#         run(
+#             'cd /app && bun run build',
+#             trigger=['./frontend/src', './frontend/public', './frontend/index.html', './frontend/vite.config.js', './frontend/tailwind.config.js']
+#         ),
+#         # Clean up after build to save space
+#         run('docker system prune -f --filter "until=1h"', trigger=['./frontend/src', './frontend/public'])
+#     ]
+# )
 
 # Clean up dangling images and build cache periodically
 local_resource(
@@ -70,10 +71,10 @@ k8s_resource(
     port_forwards=['4567:4567']
 )
 
-k8s_resource(
-    'browser-sandbox-frontend',
-    port_forwards=['3000:80']
-)
+# k8s_resource(
+#     'browser-sandbox-frontend',
+#     port_forwards=['3000:80']
+# )
 
 
 

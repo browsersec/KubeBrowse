@@ -1,5 +1,12 @@
 import { useState } from 'react';
 import GuacClient from './GuacClient';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Loader2, AlertTriangle } from 'lucide-react';
 
 const API_BASE = '' // Use relative URLs to leverage Vite's proxy
 
@@ -67,124 +74,116 @@ const ShareWSSession = () => {
 
   return (
     <div className="flex flex-col items-center gap-4 p-4">
-      <h2 className="text-xl font-bold mb-2">Join Shared Session</h2>
-      <p className="text-gray-600 mb-4">
-        Enter the connection ID to join an existing session.
-      </p>
+      <div className="text-center mb-6">
+        <h2 className="text-2xl font-bold mb-2">Join Shared Session</h2>
+        <p className="text-muted-foreground">
+          Enter the connection ID to join an existing session.
+        </p>
+      </div>
       
       {sessionState.status === 'idle' && (
-        <form onSubmit={handleSubmit} className="flex flex-col w-full max-w-md gap-3 bg-white p-5 rounded-lg shadow">
-          <div className="flex flex-col">
-            <label htmlFor="uuid" className="text-sm font-medium text-gray-700 mb-1">
-              Connection ID (UUID)
-            </label>
-            <input
-              id="uuid"
-              type="text"
-              value={inputUuid}
-              onChange={handleInputChange}
-              placeholder="123e4567-e89b-12d3-a456-426614174000"
-              className="px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 text-black focus:ring-blue-500"
-              required
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              Enter the UUID of the shared session
-            </p>
-          </div>
-          
-          <div className="flex flex-col">
-            <label htmlFor="sessionName" className="text-sm font-medium text-gray-700 mb-1">
-              Session Name (optional)
-            </label>
-            <input
-              id="sessionName"
-              type="text"
-              value={sessionName}
-              onChange={handleNameChange}
-              placeholder="My Shared Session"
-              className="px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 text-black focus:ring-blue-500"
-            />
-          </div>
-          
-          <button
-            type="submit"
-            className="mt-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
-          >
-            Connect
-          </button>
-        </form>
+        <Card className="w-full max-w-md">
+          <CardContent className="p-6">
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="uuid">Connection ID (UUID)</Label>
+                <Input
+                  id="uuid"
+                  type="text"
+                  value={inputUuid}
+                  onChange={handleInputChange}
+                  placeholder="123e4567-e89b-12d3-a456-426614174000"
+                  required
+                />
+                <p className="text-xs text-muted-foreground">
+                  Enter the UUID of the shared session
+                </p>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="sessionName">Session Name (optional)</Label>
+                <Input
+                  id="sessionName"
+                  type="text"
+                  value={sessionName}
+                  onChange={handleNameChange}
+                  placeholder="My Shared Session"
+                />
+              </div>
+              
+              <Button type="submit" className="w-full">
+                Connect
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
       )}
       
       {sessionState.status === 'creating' && (
-        <div className="text-gray-600 flex items-center">
-          <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-          </svg>
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" />
           Connecting to shared session...
         </div>
       )}
       
       {sessionState.status === 'error' && (
-        <div className="bg-red-50 border-l-4 border-red-500 p-4 w-full max-w-md">
-          <div className="flex">
-            <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-red-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-              </svg>
-            </div>
-            <div className="ml-3">
-              <p className="text-sm text-red-700">
-                {sessionState.error}
-              </p>
-              <button 
+        <Alert variant="destructive" className="w-full max-w-md">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>
+            <div className="space-y-2">
+              <p>{sessionState.error}</p>
+              <Button 
+                variant="outline" 
+                size="sm"
                 onClick={() => setSessionState(prev => ({...prev, status: 'idle'}))}
-                className="mt-2 text-sm text-red-700 underline"
               >
                 Try again
-              </button>
+              </Button>
             </div>
-          </div>
-        </div>
+          </AlertDescription>
+        </Alert>
       )}
       
       {sessionState.status === 'ready' && sessionState.connectionId && (
         <div className="w-full">
-          <div className="flex justify-between items-center mb-4 bg-gray-100 p-3 rounded">
-            <div>
-              <span className="text-green-600 font-medium mr-2">●</span>
-              <span className="font-medium">{sessionState.name || 'Shared Session'}</span>
-              <p className="text-xs text-gray-500">
-                Connected to: {sessionState.connectionId}
+          <div className="flex justify-between items-center mb-4">
+            <div className="flex items-center gap-2">
+              <Badge variant="default">
+                {sessionState.name || 'Shared Session'}
+              </Badge>
+              <p className="text-xs text-muted-foreground">
+                ID: {sessionState.connectionId}
               </p>
             </div>
-            <button
+            <Button
               onClick={handleDisconnect}
-              className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition-colors text-sm"
+              variant="destructive"
+              size="sm"
             >
               Disconnect
-            </button>
+            </Button>
           </div>
-          <div className="w-full h-[600px] border border-gray-300 rounded overflow-hidden">
-            <GuacClient
-              query={{
-                uuid: sessionState.connectionId,
-                width: Math.round(window.innerWidth * (window.devicePixelRatio || 1)),
-                height: Math.round(window.innerHeight * (window.devicePixelRatio || 1))
-              }}
-              connectionId={sessionState.connectionId}
-              onDisconnect={handleDisconnect}
-              OfficeSession={false}
-              sharing={true}
-            />
-          </div>
+          <Card>
+            <CardContent className="p-0">
+              <div className="w-full h-[600px] rounded-lg overflow-hidden">
+                <GuacClient
+                  query={{
+                    uuid: sessionState.connectionId,
+                    width: Math.round(window.innerWidth * (window.devicePixelRatio || 1)),
+                    height: Math.round(window.innerHeight * (window.devicePixelRatio || 1))
+                  }}
+                  connectionId={sessionState.connectionId}
+                  onDisconnect={handleDisconnect}
+                  OfficeSession={false}
+                  sharing={true}
+                />
+              </div>
+            </CardContent>
+          </Card>
         </div>
       )}
     </div>
   );
 };
 
-
-
 export default ShareWSSession;
-

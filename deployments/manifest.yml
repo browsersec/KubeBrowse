@@ -200,6 +200,8 @@ spec:
                 secretKeyRef:
                   name: minio-secret
                   key: secret-key
+            - name: MINIO_BUCKET
+              value: "browser-sandbox"
           volumeMounts:
             - name: minio-data
               mountPath: /data
@@ -425,6 +427,8 @@ kind: Deployment
 metadata:
   name: browser-sandbox-frontend
   namespace: browser-sandbox
+  annotations:
+    "tilt.dev/resource": "ignore"
 spec:
   replicas: 2
   selector:
@@ -462,6 +466,8 @@ kind: Service
 metadata:
   name: browser-sandbox-frontend
   namespace: browser-sandbox
+  annotations:
+    "tilt.dev/resource": "ignore"
 spec:
   type: LoadBalancer
   ports:

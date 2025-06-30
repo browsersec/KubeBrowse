@@ -1,6 +1,11 @@
 import { useState, useEffect, useRef } from "react";
 import { Upload, Clipboard, ClipboardCheck, Download, X, ChevronDown, ChevronUp } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { Card, CardContent } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 /**
  * A collapsible control panel for WebSocket connection management
@@ -281,37 +286,30 @@ function WebSocketControl({
 
   return (
     <>
-      <Toaster />
-      {/* Upload Logs Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60]">
-          <div className="bg-white rounded-lg shadow-lg max-w-3xl w-full max-h-[80vh] overflow-hidden flex flex-col text-gray-800">
-            <div className="flex justify-between items-center p-4 border-b border-gray-200">
-              <h3 className="text-lg font-medium text-gray-900">File Upload History</h3>
-              <button 
-                onClick={() => setIsModalOpen(false)} 
-                className="text-gray-500 hover:text-gray-700"
-              >
-                <X size={20} />
-              </button>
-            </div>
-            <div className="p-4 overflow-y-auto flex-1 text-gray-800">
-              {uploadHistory.length === 0 ? (
-                <div className="text-gray-500 text-center py-8">No upload history available</div>
-              ) : (
-                <div className="space-y-4">
-                  {uploadHistory.map((entry, historyIndex) => (
-                    <div key={historyIndex} className="border border-gray-200 rounded-lg overflow-hidden">
+      <Toaster />      {/* Upload Logs Modal */}
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle>File Upload History</DialogTitle>
+          </DialogHeader>
+          <div className="overflow-y-auto flex-1">
+            {uploadHistory.length === 0 ? (
+              <div className="text-muted-foreground text-center py-8">No upload history available</div>
+            ) : (
+              <div className="space-y-4">
+                {uploadHistory.map((entry, historyIndex) => (
+                  <Card key={historyIndex}>
+                    <CardContent className="p-0">
                       <div 
-                        className="flex justify-between items-center p-3 bg-gray-50 cursor-pointer"
+                        className="flex justify-between items-center p-3 cursor-pointer hover:bg-muted"
                         onClick={() => toggleLogExpansion(historyIndex)}
                       >
                         <div className="flex items-center gap-3">
-                          <span className={`px-2 py-1 rounded text-white text-xs ${entry.success ? 'bg-green-500' : 'bg-red-500'}`}>
+                          <Badge variant={entry.success ? "default" : "destructive"}>
                             {entry.success ? 'Success' : 'Failed'}
-                          </span>
-                          <span className="font-medium text-gray-900">{entry.filename}</span>
-                          <span className="text-sm text-gray-500">
+                          </Badge>
+                          <span className="font-medium">{entry.filename}</span>
+                          <span className="text-sm text-muted-foreground">
                             {new Date(entry.timestamp).toLocaleString()}
                           </span>
                         </div>
@@ -319,23 +317,23 @@ function WebSocketControl({
                       </div>
 
                       {expandedLogs[historyIndex] && (
-                        <div className="p-3 border-t border-gray-200">
-                          <div className="text-sm text-gray-700 mb-2">{entry.message}</div>
+                        <div className="p-3 border-t">
+                          <div className="text-sm mb-2">{entry.message}</div>
                           
                           <div className="space-y-3">
                             {entry.results.map((result, resultIndex) => (
-                              <div key={resultIndex} className="border border-gray-200 rounded p-3">
+                              <div key={resultIndex} className="border rounded p-3">
                                 <div className="flex justify-between items-center mb-2">
-                                  <h4 className="font-semibold capitalize text-gray-900">{result.service}</h4>
-                                  <span className={`px-2 py-0.5 text-xs rounded ${result.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                  <h4 className="font-semibold capitalize">{result.service}</h4>
+                                  <Badge variant={result.success ? "default" : "destructive"}>
                                     {result.success ? 'Success' : 'Failed'}
-                                  </span>
+                                  </Badge>
                                 </div>
                                 
-                                {result.error && <div className="text-red-500 mb-2">Error: {result.error}</div>}
+                                {result.error && <div className="text-destructive mb-2">Error: {result.error}</div>}
                                 
                                 {result.data && (
-                                  <div className="text-sm text-gray-700">
+                                  <div className="text-sm">
                                     {/* File Upload Service */}
                                     {result.service === "file_upload" && result.data.status_code && (
                                       <div>Status Code: {result.data.status_code}</div>
@@ -343,9 +341,9 @@ function WebSocketControl({
                                     
                                     {/* ClamAV Service */}
                                     {result.service === "clamav" && result.data.response && (
-                                      <div className="bg-gray-50 p-2 rounded mt-1 text-gray-800">
+                                      <div className="bg-muted p-2 rounded mt-1">
                                         {result.data.response.infected !== undefined && (
-                                          <div className={`font-medium ${result.data.response.infected ? 'text-red-600' : 'text-green-600'}`}>
+                                          <div className={`font-medium ${result.data.response.infected ? 'text-destructive' : 'text-emerald-600'}`}>
                                             {result.data.response.infected 
                                               ? '⚠️ Malware Detected' 
                                               : '✅ No Malware Detected'}
@@ -365,7 +363,7 @@ function WebSocketControl({
                                     
                                     {/* MinIO Storage Service */}
                                     {result.service === "minio" && (
-                                      <div className="text-gray-700">
+                                      <div>
                                         <div>Bucket: {result.data.bucket}</div>
                                         <div>File: {result.data.object_name}</div>
                                         <div>Size: {formatBytes(result.data.size)}</div>
@@ -379,46 +377,35 @@ function WebSocketControl({
                           </div>
                         </div>
                       )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div className="border-t border-gray-200 p-4">
-              <button 
-                onClick={() => setIsModalOpen(false)} 
-                className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300"
-              >
-                Close
-              </button>
-            </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
           </div>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
 
       <div
-        className={`fixed bottom-5 right-5 z-50 bg-white rounded-lg shadow-lg overflow-hidden transition-all duration-300 ease-in-out min-w-[50px] max-w-[250px] ${
+        className={`fixed bottom-5 right-5 z-50 bg-card border border-border rounded-lg shadow-lg overflow-hidden transition-all duration-300 ease-in-out min-w-[50px] max-w-[250px] ${
           expanded ? "w-[200px] h-auto" : "w-[50px] h-[50px]"
         }`}
-      >
-        <div
-          className="flex justify-between items-center p-2.5 cursor-pointer bg-gray-100 border-b border-gray-200 select-none"
+      >        <div
+          className="flex justify-between items-center p-2.5 cursor-pointer bg-muted border-b border-border select-none"
           onClick={toggleExpanded}
         >
           <div className="flex items-center gap-2">
-            <div
-              className={`w-3 h-3 rounded-full ${
+            <div              className={`w-3 h-3 rounded-full ${
                 disconnecting
                   ? "bg-yellow-500 animate-pulse animate-pulse-glow"
                   : isConnectionUnstable
                   ? "bg-yellow-500 animate-pulse"
                   : isConnected
-                  ? "bg-green-500 shadow-[0_0_5px_#4CAF50]"
-                  : "bg-red-500 shadow-[0_0_5px_#f44336]"
+                  ? "bg-emerald-500 shadow-[0_0_5px_rgb(34,197,94)]"
+                  : "bg-destructive shadow-[0_0_5px_hsl(var(--destructive))]"
               }`}
-            ></div>
-            {expanded && (
-              <span className="text-sm text-gray-800 whitespace-nowrap overflow-hidden text-ellipsis">
+            ></div>            {expanded && (
+              <span className="text-sm whitespace-nowrap overflow-hidden text-ellipsis">
                 {disconnecting
                   ? "Disconnecting..."
                   : isConnectionUnstable
@@ -428,56 +415,53 @@ function WebSocketControl({
                   : connectionState}
               </span>
             )}
-          </div>
-          <button className="bg-transparent border-none text-gray-600 cursor-pointer text-sm p-0 flex items-center justify-center">
+          </div>          <Button variant="ghost" size="sm" className="p-0">
             {expanded ? "▼" : "▲"}
-          </button>
+          </Button>
         </div>
 
         {expanded && (
-          <div className="p-2.5">
-            {/* Session share button */}
+          <div className="p-2.5">            {/* Session share button */}
             <div className="mb-2 flex items-center gap-2">
-              <button
+              <Button
                 onClick={handleShareSession}
                 title="Copy connection ID to clipboard"
-                className="p-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors disabled:opacity-50"
                 disabled={copiedToClipboard}
+                size="sm"
+                variant="default"
               >
-                {copiedToClipboard ? (
-                  <ClipboardCheck className="w-5 h-5" />
-                ) : (
-                  <Clipboard className="w-5 h-5" />
-                )}
-              </button>
+                {copiedToClipboard ? <ClipboardCheck className="w-4 h-4" /> : <Clipboard className="w-4 h-4" />}
+              </Button>
             </div>
 
             {/* Upload UI */}
             {connectionId && OfficeSession && (
               <div className="mb-2 flex items-center gap-2">
-                <button
+                <Button
                   onClick={handleFileUploadClick}
-                  className="p-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors disabled:opacity-50"
                   disabled={uploading}
                   title="Upload File"
+                  size="sm"
                 >
-                  <Upload className="w-5 h-5" />
-                </button>
+                  <Upload className="w-4 h-4" />
+                </Button>
                 
                 {/* view upload logs button */}
-                <button
+                <Button
                   onClick={handleShowLogs}
                   title="View file upload history"
-                  className="p-2 bg-green-500 text-white rounded hover:bg-green-600 transition-colors disabled:opacity-50"
                   disabled={uploadHistory.length === 0}
+                  size="sm"
+                  variant="secondary"
+                  className="relative"
                 >
-                  <Download className="w-5 h-5" />
+                  <Download className="w-4 h-4" />
                   {uploadHistory.length > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
+                    <Badge className="absolute -top-1 -right-1 h-4 w-4 p-0 text-xs">
                       {uploadHistory.length}
-                    </span>
+                    </Badge>
                   )}
-                </button>
+                </Button>
                 
                 <input
                   type="file"
@@ -486,39 +470,27 @@ function WebSocketControl({
                   onChange={handleFileChange}
                   disabled={uploading}
                 />
-                
-                {uploading && (
+                  {uploading && (
                   <div className="w-24">
-                    <div className="h-2 bg-gray-200 rounded">
-                      <div
-                        className="h-2 bg-blue-500 rounded transition-all duration-300"
-                        style={{ width: `${uploadProgress}%` }}
-                      ></div>
-                    </div>
-                    <div className="text-xs text-gray-600 mt-1">
+                    <Progress value={uploadProgress} className="h-2" />
+                    <div className="text-xs text-muted-foreground mt-1">
                       {uploadProgress}%
                     </div>
                   </div>
                 )}
                 {uploadSuccess && (
-                  <div className="text-xs text-green-600 animate-pulse">✓</div>
+                  <div className="text-xs text-emerald-600 animate-pulse">✓</div>
                 )}
                 {uploadError && (
-                  <div className="text-xs text-red-600">{uploadError}</div>
+                  <div className="text-xs text-destructive">{uploadError}</div>
                 )}
               </div>
             )}
-            
-            <button
-              className={`w-full py-2 px-3 rounded text-white border-none transition-colors relative overflow-hidden ${
-                disconnecting
-                  ? "bg-yellow-500 cursor-wait"
-                  : isConnected
-                  ? "bg-red-500 hover:bg-red-700 cursor-pointer"
-                  : "bg-gray-300 cursor-not-allowed"
-              }`}
-              onClick={handleDisconnect}
+              <Button
+              variant={disconnecting ? "outline" : isConnected ? "destructive" : "secondary"}
               disabled={!isConnected || disconnecting}
+              onClick={handleDisconnect}
+              className="w-full relative overflow-hidden"
             >
               {disconnecting && (
                 <span className="absolute inset-0 flex items-center justify-center">
@@ -543,11 +515,10 @@ function WebSocketControl({
                     ></path>
                   </svg>
                 </span>
-              )}
-              <span className={disconnecting ? "opacity-0" : ""}>
+              )}              <span className={disconnecting ? "opacity-0" : ""}>
                 {disconnecting ? "Disconnecting..." : "Disconnect"}
               </span>
-            </button>
+            </Button>
           </div>
         )}
       </div>
