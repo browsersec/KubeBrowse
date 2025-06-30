@@ -16,7 +16,9 @@ docker_build(
         run(
             'cd /app && go build -v -o /app/main ./api/main.go',
             trigger=['./api', './cmd', './internal', 'go.mod', 'go.sum']
-        )
+        ),
+        # Clean up after build to save space
+        run('docker system prune -f --filter "until=1h"', trigger=['./api', './cmd', './internal'])
     ]
 )
 
@@ -40,8 +42,19 @@ docker_build(
         run(
             'cd /app && bun run build',
             trigger=['./frontend/src', './frontend/public', './frontend/index.html', './frontend/vite.config.js', './frontend/tailwind.config.js']
-        )
+        ),
+        # Clean up after build to save space
+        run('docker system prune -f --filter "until=1h"', trigger=['./frontend/src', './frontend/public'])
     ]
+)
+
+# Clean up dangling images and build cache periodically
+local_resource(
+    'docker-cleanup',
+    cmd='docker system prune -f && docker image prune -f',
+    deps=[],
+    # Run cleanup every time Tilt starts
+    auto_init=True
 )
 
 # Load Kubernetes manifests.
