@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import GuacClient from './GuacClient';
+import SessionReconnectStatus from './SessionReconnectStatus';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,29 +11,121 @@ import { Loader2, AlertTriangle } from 'lucide-react';
 
 const API_BASE = '' // Use relative URLs to leverage Vite's proxy
 
+// Session persistence keys
+const SESSION_STORAGE_KEY = 'kubeBrowse_sharedSession';
+const SESSION_TIMEOUT = 24 * 60 * 60 * 1000; // 24 hours
+
 const ShareWSSession = () => {
   const [sessionState, setSessionState] = useState({
     connectionId: null,
     status: 'idle',
-    error: null
+    error: null,
+    name: ''
   });
   const [inputUuid, setInputUuid] = useState('');
   const [sessionName, setSessionName] = useState('');
+  const hasRestored = useRef(false);
 
-  const handleDisconnect = () => {
-    // if (sessionState.connectionId) {
-    //   // Stop the session
-    //   fetch(`${API_BASE}/sessions/${sessionState.connectionId}/stop`, {
-    //     method: 'DELETE'
-    //   }).catch(console.error);
-    // }
-    // console.log("Disconnected")
-    // setSessionState({
-    //   connectionId: null,
-    //   status: 'idle',
-    //   error: null
-    // });
-  };
+  const [reconnectStatus, setReconnectStatus] = useState({
+    isReconnecting: false,
+    attempts: 0,
+    connectionState: 'IDLE'
+  });
+
+  // Session persistence functions
+  const saveSessionToStorage = useCallback((sessionData) => {
+    const sessionInfo = {
+      ...sessionData,
+      timestamp: Date.now(),
+      expiresAt: Date.now() + SESSION_TIMEOUT
+    };
+    localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(sessionInfo));
+  }, []);
+
+  const loadSessionFromStorage = useCallback(() => {
+    try {
+      const stored = localStorage.getItem(SESSION_STORAGE_KEY);
+      if (!stored) return null;
+
+      const sessionInfo = JSON.parse(stored);
+      
+      if (Date.now() > sessionInfo.expiresAt) {
+        localStorage.removeItem(SESSION_STORAGE_KEY);
+        return null;
+      }
+
+      return sessionInfo;
+    } catch (error) {
+      console.error('Error loading session from storage:', error);
+      localStorage.removeItem(SESSION_STORAGE_KEY);
+      return null;
+    }
+  }, []);
+
+  const clearSessionFromStorage = useCallback(() => {
+    localStorage.removeItem(SESSION_STORAGE_KEY);
+  }, []);
+
+  // Restore session on mount
+  useEffect(() => {
+    if (hasRestored.current) return;
+    hasRestored.current = true;
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const uuidFromUrl = urlParams.get('uuid');
+
+    const restoreSession = (sessionData) => {
+      if (sessionState.connectionId !== sessionData.connectionId) {
+        const newUrl = new URL(window.location);
+        newUrl.searchParams.set('uuid', sessionData.connectionId);
+        window.history.replaceState({}, '', newUrl);
+        setSessionState({
+          connectionId: sessionData.connectionId,
+          name: sessionData.name || `Shared Session: ${sessionData.connectionId.substring(0, 8)}`,
+          status: 'ready',
+          error: null
+        });
+      }
+    };
+
+    if (uuidFromUrl) {
+      const storedSession = loadSessionFromStorage();
+      // Restore from URL, use stored name if available for the same session
+      const name = (storedSession && storedSession.connectionId === uuidFromUrl) ? storedSession.name : '';
+      restoreSession({ connectionId: uuidFromUrl, name });
+    } else {
+      const storedSession = loadSessionFromStorage();
+      if (storedSession && storedSession.connectionId) {
+        restoreSession(storedSession);
+      }
+    }
+    // eslint-disable-next-line
+  }, []); // <-- Run only on mount
+
+  // Save session to storage when it becomes ready
+  useEffect(() => {
+    if (sessionState.status === 'ready' && sessionState.connectionId) {
+      saveSessionToStorage(sessionState);
+    }
+  }, [sessionState, saveSessionToStorage]);
+
+
+  const handleDisconnect = useCallback(() => {
+    clearSessionFromStorage();
+    const newUrl = new URL(window.location);
+    newUrl.searchParams.delete('uuid');
+    window.history.replaceState({}, '', newUrl);
+
+    console.log("Disconnected from shared session");
+    setSessionState({
+      connectionId: null,
+      status: 'idle',
+      error: null,
+      name: ''
+    });
+    setInputUuid('');
+    setSessionName('');
+  }, [clearSessionFromStorage]);
 
   const handleInputChange = (e) => {
     setInputUuid(e.target.value);
@@ -55,13 +148,20 @@ const ShareWSSession = () => {
         throw new Error('Invalid UUID format. Please enter a valid connection ID.');
       }
       
-      // Set the connection state with just the UUID
+      const newSessionName = sessionName || `Shared Session: ${uuid.substring(0, 8)}`;
+      // Set the connection state with the UUID
       setSessionState({
         connectionId: uuid,
         status: 'ready',
         error: null,
-        name: sessionName || `Shared Session: ${uuid.substring(0, 8)}`
+        name: newSessionName
       });
+
+      // Update URL
+      const newUrl = new URL(window.location);
+      newUrl.searchParams.set('uuid', uuid);
+      window.history.replaceState({}, '', newUrl);
+
       console.log("Ready to connect with UUID:", uuid);
     } catch (error) {
       setSessionState(prev => ({
@@ -71,6 +171,18 @@ const ShareWSSession = () => {
       }));
     }
   };
+
+  const handleConnectionStateChange = useCallback((state, attempts) => {
+    setReconnectStatus({
+      connectionState: state,
+      isReconnecting: state === 'CONNECTING' && attempts > 0,
+      attempts: attempts || 0
+    });
+  }, []);
+
+  const handleManualReconnect = useCallback(() => {
+    window.location.reload();
+  }, []);
 
   return (
     <div className="flex flex-col items-center gap-4 p-4">
@@ -135,7 +247,11 @@ const ShareWSSession = () => {
               <Button 
                 variant="outline" 
                 size="sm"
-                onClick={() => setSessionState(prev => ({...prev, status: 'idle'}))}
+                onClick={() => {
+                  setSessionState({ connectionId: null, status: 'idle', error: null, name: '' });
+                  setInputUuid('');
+                  setSessionName('');
+                }}
               >
                 Try again
               </Button>
@@ -163,6 +279,16 @@ const ShareWSSession = () => {
               Disconnect
             </Button>
           </div>
+
+          <SessionReconnectStatus
+            connectionState={reconnectStatus.connectionState}
+            isReconnecting={reconnectStatus.isReconnecting}
+            reconnectAttempts={reconnectStatus.attempts}
+            maxReconnectAttempts={10}
+            onManualReconnect={handleManualReconnect}
+            onDisconnect={handleDisconnect}
+          />
+
           <Card>
             <CardContent className="p-0">
               <div className="w-full h-[600px] rounded-lg overflow-hidden">
@@ -174,8 +300,10 @@ const ShareWSSession = () => {
                   }}
                   connectionId={sessionState.connectionId}
                   onDisconnect={handleDisconnect}
+                  onReconnect={handleManualReconnect}
                   OfficeSession={false}
                   sharing={true}
+                  onConnectionStateChange={handleConnectionStateChange}
                 />
               </div>
             </CardContent>
