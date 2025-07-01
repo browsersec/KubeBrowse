@@ -47,3 +47,6 @@ certs/*.crt
 
 # remove local .env file
 .env
+
+# ignore .tilt builds folder
+.tilt/
