@@ -205,11 +205,6 @@ func main() {
 
 	// Move cleanup service initialization here after k8sClient is ready
 	var cleanupService *cleanup.SessionCleanupService
-	if k8sClient != nil {
-		cleanupService = cleanup.NewSessionCleanupService(redisClient, k8sClient, "browser-sandbox", tunnelStore)
-		cleanupService.Start()
-		defer cleanupService.Stop()
-	}
 
 	// Initialize Gin
 	gin.SetMode(gin.ReleaseMode)
@@ -243,6 +238,11 @@ func main() {
 	servlet := guac2.NewServer(doConnectWrapper)
 	wsServer := guac2.NewWebsocketServer(doConnectWrapper)
 
+	if k8sClient != nil {
+		cleanupService = cleanup.NewSessionCleanupService(redisClient, k8sClient, "browser-sandbox", tunnelStore, servlet)
+		cleanupService.Start()
+		defer cleanupService.Stop()
+	}
 	// sessions := guac.NewMemorySessionStore() // Old store
 	// wsServer.OnConnect = sessions.Add // Old OnConnect
 	// wsServer.OnDisconnect = sessions.Delete // Old OnDisconnect
@@ -416,7 +416,7 @@ func main() {
 
 		// Endpoint to stop a specific WebSocket session
 		sessionRoutes.DELETE("/:connectionID/stop", func(c *gin.Context) {
-			api.HandlerStopWSSession(c, redisClient, k8sClient)
+			api.HandlerStopWSSession(c, redisClient, k8sClient, servlet)
 		})
 
 		// Endpoint to extend session timeout
