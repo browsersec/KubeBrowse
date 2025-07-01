@@ -311,6 +311,12 @@ spec:
               value: "10" # 10 minutes
             - name: POD_SESSION_TTL
               value: "6" # 6 minutes
+            - name: JAEGER_ENDPOINT
+              value: "http://152.53.244.80:14268/api/traces"
+            - name: JAEGER_SERVICE_NAME
+              value: "browser-sandbox"
+            - name: DISTRIBUTED_TRACING
+              value: "true"
           securityContext: {}
 ---
 # API Service

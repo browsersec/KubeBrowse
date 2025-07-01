@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"log"
 	"net"
 	"net/http"
 	"os"
@@ -14,6 +15,9 @@ import (
 	"github.com/browsersec/KubeBrowse/internal/cleanup"
 	guac2 "github.com/browsersec/KubeBrowse/internal/guac"
 	"github.com/browsersec/KubeBrowse/internal/k8s"
+	"github.com/browsersec/KubeBrowse/internal/logging"
+	"github.com/browsersec/KubeBrowse/internal/middleware"
+	"github.com/browsersec/KubeBrowse/internal/tracing"
 
 	"github.com/browsersec/KubeBrowse/api"
 	"github.com/browsersec/KubeBrowse/docs"
@@ -60,12 +64,21 @@ func GinHandlerAdapter(h http.Handler) gin.HandlerFunc {
 }
 
 func main() {
-	redisClient = redis2.InitRedis()
 
-	// session cleanup service - Fix: Pass k8sNamespace and register after k8sClient is initialized
-	// cleanupService := cleanup.NewSessionCleanupService(redisClient, k8sClient)
-	// cleanupService.Start()
-	// defer cleanupService.Stop()
+	logging.Init(logrus.TraceLevel)
+
+	if os.Getenv("DISTRIBUTED_TRACING") != "true" {
+		shutdown := tracing.InitTracer("browser-sandbox", os.Getenv("JAEGER_ENDPOINT"))
+		defer func() {
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+			defer cancel()
+			if err := shutdown(ctx); err != nil {
+				log.Printf("Error shutting down tracer provider: %v", err)
+			}
+		}()
+	}
+
+	redisClient = redis2.InitRedis()
 
 	minioConfig := &MinioConfig{
 		bucketName: os.Getenv("MINIO_BUCKET"),
@@ -209,6 +222,7 @@ func main() {
 	// Initialize Gin
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
+	router.Use(middleware.GinLogger(), gin.Recovery(), middleware.TracingMiddleware("browser-sandbox"))
 
 	// Configure Swagger
 	docs.SwaggerInfo.BasePath = "/"
@@ -226,11 +240,6 @@ func main() {
 	router.Use(gin.Recovery())
 	router.Use(gin.Logger())
 
-	// Initialize Guacamole handlers
-	// servlet := guac.NewServer(DemoDoConnect) // We'll adjust this if DemoDoConnect's signature changes, or use a wrapper
-	// wsServer := guac.NewWebsocketServer(DemoDoConnect) // Same here
-
-	// Pass tunnelStore to DemoDoConnect by wrapping it
 	doConnectWrapper := func(request *http.Request) (guac2.Tunnel, error) {
 		return api.DemoDoConnect(request, tunnelStore, redisClient, guacdAddr, cleanupService)
 	}
@@ -243,12 +252,7 @@ func main() {
 		cleanupService.Start()
 		defer cleanupService.Stop()
 	}
-	// sessions := guac.NewMemorySessionStore() // Old store
-	// wsServer.OnConnect = sessions.Add // Old OnConnect
-	// wsServer.OnDisconnect = sessions.Delete // Old OnDisconnect
 
-	// OnConnect is implicitly handled by DemoDoConnect now adding to tunnelStore.
-	// We still need OnDisconnect to remove from the store when a tunnel closes for any reason.
 	wsServer.OnDisconnect = func(connectionID string, req *http.Request, tunnel guac2.Tunnel) {
 		logrus.Debugf("Websocket disconnected, removing tunnel: %s", connectionID)
 
