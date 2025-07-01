@@ -80,8 +80,8 @@ func CreateBrowserSandboxPod(clientset *kubernetes.Clientset, namespace, userID 
 							corev1.ResourceMemory: resource.MustParse("1000Mi"),
 						},
 						Requests: corev1.ResourceList{
-							corev1.ResourceCPU:    resource.MustParse("250m"),
-							corev1.ResourceMemory: resource.MustParse("256Mi"),
+							corev1.ResourceCPU:    resource.MustParse("500m"),
+							corev1.ResourceMemory: resource.MustParse("500Mi"),
 						},
 					},
 					// SecurityContext: &corev1.SecurityContext{

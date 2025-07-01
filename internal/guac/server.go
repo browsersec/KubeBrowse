@@ -2,10 +2,11 @@ package guac
 
 import (
 	"fmt"
-	logger "github.com/sirupsen/logrus"
 	"io"
 	"net/http"
 	"strings"
+
+	logger "github.com/sirupsen/logrus"
 )
 
 const (
@@ -51,6 +52,36 @@ func (s *Server) getTunnel(tunnelUUID string) (ret Tunnel, err error) {
 		err = ErrResourceNotFound.NewError("No such tunnel.")
 	}
 	return
+}
+
+// GetTunnelByUUID returns the tunnel with the given UUID.
+// This is similar to getTunnel but exported for external use.
+func (s *Server) GetTunnelByUUID(tunnelUUID string) (Tunnel, error) {
+	return s.getTunnel(tunnelUUID)
+}
+
+// DeregisterTunnel exports the deregisterTunnel method for external use.
+func (s *Server) DeregisterTunnel(tunnel Tunnel) {
+	s.deregisterTunnel(tunnel)
+}
+
+// StopTunnel finds a tunnel by UUID and stops it.
+// Returns true if the tunnel was found and stopped, false otherwise.
+func (s *Server) StopTunnel(tunnelUUID string) bool {
+	tunnel, err := s.getTunnel(tunnelUUID)
+	if err != nil {
+		logger.Warnf("No tunnel found with UUID %s", tunnelUUID)
+		return false
+	}
+
+	// Deregister and close the tunnel
+	s.deregisterTunnel(tunnel)
+	if err := tunnel.Close(); err != nil {
+		logger.Warnf("Error closing tunnel %s: %v", tunnelUUID, err)
+	}
+
+	logger.Infof("Successfully stopped tunnel %s", tunnelUUID)
+	return true
 }
 
 func (s *Server) sendError(response http.ResponseWriter, guacStatus Status, message string) {

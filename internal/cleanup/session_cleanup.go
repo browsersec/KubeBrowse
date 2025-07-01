@@ -2,6 +2,7 @@ package cleanup
 
 import (
 	"context"
+	"encoding/json"
 	"sync"
 	"time"
 
@@ -19,6 +20,7 @@ type SessionCleanupService struct {
 	namespace     string
 	sessions      map[string]*SessionMonitor
 	tunnelStore   *guac2.ActiveTunnelStore
+	server        *guac2.Server
 	mutex         sync.RWMutex
 	stopChan      chan struct{}
 	checkInterval time.Duration
@@ -32,12 +34,13 @@ type SessionMonitor struct {
 	cancel    context.CancelFunc
 }
 
-func NewSessionCleanupService(redisClient *redis.Client, k8sClient *kubernetes.Clientset, namespace string, tunnelStore *guac2.ActiveTunnelStore) *SessionCleanupService {
+func NewSessionCleanupService(redisClient *redis.Client, k8sClient *kubernetes.Clientset, namespace string, tunnelStore *guac2.ActiveTunnelStore, server *guac2.Server) *SessionCleanupService {
 	return &SessionCleanupService{
 		redisClient:   redisClient,
 		k8sClient:     k8sClient,
 		namespace:     namespace,
 		tunnelStore:   tunnelStore,
+		server:        server,
 		sessions:      make(map[string]*SessionMonitor),
 		stopChan:      make(chan struct{}),
 		checkInterval: 30 * time.Second, // Check every 30 seconds
@@ -174,15 +177,40 @@ func (s *SessionCleanupService) cleanupPod(monitor *SessionMonitor) {
 		}
 	}
 
-	// Then delete the pod with namespace
-	err := k8s.DeletePod(s.k8sClient, monitor.PodName)
+	// Get session data from Redis
+	val, err := s.redisClient.Get(context.Background(), "session:"+monitor.SessionID).Result()
+	if err != nil {
+		logrus.Errorf("Failed to get session data for %s: %v", monitor.SessionID, err)
+	} else {
+		var session redis2.SessionData
+		err = json.Unmarshal([]byte(val), &session)
+		if err != nil {
+			logrus.Errorf("Failed to unmarshal session data: %v", err)
+		} else {
+			// Try to stop the tunnel using server if available
+			if s.server != nil && session.TunnelConnectionID != "" {
+				tunnel, err := s.server.GetTunnelByUUID(session.TunnelConnectionID)
+				if err == nil {
+					s.server.DeregisterTunnel(tunnel)
+					if closeErr := tunnel.Close(); closeErr != nil {
+						logrus.Warnf("Error closing tunnel %s: %v", session.TunnelConnectionID, closeErr)
+					} else {
+						logrus.Infof("Successfully closed tunnel for session %s", monitor.SessionID)
+					}
+				}
+			}
+		}
+	}
+
+	// Delete the pod
+	err = k8s.DeletePod(s.k8sClient, monitor.PodName)
 	if err != nil {
 		logrus.Errorf("Failed to delete pod %s for expired session %s: %v", monitor.PodName, monitor.SessionID, err)
 	} else {
 		logrus.Infof("Successfully deleted pod %s for expired session %s", monitor.PodName, monitor.SessionID)
 	}
 
-	// Finally, clean up session data from Redis
+	// Clean up session data from Redis
 	err = s.redisClient.Del(context.Background(), "session:"+monitor.SessionID).Err()
 	if err != nil {
 		logrus.Errorf("Failed to delete session data from Redis for %s: %v", monitor.SessionID, err)

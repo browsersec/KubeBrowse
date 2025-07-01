@@ -261,6 +261,7 @@ const BrowserSession = () => {
                   }}
                   connectionId={sessionState.connectionId}
                   onDisconnect={handleDisconnect}
+                  onReconnect={handleManualReconnect}
                   OfficeSession={false}
                   sessionUUID={sessionState.connectionId}
                   onConnectionStateChange={handleConnectionStateChange}
@@ -274,4 +275,4 @@ const BrowserSession = () => {
   );
 };
 
-export default BrowserSession; 
+export default BrowserSession;
