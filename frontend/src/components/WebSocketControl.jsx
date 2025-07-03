@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Upload, Clipboard, ClipboardCheck, Download, X, ChevronDown, ChevronUp, AlertTriangle } from "lucide-react";
+import { Upload, Clipboard, ClipboardCheck, Download, X, ChevronDown, ChevronUp, AlertTriangle, Clock, Plus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,6 +19,8 @@ function WebSocketControl({
   OfficeSession = true,
   isConnectionUnstable = false,
   errorMessage = '',
+  timeLeft = null,
+  onExtendSession = null,
 }) {
   const [expanded, setExpanded] = useState(true);
   const [disconnecting, setDisconnecting] = useState(false);
@@ -42,6 +44,14 @@ function WebSocketControl({
   const [copiedToClipboard, setCopiedToClipboard] = useState(false);
 
   const { toast } = useToast();
+
+  // Format time display (MM:SS)
+  const formatTime = (seconds) => {
+    if (!seconds) return "00:00";
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
 
   // Show toast when connection becomes unstable
   useEffect(() => {
@@ -375,6 +385,14 @@ function WebSocketControl({
                     : connectionState}
                 </span>
               )}
+              {expanded && timeLeft && isConnected && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Clock className="h-3 w-3" />
+                  <span className={timeLeft < 300 ? "text-orange-500 font-medium" : ""}>
+                    {formatTime(timeLeft)}
+                  </span>
+                </div>
+              )}
             </div>
             <Button variant="ghost" size="sm" className="p-0 h-auto">
               {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
@@ -384,6 +402,19 @@ function WebSocketControl({
 
         {expanded && (
           <CardContent className="p-2.5 space-y-2">
+            {/* Extend session button */}
+            {timeLeft && onExtendSession && isConnected && (
+              <Button
+                onClick={onExtendSession}
+                variant="outline"
+                size="sm"
+                className="w-full flex items-center gap-2"
+              >
+                <Plus className="h-4 w-4" />
+                Extend (+15min)
+              </Button>
+            )}
+            
             {/* Session share button */}
             <Button
               onClick={handleShareSession}

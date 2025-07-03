@@ -32,7 +32,7 @@ const buildQueryString = (queryObj) => {
   return params.toString();
 };
 
-function GuacClient({ query, forceHttp = false, onDisconnect, connectionId , OfficeSession = true , sharing = false }) {
+function GuacClient({ query, forceHttp = false, onDisconnect, connectionId , OfficeSession = true , sharing = false, timeLeft = null, onExtendSession = null }) {
   const [connected, setConnected] = useState(false);
   
   // Convert query object to proper query string
@@ -400,6 +400,8 @@ function GuacClient({ query, forceHttp = false, onDisconnect, connectionId , Off
         connectionId={connectionId}
         isConnectionUnstable={isConnectionUnstable}
         errorMessage={errorMessage}
+        timeLeft={timeLeft}
+        onExtendSession={onExtendSession}
       />
       
       <Toaster position="top-right" />

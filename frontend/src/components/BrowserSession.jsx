@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import GuacClient from './GuacClient';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Play, X, Globe } from "lucide-react";
+import { Loader2, Play, X, Globe, Clock, Plus } from "lucide-react";
 
 // const API_BASE = import.meta.env.VITE_GUAC_CLIENT_URL || `${isSecure ? 'https' : 'http'}://${location.host}`;
 // const API_BASE = 'https://152.53.244.80:30006'
@@ -15,8 +15,62 @@ const BrowserSession = () => {
     connectionId: null,
     websocketUrl: null,
     status: 'idle',
-    error: null
+    error: null,
+    timeLeft: null, // Time left in seconds
+    sessionDuration: null, // Total session duration
   });
+
+  // Timer countdown effect
+  useEffect(() => {
+    let interval;
+    if (sessionState.status === 'ready' && sessionState.timeLeft > 0) {
+      interval = setInterval(() => {
+        setSessionState(prev => ({
+          ...prev,
+          timeLeft: Math.max(0, prev.timeLeft - 1)
+        }));
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [sessionState.status, sessionState.timeLeft]);
+
+  // Format time display (MM:SS)
+  const formatTime = (seconds) => {
+    if (!seconds) return "00:00";
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // Extend session time
+  const extendSession = async () => {
+    try {
+      // TODO: Replace with your actual API endpoint and format
+      const response = await fetch(`${API_BASE}/sessions/${sessionState.connectionId}/extend`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          extensionMinutes: 15 // Or whatever your API expects
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error("Failed to extend session");
+      }
+      
+      const data = await response.json();
+      // TODO: Update timeLeft based on API response format
+      setSessionState(prev => ({
+        ...prev,
+        timeLeft: data.newTimeLeft || prev.timeLeft + (15 * 60) // Add 15 minutes
+      }));
+    } catch (error) {
+      console.error("Failed to extend session:", error);
+      // TODO: Show toast notification for error
+    }
+  };
 
   const createSession = async () => {
     try {
@@ -44,7 +98,9 @@ const BrowserSession = () => {
         connectionId: data.connection_id,
         websocketUrl: connectData.websocket_url,
         status: 'ready',
-        error: null
+        error: null,
+        timeLeft: data.sessionDuration || 30 * 60, // Default 30 minutes or from API
+        sessionDuration: data.sessionDuration || 30 * 60,
       });
       console.log(connectData)
     } catch (error) {
@@ -68,7 +124,9 @@ const BrowserSession = () => {
       connectionId: null,
       websocketUrl: null,
       status: 'idle',
-      error: null
+      error: null,
+      timeLeft: null,
+      sessionDuration: null,
     });
   };
 
@@ -130,6 +188,8 @@ const BrowserSession = () => {
                 connectionId={sessionState.connectionId}
                 onDisconnect={handleDisconnect}
                 OfficeSession={false}
+                timeLeft={sessionState.timeLeft}
+                onExtendSession={extendSession}
               />
             </div>
           </CardContent>
