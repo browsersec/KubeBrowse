@@ -6,7 +6,7 @@ import states from '../lib/states';
 import Modal from './Modal';
 import WebSocketControl from './WebSocketControl';
 import useGuacWebSocket from '../hooks/useGuacWebSocket';
-import { Toaster } from '@/components/ui/toaster';
+import { Toaster } from 'react-hot-toast';
 
 // Set custom Mouse implementation
 Guacamole.Mouse = GuacMouse.mouse;
@@ -404,7 +404,16 @@ function GuacClient({ query, forceHttp = false, onDisconnect, connectionId , Off
         onExtendSession={onExtendSession}
       />
       
-      <Toaster position="top-right" />
+      <Toaster 
+        position="top-right"
+        toastOptions={{
+          duration: 4000,
+          style: {
+            background: '#363636',
+            color: '#fff',
+          },
+        }}
+      />
     </div>
   );
 }

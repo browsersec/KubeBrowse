@@ -1,12 +1,14 @@
 import { useState, useEffect, useRef } from "react";
 import { Upload, Clipboard, ClipboardCheck, Download, X, ChevronDown, ChevronUp, AlertTriangle, Clock, Plus } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import toast from 'react-hot-toast';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+
+const API_BASE = ""; // Use relative URLs to leverage Vite's proxy
 
 /**
  * A collapsible control panel for WebSocket connection management
@@ -25,6 +27,9 @@ function WebSocketControl({
   const [expanded, setExpanded] = useState(true);
   const [disconnecting, setDisconnecting] = useState(false);
   const [animationTimeout, setAnimationTimeout] = useState(null);
+  const [extending, setExtending] = useState(false);
+  const [timeLeftData, setTimeLeftData] = useState(null);
+  const [fetchingTime, setFetchingTime] = useState(false);
   // Upload state
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -43,8 +48,6 @@ function WebSocketControl({
   // copied to clipboard state
   const [copiedToClipboard, setCopiedToClipboard] = useState(false);
 
-  const { toast } = useToast();
-
   // Format time display (MM:SS)
   const formatTime = (seconds) => {
     if (!seconds) return "00:00";
@@ -56,24 +59,60 @@ function WebSocketControl({
   // Show toast when connection becomes unstable
   useEffect(() => {
     if (isConnectionUnstable) {
-      toast({
-        title: "Connection Unstable",
-        description: "WebSocket connection is unstable",
-        variant: "destructive",
+      toast.error("WebSocket connection is unstable", {
+        duration: 4000,
       });
     }
-  }, [isConnectionUnstable, toast]);
+  }, [isConnectionUnstable]);
 
   // Show toast when there is a tunnel error
   useEffect(() => {
     if (connectionState === 'TUNNEL_ERROR') {
-      toast({
-        title: "Tunnel Error",
-        description: errorMessage || 'Unable to connect',
-        variant: "destructive",
+      toast.error(errorMessage || 'Unable to connect', {
+        duration: 4000,
       });
     }
-  }, [connectionState, errorMessage, toast]);
+  }, [connectionState, errorMessage]);
+
+  // Fetch time left data from API
+  const fetchTimeLeft = async () => {
+    if (!connectionId || fetchingTime) return;
+    
+    setFetchingTime(true);
+    try {
+      const response = await fetch(`${API_BASE}/sessions/${connectionId}/time-left`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error("Failed to fetch time left");
+      }
+      
+      const data = await response.json();
+      setTimeLeftData(data);
+    } catch (error) {
+      console.error("Failed to fetch time left:", error);
+      // Don't show toast for this error as it's a background operation
+    } finally {
+      setFetchingTime(false);
+    }
+  };
+
+  // Auto-fetch time left when component mounts and when connected
+  useEffect(() => {
+    const isConnected = connectionState === 'CONNECTED';
+    if (connectionId && isConnected) {
+      fetchTimeLeft();
+      
+      // Set up interval to fetch time left every 30 seconds
+      const interval = setInterval(fetchTimeLeft, 30000);
+      
+      return () => clearInterval(interval);
+    }
+  }, [connectionId, connectionState]);
 
   // Clear animation timeout on unmount
   useEffect(() => {
@@ -189,28 +228,19 @@ function WebSocketControl({
         const virusNames = viruses.length > 0 ? viruses.join(', ') : 'Unknown threat';
         
         // Show a prominent warning toast
-        toast({
-          title: "😈 Malware Detected!",
-          description: (
-            <div>
-              <div>The file may contain malicious content.</div>
-              {viruses.length > 0 && <div className="text-xs mt-1">Detected: {virusNames}</div>}
-            </div>
-          ),
-          variant: "destructive",
+        toast.error(`😈 Malware Detected! The file may contain malicious content.${viruses.length > 0 ? ` Detected: ${virusNames}` : ''}`, {
+          duration: 6000,
         });
       } else {
         // Show success toast
-        toast({
-          title: "File Uploaded Successfully",
-          description: "File has been scanned and is safe",
+        toast.success("File has been scanned and is safe", {
+          duration: 4000,
         });
       }
     } catch (error) {
       console.error("Error checking for malware:", error);
-      toast({
-        title: "Upload Complete",
-        description: "File uploaded but scan results unavailable",
+      toast("File uploaded but scan results unavailable", {
+        duration: 4000,
       });
     }
   };
@@ -221,17 +251,14 @@ function WebSocketControl({
     try {
       await navigator.clipboard.writeText(connectionId);
       setCopiedToClipboard(true);
-      toast({
-        title: "Connection ID Copied",
-        description: "Connection ID has been copied to clipboard",
+      toast.success("Connection ID has been copied to clipboard", {
+        duration: 3000,
       });
       setTimeout(() => setCopiedToClipboard(false), 2000);
     } catch (err) {
       console.error("Failed to copy to clipboard:", err);
-      toast({
-        title: "Copy Failed",
-        description: "Failed to copy connection ID to clipboard",
-        variant: "destructive",
+      toast.error("Failed to copy connection ID to clipboard", {
+        duration: 4000,
       });
     }
   };
@@ -245,6 +272,49 @@ function WebSocketControl({
 
   const handleShowLogs = () => {
     setIsModalOpen(true);
+  };
+
+  // Extend session time
+  const handleExtendSession = async () => {
+    if (!connectionId || extending) return;
+    
+    setExtending(true);
+    try {
+      const response = await fetch(`${API_BASE}/sessions/${connectionId}/extend`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          connectionID: connectionId,
+          ExtensionMinutes: 5
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error("Failed to extend session");
+      }
+      
+      const data = await response.json();
+      toast.success("Session extended successfully", {
+        duration: 3000,
+      });
+      
+      // Refresh time left data after successful extension
+      fetchTimeLeft();
+      
+      // Call the parent's onExtendSession if it exists (for backward compatibility)
+      if (onExtendSession) {
+        onExtendSession();
+      }
+    } catch (error) {
+      console.error("Failed to extend session:", error);
+      toast.error("Failed to extend session", {
+        duration: 4000,
+      });
+    } finally {
+      setExtending(false);
+    }
   };
 
   const isConnected = connectionState === 'CONNECTED';
@@ -385,11 +455,11 @@ function WebSocketControl({
                     : connectionState}
                 </span>
               )}
-              {expanded && timeLeft && isConnected && (
+              {expanded && timeLeftData && isConnected && (
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   <Clock className="h-3 w-3" />
-                  <span className={timeLeft < 300 ? "text-orange-500 font-medium" : ""}>
-                    {formatTime(timeLeft)}
+                  <span className={timeLeftData.total_seconds < 300 ? "text-orange-500 font-medium" : ""}>
+                    {timeLeftData.time_left}
                   </span>
                 </div>
               )}
@@ -403,15 +473,16 @@ function WebSocketControl({
         {expanded && (
           <CardContent className="p-2.5 space-y-2">
             {/* Extend session button */}
-            {timeLeft && onExtendSession && isConnected && (
+            {timeLeftData && isConnected && timeLeftData.can_extend && (
               <Button
-                onClick={onExtendSession}
+                onClick={handleExtendSession}
                 variant="outline"
                 size="sm"
+                disabled={extending}
                 className="w-full flex items-center gap-2"
               >
                 <Plus className="h-4 w-4" />
-                Extend (+15min)
+                {extending ? "Extending..." : "Extend"}
               </Button>
             )}
             
