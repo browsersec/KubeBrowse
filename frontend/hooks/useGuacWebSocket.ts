@@ -266,10 +266,10 @@ const useGuacWebSocket = (
 
     // Override the parent's _setState method to ensure it's available
     _setState(state: any) {
-      // Call parent implementation if it exists
-      if (super._setState) {
+      try {
+        // Call parent implementation
         super._setState(state);
-      } else {
+      } catch (error) {
         // Fallback implementation for state management
         this.state = state;
         // Trigger any necessary state change handlers
@@ -333,7 +333,7 @@ const useGuacWebSocket = (
       setIsConnectionUnstable(false);
 
       // Attempt reconnection if this wasn't a deliberate disconnect
-      if (tunnel.reconnectOnClose !== false && sessionUUID) {
+      if ((tunnel as any).reconnectOnClose !== false && sessionUUID) {
         if (attemptReconnectionRef.current) {
           attemptReconnectionRef.current();
         }
@@ -375,7 +375,7 @@ const useGuacWebSocket = (
           setConnectionState(states.DISCONNECTED);
           setIsConnectionUnstable(false);
           // Attempt reconnection if this wasn't a deliberate disconnect and we have a session UUID
-          if (tunnel.reconnectOnClose !== false && sessionUUID) {
+          if ((tunnel as any).reconnectOnClose !== false && sessionUUID) {
             console.log('Connection closed unexpectedly, attempting reconnection...');
             if (attemptReconnectionRef.current) {
               attemptReconnectionRef.current();
@@ -454,8 +454,8 @@ const useGuacWebSocket = (
       if (tunnelRef.current) {
         try {
           // Mark as deliberate disconnect to prevent reconnection
-          if (tunnelRef.current.reconnectOnClose !== undefined) {
-            tunnelRef.current.reconnectOnClose = false;
+          if ((tunnelRef.current as any).reconnectOnClose !== undefined) {
+            (tunnelRef.current as any).reconnectOnClose = false;
           }
           if (tunnelRef.current.disconnect) {
             tunnelRef.current.disconnect();
@@ -485,7 +485,7 @@ const useGuacWebSocket = (
           if (event.code !== 1000) {
             tunnelRef.current.setState(Guacamole.Tunnel.State.CLOSED);
             // Attempt reconnection if we have a session UUID and this wasn't deliberate
-            if (sessionUUID && tunnelRef.current.reconnectOnClose !== false) {
+            if (sessionUUID && (tunnelRef.current as any).reconnectOnClose !== false) {
               console.log('WebSocket closed unexpectedly, attempting reconnection...');
               if (attemptReconnectionRef.current) {
                 attemptReconnectionRef.current();
@@ -505,7 +505,7 @@ const useGuacWebSocket = (
             });
           }
           // Attempt reconnection for WebSocket errors if we have a session UUID
-          if (sessionUUID && tunnelRef.current.reconnectOnClose !== false) {
+          if (sessionUUID && (tunnelRef.current as any).reconnectOnClose !== false) {
             console.log('WebSocket error occurred, attempting reconnection...');
             if (attemptReconnectionRef.current) {
               attemptReconnectionRef.current();

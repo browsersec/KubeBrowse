@@ -172,7 +172,7 @@ class GuacMouse implements MouseHandlers {
       while (currentTarget) {
         if (currentTarget === element)
           return;
-        currentTarget = currentTarget.parentNode;
+        currentTarget = currentTarget.parentNode as Node;
       }
 
       this.cancelEvent(e);
