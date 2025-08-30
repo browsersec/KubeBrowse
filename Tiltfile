@@ -71,12 +71,12 @@ k8s_resource(
 )
 
 # Define Kubernetes resources for frontend
-k8s_resource(
-    'browser-sandbox-frontend',
-    port_forwards=['3000:80'],
-    auto_init=False,
-    labels=["frontend"]
-)
+# k8s_resource(
+#     'browser-sandbox-frontend',
+#     port_forwards=['3000:80'],
+#     auto_init=False,
+#     labels=["frontend"]
+# )
 
 # Update infrastructure resources to match what's available in the cluster
 k8s_resource(

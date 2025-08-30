@@ -1,13 +1,18 @@
 import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Chrome, Shredder, Share, Settings, Sun, Moon, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Chrome, Shredder, Share, Settings, Sun, Moon, ChevronLeft, ChevronRight, LogIn } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
+import { useAuth } from '../../context/AuthContext';
 import { Button } from '../ui/button';
+import { UserMenu } from '../auth/UserMenu';
+import { AuthModal } from '../auth/AuthModal';
 
 export default function Sidebar() {
   const [expanded, setExpanded] = useState(true);
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const { theme, toggleTheme } = useTheme();
+  const { isAuthenticated, isLoading } = useAuth();
 
   return (
     <motion.div 
@@ -71,6 +76,24 @@ export default function Sidebar() {
       </nav>
 
       <div className="p-4 border-t border-border flex flex-col space-y-2">
+        {/* Authentication Section */}
+        {!isLoading && (
+          <div className="mb-2">
+            {isAuthenticated ? (
+              <UserMenu />
+            ) : (
+              <Button
+                variant="outline"
+                onClick={() => setShowAuthModal(true)}
+                className={expanded ? "justify-start w-full" : "w-full"}
+              >
+                <LogIn className="h-5 w-5" />
+                {expanded && <span className="ml-3">Sign In</span>}
+              </Button>
+            )}
+          </div>
+        )}
+
         <NavLink 
           to="/settings"
           className={({ isActive }) => 
@@ -102,6 +125,12 @@ export default function Sidebar() {
           </Button>
         )}
       </div>
+
+      {/* Auth Modal */}
+      <AuthModal 
+        isOpen={showAuthModal} 
+        onClose={() => setShowAuthModal(false)} 
+      />
     </motion.div>
   );
 }

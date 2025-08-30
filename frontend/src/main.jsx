@@ -3,8 +3,9 @@ import { createRoot } from 'react-dom/client'
 import { createBrowserRouter, RouterProvider } from 'react-router-dom'
 import './index.css'
 
-// Theme
+// Context providers
 import { ThemeProvider } from './context/ThemeContext'
+import { AuthProvider } from './context/AuthContext'
 
 // Layouts
 import DashboardLayout from './layouts/DashboardLayout'
@@ -15,6 +16,7 @@ import NotFoundRoute from './routes/NotFoundRoute'
 import OfficeSessionRoute from './routes/OfficeSessionRoute'
 import BrowserSessionRoute from './routes/BrowserSessionRoute'
 import ShareWSRoute from './routes/ShareWSRoute'
+import { AuthSuccessRoute } from './routes/AuthSuccessRoute'
 const router = createBrowserRouter([
   {
     path: '/',
@@ -22,6 +24,10 @@ const router = createBrowserRouter([
     children: [
       {
         index: true,
+        element: <OfficeSessionRoute />
+      },
+      {
+        path: 'dashboard',
         element: <OfficeSessionRoute />
       },
       {
@@ -43,6 +49,10 @@ const router = createBrowserRouter([
     ]
   },
   {
+    path: '/auth/success',
+    element: <AuthSuccessRoute />
+  },
+  {
     path: '*',
     element: <NotFoundRoute />
   }
@@ -51,7 +61,9 @@ const router = createBrowserRouter([
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <ThemeProvider>
-      <RouterProvider router={router} />
+      <AuthProvider>
+        <RouterProvider router={router} />
+      </AuthProvider>
     </ThemeProvider>
   </StrictMode>,
 )

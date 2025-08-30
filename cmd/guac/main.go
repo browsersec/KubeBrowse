@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -12,6 +13,8 @@ import (
 	"path/filepath"
 	"time"
 
+	sqlc "github.com/browsersec/KubeBrowse/db/sqlc"
+	"github.com/browsersec/KubeBrowse/internal/auth"
 	"github.com/browsersec/KubeBrowse/internal/cleanup"
 	guac2 "github.com/browsersec/KubeBrowse/internal/guac"
 	"github.com/browsersec/KubeBrowse/internal/k8s"
@@ -26,6 +29,7 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis/v8"
+	_ "github.com/lib/pq"
 	"github.com/sirupsen/logrus"
 	swaggerfiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
@@ -48,6 +52,8 @@ var (
 
 var tunnelStore *guac2.ActiveTunnelStore
 var redisClient *redis.Client
+var dbConn *sql.DB
+var queries *sqlc.Queries
 
 type MinioConfig struct {
 	bucketName string
@@ -79,6 +85,33 @@ func main() {
 	}
 
 	redisClient = redis2.InitRedis()
+
+	// Initialize database connection
+	dbURL := os.Getenv("DATABASE_URL")
+	if dbURL == "" {
+		dbURL = "postgres://postgres:password@localhost:5432/kubebrowse?sslmode=disable"
+		logrus.Warn("DATABASE_URL not set, using default connection string")
+	}
+
+	var err error
+	dbConn, err = sql.Open("postgres", dbURL)
+	if err != nil {
+		logrus.Errorf("Failed to connect to database: %v", err)
+		logrus.Warn("Continuing without database - authentication will not work")
+	} else {
+		// Test connection
+		if err = dbConn.Ping(); err != nil {
+			logrus.Errorf("Failed to ping database: %v", err)
+			logrus.Warn("Database connection failed - authentication will not work")
+			dbConn = nil
+		} else {
+			logrus.Info("Successfully connected to database")
+			queries = sqlc.New(dbConn)
+		}
+	}
+
+	// Initialize Goth OAuth providers
+	auth.InitializeGoth()
 
 	minioConfig := &MinioConfig{
 		bucketName: os.Getenv("MINIO_BUCKET"),
@@ -442,6 +475,35 @@ func main() {
 				api.HandlerUploadFile(c, redisClient, k8sClient, minioClient.Client, minioConfig.bucketName, clamavAddr, 10)
 			}
 		})
+	}
+
+	// Initialize authentication service and handlers
+	var authService *auth.Service
+	var authHandler *auth.Handler
+	if dbConn != nil && queries != nil {
+		authService = auth.NewService(queries, dbConn)
+		authHandler = auth.NewHandler(authService)
+
+		// Add authentication routes
+		authRoutes := router.Group("/auth")
+		{
+			// Email authentication
+			authRoutes.POST("/register", authHandler.RegisterWithEmail)
+			authRoutes.POST("/login", authHandler.LoginWithEmail)
+			authRoutes.POST("/logout", authHandler.Logout)
+
+			// OAuth authentication
+			authRoutes.GET("/oauth/:provider", authHandler.BeginOAuth)
+			authRoutes.GET("/oauth/:provider/callback", authHandler.CallbackOAuth)
+
+			// User info
+			authRoutes.GET("/me", auth.AuthMiddleware(authService), authHandler.GetCurrentUser)
+		}
+
+		// Apply optional auth middleware to all routes for user context
+		router.Use(auth.OptionalAuthMiddleware(authService))
+	} else {
+		logrus.Warn("Authentication routes disabled - database connection required")
 	}
 
 	// Add Swagger documentation route
