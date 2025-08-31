@@ -2,21 +2,33 @@ FROM golang:1.24-alpine AS builder
 
 WORKDIR /app
 
-# Install dependencies for builder
-RUN apk add --no-cache git make bash
+# Install dependencies for builder including sqlc
+RUN apk add --no-cache git make bash curl
+
+# Install sqlc
+RUN curl -L https://github.com/sqlc-dev/sqlc/releases/download/v1.29.0/sqlc_1.29.0_linux_amd64.tar.gz | tar -xz -C /usr/local/bin
 
 COPY go.mod go.sum ./
 RUN sed -i '/^tool github.com\/evilmartians\/lefthook/d' go.mod
 RUN go mod download
 
-# Copy all source files. Tilt live_update will handle incremental changes.
-COPY . .
+# Copy source files needed for sqlc generation
+COPY sqlc.yaml ./sqlc.yaml
+COPY db/ ./db/
 
-# Initial build of the application to /app/main
-# This path must match what CMD expects and what Tilt's live_update rebuilds.
+# Generate sqlc code
+RUN sqlc generate
+
+# Copy remaining source files (excluding db/ since it's already copied)
+COPY cmd/ ./cmd/
+COPY internal/ ./internal/
+COPY api/ ./api/
+COPY docs/ ./docs/
+COPY templates/ ./templates/
+COPY go.mod go.sum ./
+
+# Initial build of the application
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o guac cmd/guac/main.go
-# Original was: RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o guac cmd/guac/main.go
-# The path ./api/main.go is from the Tiltfile configuration.
 
 # Final stage for running the application
 FROM alpine:3.20
@@ -30,8 +42,6 @@ WORKDIR /app
 # Copy the built binary from the builder stage.
 COPY --from=builder /app/guac /app/guac
 # Copy templates (if your application uses them from filesystem at runtime)
-# If templates are embedded in Go binary, this is not needed.
-# Assuming ./templates exists and is used, based on original Dockerfile.
 COPY --from=builder /app/templates /app/templates
 
 # Create and copy certificates as before

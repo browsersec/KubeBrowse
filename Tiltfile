@@ -38,7 +38,9 @@ docker_build_with_restart(
         './api',
         './cmd',
         './internal',
-        './docs'
+        './docs',
+        './db',
+        './sqlc.yaml'
     ],
     live_update=[
         sync('./.tilt/guac', '/app/guac'),
