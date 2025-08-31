@@ -16,6 +16,7 @@ import (
 	sqlc "github.com/browsersec/KubeBrowse/db/sqlc"
 	"github.com/browsersec/KubeBrowse/internal/auth"
 	"github.com/browsersec/KubeBrowse/internal/cleanup"
+	"github.com/browsersec/KubeBrowse/internal/email"
 	guac2 "github.com/browsersec/KubeBrowse/internal/guac"
 	"github.com/browsersec/KubeBrowse/internal/k8s"
 	"github.com/browsersec/KubeBrowse/internal/logging"
@@ -54,6 +55,7 @@ var tunnelStore *guac2.ActiveTunnelStore
 var redisClient *redis.Client
 var dbConn *sql.DB
 var queries *sqlc.Queries
+var emailService *email.Service
 
 type MinioConfig struct {
 	bucketName string
@@ -107,6 +109,37 @@ func main() {
 		} else {
 			logrus.Info("Successfully connected to database")
 			queries = sqlc.New(dbConn)
+		}
+	}
+
+	// Initialize email service
+	emailService = email.NewService()
+
+	// Test email configuration at startup
+	if emailService.IsConfigured() {
+		logrus.Info("Email service configured successfully")
+		logrus.Infof("SMTP Host: %s", os.Getenv("SMTP_HOST"))
+		logrus.Infof("SMTP Port: %s", os.Getenv("SMTP_PORT"))
+		logrus.Infof("SMTP Username: %s", os.Getenv("SMTP_USERNAME"))
+		logrus.Infof("From Email: %s", os.Getenv("FROM_EMAIL"))
+		logrus.Infof("Base URL: %s", os.Getenv("BASE_URL"))
+
+		// Test SMTP connection (optional - uncomment for testing)
+		// testEmailConnection()
+	} else {
+		logrus.Warn("Email service not configured - email verification will not work")
+		logrus.Warn("Missing SMTP configuration. Please set the following environment variables:")
+		if os.Getenv("SMTP_HOST") == "" {
+			logrus.Warn("  - SMTP_HOST")
+		}
+		if os.Getenv("SMTP_USERNAME") == "" {
+			logrus.Warn("  - SMTP_USERNAME")
+		}
+		if os.Getenv("SMTP_PASSWORD") == "" {
+			logrus.Warn("  - SMTP_PASSWORD")
+		}
+		if os.Getenv("FROM_EMAIL") == "" {
+			logrus.Warn("  - FROM_EMAIL")
 		}
 	}
 
@@ -482,7 +515,21 @@ func main() {
 	var authHandler *auth.Handler
 	if dbConn != nil && queries != nil {
 		authService = auth.NewService(queries, dbConn)
-		authHandler = auth.NewHandler(authService)
+		authHandler = auth.NewHandlerWithRedis(authService, redisClient)
+
+		// Start background cleanup of expired database sessions
+		go func() {
+			ticker := time.NewTicker(1 * time.Hour) // Clean up every hour
+			defer ticker.Stop()
+
+			for range ticker.C {
+				if err := authService.CleanupExpiredSessions(); err != nil {
+					logrus.Warnf("Failed to cleanup expired sessions: %v", err)
+				} else {
+					logrus.Debug("Successfully cleaned up expired sessions")
+				}
+			}
+		}()
 
 		// Add authentication routes
 		authRoutes := router.Group("/auth")
@@ -492,12 +539,34 @@ func main() {
 			authRoutes.POST("/login", authHandler.LoginWithEmail)
 			authRoutes.POST("/logout", authHandler.Logout)
 
+			// Email verification
+			authRoutes.GET("/verify-email", authHandler.VerifyEmail)
+			authRoutes.POST("/verify-email", authHandler.VerifyEmail)
+			authRoutes.POST("/resend-verification", authHandler.ResendVerificationEmail)
+
 			// OAuth authentication
 			authRoutes.GET("/oauth/:provider", authHandler.BeginOAuth)
 			authRoutes.GET("/oauth/:provider/callback", authHandler.CallbackOAuth)
 
+			// OAuth success page - redirect to frontend
+			authRoutes.GET("/success", func(c *gin.Context) {
+				// Get frontend URL from environment variable
+				frontendURL := os.Getenv("FRONTEND_URL")
+				if frontendURL == "" {
+					frontendURL = "http://localhost:5173"
+				}
+
+				// Redirect to frontend home page
+				c.Redirect(http.StatusTemporaryRedirect, frontendURL)
+			})
+
 			// User info
 			authRoutes.GET("/me", auth.AuthMiddleware(authService), authHandler.GetCurrentUser)
+
+			// Profile and settings management
+			authRoutes.GET("/profile", auth.AuthMiddleware(authService), authHandler.GetUserProfile)
+			authRoutes.PUT("/profile", auth.AuthMiddleware(authService), authHandler.UpdateProfile)
+			authRoutes.PUT("/password", auth.AuthMiddleware(authService), authHandler.UpdatePassword)
 		}
 
 		// Apply optional auth middleware to all routes for user context

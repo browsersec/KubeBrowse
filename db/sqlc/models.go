@@ -12,16 +12,19 @@ import (
 )
 
 type User struct {
-	ID           uuid.UUID      `json:"id"`
-	Username     sql.NullString `json:"username"`
-	Email        string         `json:"email"`
-	PasswordHash sql.NullString `json:"password_hash"`
-	Provider     sql.NullString `json:"provider"`
-	ProviderID   sql.NullString `json:"provider_id"`
-	AvatarUrl    sql.NullString `json:"avatar_url"`
-	Name         sql.NullString `json:"name"`
-	CreatedAt    time.Time      `json:"created_at"`
-	UpdatedAt    time.Time      `json:"updated_at"`
+	ID                         uuid.UUID      `json:"id"`
+	Username                   sql.NullString `json:"username"`
+	Email                      string         `json:"email"`
+	PasswordHash               sql.NullString `json:"password_hash"`
+	Provider                   sql.NullString `json:"provider"`
+	ProviderID                 sql.NullString `json:"provider_id"`
+	AvatarUrl                  sql.NullString `json:"avatar_url"`
+	Name                       sql.NullString `json:"name"`
+	EmailVerified              sql.NullBool   `json:"email_verified"`
+	EmailVerificationToken     sql.NullString `json:"email_verification_token"`
+	EmailVerificationExpiresAt sql.NullTime   `json:"email_verification_expires_at"`
+	CreatedAt                  time.Time      `json:"created_at"`
+	UpdatedAt                  time.Time      `json:"updated_at"`
 }
 
 type UserSession struct {

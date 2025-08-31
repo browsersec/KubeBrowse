@@ -269,6 +269,8 @@ spec:
           env:
             - name: GUACD_ADDRESS
               value: "guacd.browser-sandbox.svc.cluster.local:4822"
+            - name: DATABASE_URL
+              value: "postgres://postgresuser:postgrespassword@postgres.browser-sandbox.svc.cluster.local:5432/sandbox_db?sslmode=disable"
             - name: POSTGRES_HOST
               value: "postgres"
             - name: POSTGRES_PORT
@@ -320,13 +322,29 @@ spec:
             - name: GITHUB_CLIENT_ID
               value: "Ov23li974J8UoG1CH0HJ"
             - name: GITHUB_CLIENT_SECRET
-              value: "297bf27fd5c130264371aa0470e52cb182c190b0"
+              value: "f16b7dc2b85d4a7f817e273b4a2d64124153ce8f"
             - name: GITHUB_CALLBACK_URL
-              value: "https://browser-sandbox-api.browser-sandbox.svc.cluster.local:4567/auth/github/callback"
+              value: "https://localhost:4567/auth/oauth/github/callback"
             - name: SESSION_SECRET
               value: "McX0xoYlJYpO0EGdUZC6aJxVh2rKYrXZM7SPMpVREeXMXoMBI20v90PICD-LfEn7jr07c5vH2CWcKzjl8hoNvQ"
+            - name: FRONTEND_URL
+              value: "http://localhost:5173"
             - name: ENVIRONMENT
               value: "development"
+            - name: SMTP_HOST
+              value: "smtp.gmail.com"
+            - name: SMTP_PORT
+              value: "587"
+            - name: SMTP_USERNAME
+              value: "sanjay.obsidian@gmail.com"
+            - name: SMTP_PASSWORD
+              value: "ulagdeliigobhdgr"
+            - name: FROM_EMAIL
+              value: "sanjay.obsidian@gmail.com"
+            # - name: CERT_PATH
+            #   value: ""
+            # - name: CERT_KEY_PATH
+            #   value: ""
           securityContext: {}
 ---
 # API Service

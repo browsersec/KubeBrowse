@@ -13,15 +13,20 @@ func AuthMiddleware(service *Service) gin.HandlerFunc {
 		// Get session token from cookie
 		sessionToken, err := c.Cookie(SessionCookieName)
 		if err != nil {
+			logrus.Debugf("AuthMiddleware: No session cookie found: %v", err)
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication required"})
 			c.Abort()
 			return
 		}
 
+		logrus.Debugf("AuthMiddleware: Found session token: %s", sessionToken)
+
 		// Validate session
+		logrus.Debugf("AuthMiddleware: Validating session token: %s", sessionToken)
 		user, session, err := service.ValidateSession(sessionToken)
 		if err != nil {
 			if err == ErrSessionExpired {
+				logrus.Debugf("AuthMiddleware: Session expired for token: %s", sessionToken)
 				// Clear invalid cookie
 				c.SetCookie(SessionCookieName, "", -1, "/", "", false, true)
 				c.JSON(http.StatusUnauthorized, gin.H{"error": "Session expired"})
@@ -33,6 +38,8 @@ func AuthMiddleware(service *Service) gin.HandlerFunc {
 			c.Abort()
 			return
 		}
+
+		logrus.Debugf("AuthMiddleware: Session validated successfully for user: %s", user.Email)
 
 		// Set user in context
 		c.Set(UserContextKey, user)

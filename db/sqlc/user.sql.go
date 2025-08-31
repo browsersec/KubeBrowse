@@ -15,20 +15,27 @@ import (
 
 const createEmailUser = `-- name: CreateEmailUser :one
 INSERT INTO users (
-  email, password_hash, provider
+  email, password_hash, provider, email_verification_token, email_verification_expires_at
 ) VALUES (
-  $1, $2, 'email'
+  $1, $2, 'email', $3, $4
 )
-RETURNING id, username, email, password_hash, provider, provider_id, avatar_url, name, created_at, updated_at
+RETURNING id, username, email, password_hash, provider, provider_id, avatar_url, name, email_verified, email_verification_token, email_verification_expires_at, created_at, updated_at
 `
 
 type CreateEmailUserParams struct {
-	Email        string         `json:"email"`
-	PasswordHash sql.NullString `json:"password_hash"`
+	Email                      string         `json:"email"`
+	PasswordHash               sql.NullString `json:"password_hash"`
+	EmailVerificationToken     sql.NullString `json:"email_verification_token"`
+	EmailVerificationExpiresAt sql.NullTime   `json:"email_verification_expires_at"`
 }
 
 func (q *Queries) CreateEmailUser(ctx context.Context, arg CreateEmailUserParams) (User, error) {
-	row := q.db.QueryRowContext(ctx, createEmailUser, arg.Email, arg.PasswordHash)
+	row := q.db.QueryRowContext(ctx, createEmailUser,
+		arg.Email,
+		arg.PasswordHash,
+		arg.EmailVerificationToken,
+		arg.EmailVerificationExpiresAt,
+	)
 	var i User
 	err := row.Scan(
 		&i.ID,
@@ -39,6 +46,9 @@ func (q *Queries) CreateEmailUser(ctx context.Context, arg CreateEmailUserParams
 		&i.ProviderID,
 		&i.AvatarUrl,
 		&i.Name,
+		&i.EmailVerified,
+		&i.EmailVerificationToken,
+		&i.EmailVerificationExpiresAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -47,11 +57,11 @@ func (q *Queries) CreateEmailUser(ctx context.Context, arg CreateEmailUserParams
 
 const createOAuthUser = `-- name: CreateOAuthUser :one
 INSERT INTO users (
-  email, provider, provider_id, avatar_url, name, username
+  email, provider, provider_id, avatar_url, name, username, password_hash
 ) VALUES (
-  $1, $2, $3, $4, $5, $6
+  $1, $2, $3, $4, $5, $6, NULL
 )
-RETURNING id, username, email, password_hash, provider, provider_id, avatar_url, name, created_at, updated_at
+RETURNING id, username, email, password_hash, provider, provider_id, avatar_url, name, email_verified, email_verification_token, email_verification_expires_at, created_at, updated_at
 `
 
 type CreateOAuthUserParams struct {
@@ -82,6 +92,9 @@ func (q *Queries) CreateOAuthUser(ctx context.Context, arg CreateOAuthUserParams
 		&i.ProviderID,
 		&i.AvatarUrl,
 		&i.Name,
+		&i.EmailVerified,
+		&i.EmailVerificationToken,
+		&i.EmailVerificationExpiresAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -124,7 +137,7 @@ INSERT INTO users (
 ) VALUES (
   $1, $2, $3, $4, $5, $6, $7
 )
-RETURNING id, username, email, password_hash, provider, provider_id, avatar_url, name, created_at, updated_at
+RETURNING id, username, email, password_hash, provider, provider_id, avatar_url, name, email_verified, email_verification_token, email_verification_expires_at, created_at, updated_at
 `
 
 type CreateUserParams struct {
@@ -157,6 +170,9 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.ProviderID,
 		&i.AvatarUrl,
 		&i.Name,
+		&i.EmailVerified,
+		&i.EmailVerificationToken,
+		&i.EmailVerificationExpiresAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -204,7 +220,7 @@ func (q *Queries) DeleteUserSessions(ctx context.Context, userID uuid.UUID) erro
 }
 
 const getSession = `-- name: GetSession :one
-SELECT s.id, s.user_id, s.session_token, s.expires_at, s.created_at, s.updated_at, u.id as user_id, u.email, u.username, u.name, u.avatar_url, u.provider
+SELECT s.id, s.user_id, s.session_token, s.expires_at, s.created_at, s.updated_at, u.email, u.username, u.name, u.avatar_url, u.provider
 FROM user_sessions s
 JOIN users u ON s.user_id = u.id
 WHERE s.session_token = $1 AND s.expires_at > NOW()
@@ -218,7 +234,6 @@ type GetSessionRow struct {
 	ExpiresAt    time.Time      `json:"expires_at"`
 	CreatedAt    time.Time      `json:"created_at"`
 	UpdatedAt    time.Time      `json:"updated_at"`
-	UserID_2     uuid.UUID      `json:"user_id_2"`
 	Email        string         `json:"email"`
 	Username     sql.NullString `json:"username"`
 	Name         sql.NullString `json:"name"`
@@ -236,7 +251,6 @@ func (q *Queries) GetSession(ctx context.Context, sessionToken string) (GetSessi
 		&i.ExpiresAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.UserID_2,
 		&i.Email,
 		&i.Username,
 		&i.Name,
@@ -247,7 +261,7 @@ func (q *Queries) GetSession(ctx context.Context, sessionToken string) (GetSessi
 }
 
 const getUser = `-- name: GetUser :one
-SELECT id, username, email, password_hash, provider, provider_id, avatar_url, name, created_at, updated_at FROM users
+SELECT id, username, email, password_hash, provider, provider_id, avatar_url, name, email_verified, email_verification_token, email_verification_expires_at, created_at, updated_at FROM users
 WHERE id = $1 LIMIT 1
 `
 
@@ -263,6 +277,9 @@ func (q *Queries) GetUser(ctx context.Context, id uuid.UUID) (User, error) {
 		&i.ProviderID,
 		&i.AvatarUrl,
 		&i.Name,
+		&i.EmailVerified,
+		&i.EmailVerificationToken,
+		&i.EmailVerificationExpiresAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -270,7 +287,7 @@ func (q *Queries) GetUser(ctx context.Context, id uuid.UUID) (User, error) {
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, username, email, password_hash, provider, provider_id, avatar_url, name, created_at, updated_at FROM users
+SELECT id, username, email, password_hash, provider, provider_id, avatar_url, name, email_verified, email_verification_token, email_verification_expires_at, created_at, updated_at FROM users
 WHERE email = $1 LIMIT 1
 `
 
@@ -286,6 +303,37 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.ProviderID,
 		&i.AvatarUrl,
 		&i.Name,
+		&i.EmailVerified,
+		&i.EmailVerificationToken,
+		&i.EmailVerificationExpiresAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getUserByEmailVerificationToken = `-- name: GetUserByEmailVerificationToken :one
+SELECT id, username, email, password_hash, provider, provider_id, avatar_url, name, email_verified, email_verification_token, email_verification_expires_at, created_at, updated_at FROM users
+WHERE email_verification_token = $1 AND email_verification_expires_at > NOW()
+LIMIT 1
+`
+
+// Email verification queries
+func (q *Queries) GetUserByEmailVerificationToken(ctx context.Context, emailVerificationToken sql.NullString) (User, error) {
+	row := q.db.QueryRowContext(ctx, getUserByEmailVerificationToken, emailVerificationToken)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.Email,
+		&i.PasswordHash,
+		&i.Provider,
+		&i.ProviderID,
+		&i.AvatarUrl,
+		&i.Name,
+		&i.EmailVerified,
+		&i.EmailVerificationToken,
+		&i.EmailVerificationExpiresAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -293,7 +341,7 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 }
 
 const getUserByProvider = `-- name: GetUserByProvider :one
-SELECT id, username, email, password_hash, provider, provider_id, avatar_url, name, created_at, updated_at FROM users
+SELECT id, username, email, password_hash, provider, provider_id, avatar_url, name, email_verified, email_verification_token, email_verification_expires_at, created_at, updated_at FROM users
 WHERE provider = $1 AND provider_id = $2 LIMIT 1
 `
 
@@ -314,6 +362,9 @@ func (q *Queries) GetUserByProvider(ctx context.Context, arg GetUserByProviderPa
 		&i.ProviderID,
 		&i.AvatarUrl,
 		&i.Name,
+		&i.EmailVerified,
+		&i.EmailVerificationToken,
+		&i.EmailVerificationExpiresAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -321,7 +372,7 @@ func (q *Queries) GetUserByProvider(ctx context.Context, arg GetUserByProviderPa
 }
 
 const listUsers = `-- name: ListUsers :many
-SELECT id, username, email, password_hash, provider, provider_id, avatar_url, name, created_at, updated_at FROM users
+SELECT id, username, email, password_hash, provider, provider_id, avatar_url, name, email_verified, email_verification_token, email_verification_expires_at, created_at, updated_at FROM users
 ORDER BY created_at
 `
 
@@ -343,6 +394,9 @@ func (q *Queries) ListUsers(ctx context.Context) ([]User, error) {
 			&i.ProviderID,
 			&i.AvatarUrl,
 			&i.Name,
+			&i.EmailVerified,
+			&i.EmailVerificationToken,
+			&i.EmailVerificationExpiresAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -359,11 +413,79 @@ func (q *Queries) ListUsers(ctx context.Context) ([]User, error) {
 	return items, nil
 }
 
+const resendEmailVerification = `-- name: ResendEmailVerification :one
+UPDATE users
+SET email_verification_token = $2, email_verification_expires_at = $3, updated_at = NOW()
+WHERE email = $1 AND email_verified = FALSE
+RETURNING id, username, email, password_hash, provider, provider_id, avatar_url, name, email_verified, email_verification_token, email_verification_expires_at, created_at, updated_at
+`
+
+type ResendEmailVerificationParams struct {
+	Email                      string         `json:"email"`
+	EmailVerificationToken     sql.NullString `json:"email_verification_token"`
+	EmailVerificationExpiresAt sql.NullTime   `json:"email_verification_expires_at"`
+}
+
+func (q *Queries) ResendEmailVerification(ctx context.Context, arg ResendEmailVerificationParams) (User, error) {
+	row := q.db.QueryRowContext(ctx, resendEmailVerification, arg.Email, arg.EmailVerificationToken, arg.EmailVerificationExpiresAt)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.Email,
+		&i.PasswordHash,
+		&i.Provider,
+		&i.ProviderID,
+		&i.AvatarUrl,
+		&i.Name,
+		&i.EmailVerified,
+		&i.EmailVerificationToken,
+		&i.EmailVerificationExpiresAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const updateEmailVerificationToken = `-- name: UpdateEmailVerificationToken :one
+UPDATE users
+SET email_verification_token = $2, email_verification_expires_at = $3, updated_at = NOW()
+WHERE id = $1
+RETURNING id, username, email, password_hash, provider, provider_id, avatar_url, name, email_verified, email_verification_token, email_verification_expires_at, created_at, updated_at
+`
+
+type UpdateEmailVerificationTokenParams struct {
+	ID                         uuid.UUID      `json:"id"`
+	EmailVerificationToken     sql.NullString `json:"email_verification_token"`
+	EmailVerificationExpiresAt sql.NullTime   `json:"email_verification_expires_at"`
+}
+
+func (q *Queries) UpdateEmailVerificationToken(ctx context.Context, arg UpdateEmailVerificationTokenParams) (User, error) {
+	row := q.db.QueryRowContext(ctx, updateEmailVerificationToken, arg.ID, arg.EmailVerificationToken, arg.EmailVerificationExpiresAt)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.Email,
+		&i.PasswordHash,
+		&i.Provider,
+		&i.ProviderID,
+		&i.AvatarUrl,
+		&i.Name,
+		&i.EmailVerified,
+		&i.EmailVerificationToken,
+		&i.EmailVerificationExpiresAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const updateUser = `-- name: UpdateUser :one
 UPDATE users
 SET username = $2, email = $3, updated_at = NOW()
 WHERE id = $1
-RETURNING id, username, email, password_hash, provider, provider_id, avatar_url, name, created_at, updated_at
+RETURNING id, username, email, password_hash, provider, provider_id, avatar_url, name, email_verified, email_verification_token, email_verification_expires_at, created_at, updated_at
 `
 
 type UpdateUserParams struct {
@@ -384,6 +506,151 @@ func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, e
 		&i.ProviderID,
 		&i.AvatarUrl,
 		&i.Name,
+		&i.EmailVerified,
+		&i.EmailVerificationToken,
+		&i.EmailVerificationExpiresAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const updateUserPassword = `-- name: UpdateUserPassword :one
+UPDATE users
+SET password_hash = $2, updated_at = NOW()
+WHERE id = $1
+RETURNING id, username, email, password_hash, provider, provider_id, avatar_url, name, email_verified, email_verification_token, email_verification_expires_at, created_at, updated_at
+`
+
+type UpdateUserPasswordParams struct {
+	ID           uuid.UUID      `json:"id"`
+	PasswordHash sql.NullString `json:"password_hash"`
+}
+
+func (q *Queries) UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) (User, error) {
+	row := q.db.QueryRowContext(ctx, updateUserPassword, arg.ID, arg.PasswordHash)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.Email,
+		&i.PasswordHash,
+		&i.Provider,
+		&i.ProviderID,
+		&i.AvatarUrl,
+		&i.Name,
+		&i.EmailVerified,
+		&i.EmailVerificationToken,
+		&i.EmailVerificationExpiresAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const updateUserProfile = `-- name: UpdateUserProfile :one
+UPDATE users
+SET username = $2, name = $3, avatar_url = $4, updated_at = NOW()
+WHERE id = $1
+RETURNING id, username, email, password_hash, provider, provider_id, avatar_url, name, email_verified, email_verification_token, email_verification_expires_at, created_at, updated_at
+`
+
+type UpdateUserProfileParams struct {
+	ID        uuid.UUID      `json:"id"`
+	Username  sql.NullString `json:"username"`
+	Name      sql.NullString `json:"name"`
+	AvatarUrl sql.NullString `json:"avatar_url"`
+}
+
+// Profile and settings management queries
+func (q *Queries) UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (User, error) {
+	row := q.db.QueryRowContext(ctx, updateUserProfile,
+		arg.ID,
+		arg.Username,
+		arg.Name,
+		arg.AvatarUrl,
+	)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.Email,
+		&i.PasswordHash,
+		&i.Provider,
+		&i.ProviderID,
+		&i.AvatarUrl,
+		&i.Name,
+		&i.EmailVerified,
+		&i.EmailVerificationToken,
+		&i.EmailVerificationExpiresAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const updateUserSettings = `-- name: UpdateUserSettings :one
+UPDATE users
+SET username = $2, name = $3, avatar_url = $4, updated_at = NOW()
+WHERE id = $1
+RETURNING id, username, email, password_hash, provider, provider_id, avatar_url, name, email_verified, email_verification_token, email_verification_expires_at, created_at, updated_at
+`
+
+type UpdateUserSettingsParams struct {
+	ID        uuid.UUID      `json:"id"`
+	Username  sql.NullString `json:"username"`
+	Name      sql.NullString `json:"name"`
+	AvatarUrl sql.NullString `json:"avatar_url"`
+}
+
+func (q *Queries) UpdateUserSettings(ctx context.Context, arg UpdateUserSettingsParams) (User, error) {
+	row := q.db.QueryRowContext(ctx, updateUserSettings,
+		arg.ID,
+		arg.Username,
+		arg.Name,
+		arg.AvatarUrl,
+	)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.Email,
+		&i.PasswordHash,
+		&i.Provider,
+		&i.ProviderID,
+		&i.AvatarUrl,
+		&i.Name,
+		&i.EmailVerified,
+		&i.EmailVerificationToken,
+		&i.EmailVerificationExpiresAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const verifyUserEmail = `-- name: VerifyUserEmail :one
+UPDATE users
+SET email_verified = TRUE, email_verification_token = NULL, email_verification_expires_at = NULL, updated_at = NOW()
+WHERE email_verification_token = $1 AND email_verification_expires_at > NOW()
+RETURNING id, username, email, password_hash, provider, provider_id, avatar_url, name, email_verified, email_verification_token, email_verification_expires_at, created_at, updated_at
+`
+
+func (q *Queries) VerifyUserEmail(ctx context.Context, emailVerificationToken sql.NullString) (User, error) {
+	row := q.db.QueryRowContext(ctx, verifyUserEmail, emailVerificationToken)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.Email,
+		&i.PasswordHash,
+		&i.Provider,
+		&i.ProviderID,
+		&i.AvatarUrl,
+		&i.Name,
+		&i.EmailVerified,
+		&i.EmailVerificationToken,
+		&i.EmailVerificationExpiresAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)

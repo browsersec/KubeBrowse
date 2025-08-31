@@ -7,6 +7,9 @@ CREATE TABLE users (
   provider_id VARCHAR(255),
   avatar_url VARCHAR(500),
   name VARCHAR(255),
+  email_verified BOOLEAN DEFAULT FALSE,
+  email_verification_token VARCHAR(255),
+  email_verification_expires_at TIMESTAMP,
   created_at TIMESTAMP NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
@@ -25,3 +28,5 @@ CREATE INDEX idx_user_sessions_user_id ON user_sessions(user_id);
 CREATE INDEX idx_user_sessions_expires_at ON user_sessions(expires_at);
 CREATE INDEX idx_users_email ON users(email);
 CREATE INDEX idx_users_provider ON users(provider, provider_id);
+CREATE INDEX idx_users_email_verification_token ON users(email_verification_token);
+CREATE INDEX idx_users_email_verified ON users(email_verified);

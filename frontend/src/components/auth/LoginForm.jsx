@@ -5,6 +5,7 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Card } from '../ui/card';
 import { Alert } from '../ui/alert';
+import EmailVerification from './EmailVerification';
 
 export function LoginForm({ onSwitchToRegister }) {
   const [formData, setFormData] = useState({
@@ -12,8 +13,9 @@ export function LoginForm({ onSwitchToRegister }) {
     password: ''
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showEmailVerification, setShowEmailVerification] = useState(false);
   
-  const { login, loginWithGitHub, error, clearError } = useAuth();
+  const { login, loginWithGitHub, error, clearError, emailVerificationNeeded, pendingVerificationEmail } = useAuth();
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -31,6 +33,9 @@ export function LoginForm({ onSwitchToRegister }) {
     const result = await login(formData.email, formData.password);
     
     if (!result.success) {
+      if (result.needsVerification) {
+        setShowEmailVerification(true);
+      }
       setIsSubmitting(false);
     }
     // If successful, the auth context will handle the state update
@@ -39,6 +44,21 @@ export function LoginForm({ onSwitchToRegister }) {
   const handleGitHubLogin = () => {
     loginWithGitHub();
   };
+
+  const handleBackToLogin = () => {
+    setShowEmailVerification(false);
+    clearError();
+  };
+
+  // Show email verification screen if needed
+  if (showEmailVerification || emailVerificationNeeded) {
+    return (
+      <EmailVerification 
+        email={pendingVerificationEmail || formData.email} 
+        onBack={handleBackToLogin}
+      />
+    );
+  }
 
   return (
     <Card className="w-full max-w-md mx-auto p-6">

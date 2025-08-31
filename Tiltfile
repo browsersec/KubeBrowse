@@ -3,26 +3,6 @@ load('ext://restart_process', 'docker_build_with_restart')
 allow_k8s_contexts("default")
 print("Tilt starting up...")
 
-# Local compilation for backend Go app
-# local_resource(
-#   'kubebrowse-compile',
-#   '''
-#   # Build Go binary
-#   mkdir -p ./.tilt
-#   CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o ./.tilt/guac cmd/guac/main.go
-#   chmod +x ./.tilt/guac
-#   ''',
-#   deps=[
-#     './api',
-#     './cmd',
-#     './internal',
-#     './docs',
-#     './go.mod',
-#     './go.sum'
-#   ],
-#   dir='.'
-# )
-
 # Backend API (Go) with restart support - include all necessary files
 docker_build_with_restart(
     'ghcr.io/browsersec/kubebrowse',
@@ -64,6 +44,22 @@ k8s_yaml([
   './deployments/manifest.yml',
 ], allow_duplicates=True)
 
+# Add PostgreSQL port forward for local database access
+k8s_resource(
+    'postgres',
+    port_forwards=['5432:5432'],
+    labels=["database"],
+    auto_init=False
+)
+
+# Add Redis port forward for local development
+k8s_resource(
+    'redis',
+    port_forwards=['6379:6379'],
+    labels=["database"],
+    auto_init=False
+)
+
 # Define Kubernetes resources - simplified to avoid object reference errors
 k8s_resource(
     'browser-sandbox-api',
@@ -72,15 +68,7 @@ k8s_resource(
     labels=["api"]
 )
 
-# Define Kubernetes resources for frontend
-# k8s_resource(
-#     'browser-sandbox-frontend',
-#     port_forwards=['3000:80'],
-#     auto_init=False,
-#     labels=["frontend"]
-# )
-
-# Update infrastructure resources to match what's available in the cluster
+# Infrastructure resources - simplified to avoid object reference issues
 k8s_resource(
     objects=[
         'browser-sandbox:Namespace:default',
@@ -105,3 +93,12 @@ k8s_resource(
 print("Tiltfile configured successfully.")
 print("Run `tilt up` to start the development environment.")
 print("For cleanup, trigger the docker-cleanup resource manually with: tilt trigger docker-cleanup")
+print("")
+print("Database Access:")
+print("- PostgreSQL: localhost:5432 (postgresuser/postgrespassword)")
+print("- Redis: localhost:6379")
+print("- API: localhost:4567")
+print("")
+print("To run migrations locally:")
+print("export DATABASE_URL='postgres://postgresuser:postgrespassword@localhost:5432/sandbox_db?sslmode=disable'")
+print("make migrate")

@@ -22,6 +22,8 @@ export default defineConfig({
         secure: false, // Ignore certificate validation
         timeout: 60000, // Increase timeout to 60 seconds
         proxyTimeout: 60000,
+        cookieDomainRewrite: 'localhost',
+        cookiePathRewrite: '/',
       },
       '/test': {
         target: guacClient,
@@ -30,6 +32,8 @@ export default defineConfig({
         secure: false, // Ignore certificate validation
         timeout: 60000, // Increase timeout to 60 seconds
         proxyTimeout: 60000,
+        cookieDomainRewrite: 'localhost',
+        cookiePathRewrite: '/',
       },
       '/sessions': {
         target: guacClient,
@@ -38,6 +42,37 @@ export default defineConfig({
         secure: false, // Ignore certificate validation
         timeout: 60000, // Increase timeout to 60 seconds
         proxyTimeout: 60000,
+        cookieDomainRewrite: 'localhost',
+        cookiePathRewrite: '/',
+      },
+      '/auth': {
+        target: guacClient,
+        changeOrigin: true,
+        ws: false,
+        secure: false, // Ignore certificate validation
+        timeout: 60000, // Increase timeout to 60 seconds
+        proxyTimeout: 60000,
+        cookieDomainRewrite: 'localhost',
+        cookiePathRewrite: '/',
+        onProxyReq: (proxyReq, req, res) => {
+          // Ensure cookies are forwarded properly
+          if (req.headers.cookie) {
+            proxyReq.setHeader('Cookie', req.headers.cookie);
+          }
+        },
+        onProxyRes: (proxyRes, req, res) => {
+          // Handle Set-Cookie headers from the backend
+          if (proxyRes.headers['set-cookie']) {
+            const cookies = proxyRes.headers['set-cookie'];
+            // Rewrite cookie domain and path for frontend
+            const rewrittenCookies = cookies.map(cookie => 
+              cookie.replace(/Domain=[^;]+;?/g, 'Domain=localhost;')
+                   .replace(/Path=[^;]+;?/g, 'Path=/;')
+                   .replace(/Secure;?/g, '') // Remove Secure flag for local development
+            );
+            proxyRes.headers['set-cookie'] = rewrittenCookies;
+          }
+        }
       },
       '/websocket-tunnel': {
         target: guacClient,

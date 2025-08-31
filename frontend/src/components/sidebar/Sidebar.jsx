@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Chrome, Shredder, Share, Settings, Sun, Moon, ChevronLeft, ChevronRight, LogIn } from 'lucide-react';
@@ -13,6 +13,27 @@ export default function Sidebar() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const { theme, toggleTheme } = useTheme();
   const { isAuthenticated, isLoading } = useAuth();
+
+  // Automatically close auth modal when user becomes authenticated
+  useEffect(() => {
+    if (isAuthenticated && showAuthModal) {
+      console.log('User authenticated, closing auth modal');
+      setShowAuthModal(false);
+    }
+  }, [isAuthenticated, showAuthModal]);
+
+  // Safety check: ensure modal is closed when user is authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      setShowAuthModal(false);
+    }
+  }, [isAuthenticated]);
+
+  const handleOpenAuthModal = () => {
+    if (!isAuthenticated) {
+      setShowAuthModal(true);
+    }
+  };
 
   return (
     <motion.div 
@@ -84,7 +105,7 @@ export default function Sidebar() {
             ) : (
               <Button
                 variant="outline"
-                onClick={() => setShowAuthModal(true)}
+                onClick={handleOpenAuthModal}
                 className={expanded ? "justify-start w-full" : "w-full"}
               >
                 <LogIn className="h-5 w-5" />
@@ -126,11 +147,13 @@ export default function Sidebar() {
         )}
       </div>
 
-      {/* Auth Modal */}
-      <AuthModal 
-        isOpen={showAuthModal} 
-        onClose={() => setShowAuthModal(false)} 
-      />
+      {/* Auth Modal - only show when not authenticated */}
+      {!isAuthenticated && (
+        <AuthModal 
+          isOpen={showAuthModal} 
+          onClose={() => setShowAuthModal(false)} 
+        />
+      )}
     </motion.div>
   );
 }

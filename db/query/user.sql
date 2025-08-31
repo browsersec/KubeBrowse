@@ -24,17 +24,17 @@ RETURNING *;
 
 -- name: CreateEmailUser :one
 INSERT INTO users (
-  email, password_hash, provider
+  email, password_hash, provider, email_verification_token, email_verification_expires_at
 ) VALUES (
-  $1, $2, 'email'
+  $1, $2, 'email', $3, $4
 )
 RETURNING *;
 
 -- name: CreateOAuthUser :one
 INSERT INTO users (
-  email, provider, provider_id, avatar_url, name, username
+  email, provider, provider_id, avatar_url, name, username, password_hash
 ) VALUES (
-  $1, $2, $3, $4, $5, $6
+  $1, $2, $3, $4, $5, $6, NULL
 )
 RETURNING *;
 
@@ -58,7 +58,7 @@ INSERT INTO user_sessions (
 RETURNING *;
 
 -- name: GetSession :one
-SELECT s.*, u.id as user_id, u.email, u.username, u.name, u.avatar_url, u.provider
+SELECT s.id, s.user_id, s.session_token, s.expires_at, s.created_at, s.updated_at, u.email, u.username, u.name, u.avatar_url, u.provider
 FROM user_sessions s
 JOIN users u ON s.user_id = u.id
 WHERE s.session_token = $1 AND s.expires_at > NOW()
@@ -75,3 +75,46 @@ WHERE expires_at <= NOW();
 -- name: DeleteUserSessions :exec
 DELETE FROM user_sessions
 WHERE user_id = $1;
+
+-- Profile and settings management queries
+-- name: UpdateUserProfile :one
+UPDATE users
+SET username = $2, name = $3, avatar_url = $4, updated_at = NOW()
+WHERE id = $1
+RETURNING *;
+
+-- name: UpdateUserPassword :one
+UPDATE users
+SET password_hash = $2, updated_at = NOW()
+WHERE id = $1
+RETURNING *;
+
+-- name: UpdateUserSettings :one
+UPDATE users
+SET username = $2, name = $3, avatar_url = $4, updated_at = NOW()
+WHERE id = $1
+RETURNING *;
+
+-- Email verification queries
+-- name: GetUserByEmailVerificationToken :one
+SELECT * FROM users
+WHERE email_verification_token = $1 AND email_verification_expires_at > NOW()
+LIMIT 1;
+
+-- name: VerifyUserEmail :one
+UPDATE users
+SET email_verified = TRUE, email_verification_token = NULL, email_verification_expires_at = NULL, updated_at = NOW()
+WHERE email_verification_token = $1 AND email_verification_expires_at > NOW()
+RETURNING *;
+
+-- name: UpdateEmailVerificationToken :one
+UPDATE users
+SET email_verification_token = $2, email_verification_expires_at = $3, updated_at = NOW()
+WHERE id = $1
+RETURNING *;
+
+-- name: ResendEmailVerification :one
+UPDATE users
+SET email_verification_token = $2, email_verification_expires_at = $3, updated_at = NOW()
+WHERE email = $1 AND email_verified = FALSE
+RETURNING *;

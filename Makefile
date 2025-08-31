@@ -82,6 +82,60 @@ build: deps
 setup: deps hooks
 	@echo "Development environment setup complete"
 
+# Database migration targets using golang-migrate
+migrate:
+	@echo "Running database migrations using golang-migrate..."
+	@if [ -z "$(DATABASE_URL)" ]; then \
+		echo "❌ DATABASE_URL environment variable is not set"; \
+		echo "Please set DATABASE_URL with your database connection string"; \
+		echo "Example: export DATABASE_URL='postgres://username:password@localhost:5432/dbname?sslmode=disable'"; \
+		exit 1; \
+	fi
+	@./scripts/migrate.sh
+
+migrate-status:
+	@echo "Checking migration status..."
+	@if [ -z "$(DATABASE_URL)" ]; then \
+		echo "❌ DATABASE_URL environment variable is not set"; \
+		echo "Please set DATABASE_URL with your database connection string"; \
+		exit 1; \
+	fi
+	@migrate -path ./db/migrations -database "$(DATABASE_URL)" version
+
+migrate-create:
+	@echo "Creating new migration..."
+	@if [ -z "$(NAME)" ]; then \
+		echo "❌ Migration name not specified"; \
+		echo "Usage: make migrate-create NAME=migration_name"; \
+		exit 1; \
+	fi
+	@migrate create -ext sql -dir ./db/migrations -seq $(NAME)
+
+migrate-up:
+	@echo "Running migrations up..."
+	@if [ -z "$(DATABASE_URL)" ]; then \
+		echo "❌ DATABASE_URL environment variable is not set"; \
+		exit 1; \
+	fi
+	@migrate -path ./db/migrations -database "$(DATABASE_URL)" up
+
+migrate-down:
+	@echo "Rolling back migrations..."
+	@if [ -z "$(DATABASE_URL)" ]; then \
+		echo "❌ DATABASE_URL environment variable is not set"; \
+		exit 1; \
+	fi
+	@migrate -path ./db/migrations -database "$(DATABASE_URL)" down
+
+migrate-force:
+	@echo "Forcing migration version..."
+	@if [ -z "$(DATABASE_URL)" ] || [ -z "$(VERSION)" ]; then \
+		echo "❌ DATABASE_URL and VERSION environment variables must be set"; \
+		echo "Usage: make migrate-force DATABASE_URL='...' VERSION=1"; \
+		exit 1; \
+	fi
+	@migrate -path ./db/migrations -database "$(DATABASE_URL)" force $(VERSION)
+
 help:
 	go run cmd/guac/main.go -h
 	@echo ""
@@ -95,3 +149,16 @@ help:
 	@echo "  build        - Build the project"
 	@echo "  generate     - Generate self-signed certificates"
 	@echo "  generate_prod - Generate Let's Encrypt certificates"
+	@echo ""
+	@echo "Database Migration Commands (using golang-migrate):"
+	@echo "  migrate      - Run all pending migrations"
+	@echo "  migrate-status - Check current migration version"
+	@echo "  migrate-create - Create new migration (NAME=migration_name)"
+	@echo "  migrate-up   - Run migrations up"
+	@echo "  migrate-down - Rollback migrations"
+	@echo "  migrate-force - Force migration version (VERSION=1)"
+	@echo ""
+	@echo "Migration Examples:"
+	@echo "  export DATABASE_URL='postgres://user:pass@localhost:5432/db?sslmode=disable'"
+	@echo "  make migrate"
+	@echo "  make migrate-create NAME=add_user_preferences"

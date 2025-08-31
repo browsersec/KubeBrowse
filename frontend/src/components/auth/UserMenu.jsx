@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { Button } from '../ui/button';
+import { Link } from 'react-router-dom';
 
 export function UserMenu() {
   const { user, isAuthenticated, logout } = useAuth();
@@ -51,19 +52,21 @@ export function UserMenu() {
               <div className="text-gray-500 dark:text-gray-400">{user.email}</div>
             </div>
             
-            <button
+            <Link
+              to="/profile"
               onClick={() => setIsMenuOpen(false)}
               className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
             >
               Profile
-            </button>
+            </Link>
             
-            <button
+            <Link
+              to="/settings"
               onClick={() => setIsMenuOpen(false)}
               className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
             >
               Settings
-            </button>
+            </Link>
             
             <hr className="border-gray-200 dark:border-gray-700" />
             
