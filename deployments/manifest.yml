@@ -313,38 +313,6 @@ spec:
               value: "10" # 10 minutes
             - name: POD_SESSION_TTL
               value: "6" # 6 minutes
-            - name: JAEGER_ENDPOINT
-              value: "http://152.53.244.80:14268/api/traces"
-            - name: JAEGER_SERVICE_NAME
-              value: "browser-sandbox"
-            - name: DISTRIBUTED_TRACING
-              value: "true"
-            - name: GITHUB_CLIENT_ID
-              value: "Ov23li974J8UoG1CH0HJ"
-            - name: GITHUB_CLIENT_SECRET
-              value: "f16b7dc2b85d4a7f817e273b4a2d64124153ce8f"
-            - name: GITHUB_CALLBACK_URL
-              value: "https://localhost:4567/auth/oauth/github/callback"
-            - name: SESSION_SECRET
-              value: "McX0xoYlJYpO0EGdUZC6aJxVh2rKYrXZM7SPMpVREeXMXoMBI20v90PICD-LfEn7jr07c5vH2CWcKzjl8hoNvQ"
-            - name: FRONTEND_URL
-              value: "http://localhost:5173"
-            - name: ENVIRONMENT
-              value: "development"
-            - name: SMTP_HOST
-              value: "smtp.gmail.com"
-            - name: SMTP_PORT
-              value: "587"
-            - name: SMTP_USERNAME
-              value: "sanjay.obsidian@gmail.com"
-            - name: SMTP_PASSWORD
-              value: "ulagdeliigobhdgr"
-            - name: FROM_EMAIL
-              value: "sanjay.obsidian@gmail.com"
-            # - name: CERT_PATH
-            #   value: ""
-            # - name: CERT_KEY_PATH
-            #   value: ""
           securityContext: {}
 ---
 # API Service
