@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"log"
 	"net"
 	"net/http"
 	"os"
@@ -18,6 +19,9 @@ import (
 	"github.com/browsersec/KubeBrowse/internal/email"
 	guac2 "github.com/browsersec/KubeBrowse/internal/guac"
 	"github.com/browsersec/KubeBrowse/internal/k8s"
+	"github.com/browsersec/KubeBrowse/internal/logging"
+	"github.com/browsersec/KubeBrowse/internal/middleware"
+	"github.com/browsersec/KubeBrowse/internal/tracing"
 
 	"github.com/browsersec/KubeBrowse/api"
 	"github.com/browsersec/KubeBrowse/docs"
@@ -68,12 +72,79 @@ func GinHandlerAdapter(h http.Handler) gin.HandlerFunc {
 }
 
 func main() {
+
+	logging.Init(logrus.TraceLevel)
+
+	if os.Getenv("DISTRIBUTED_TRACING") != "true" {
+		shutdown := tracing.InitTracer("browser-sandbox", os.Getenv("JAEGER_ENDPOINT"))
+		defer func() {
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+			defer cancel()
+			if err := shutdown(ctx); err != nil {
+				log.Printf("Error shutting down tracer provider: %v", err)
+			}
+		}()
+	}
+
 	redisClient = redis2.InitRedis()
 
-	// session cleanup service - Fix: Pass k8sNamespace and register after k8sClient is initialized
-	// cleanupService := cleanup.NewSessionCleanupService(redisClient, k8sClient)
-	// cleanupService.Start()
-	// defer cleanupService.Stop()
+	// Initialize database connection
+	dbURL := os.Getenv("DATABASE_URL")
+	if dbURL == "" {
+		dbURL = "postgres://postgres:password@localhost:5432/kubebrowse?sslmode=disable"
+		logrus.Warn("DATABASE_URL not set, using default connection string")
+	}
+
+	var err error
+	dbConn, err = sql.Open("postgres", dbURL)
+	if err != nil {
+		logrus.Errorf("Failed to connect to database: %v", err)
+		logrus.Warn("Continuing without database - authentication will not work")
+	} else {
+		// Test connection
+		if err = dbConn.Ping(); err != nil {
+			logrus.Errorf("Failed to ping database: %v", err)
+			logrus.Warn("Database connection failed - authentication will not work")
+			dbConn = nil
+		} else {
+			logrus.Info("Successfully connected to database")
+			queries = sqlc.New(dbConn)
+		}
+	}
+
+	// Initialize email service
+	emailService = email.NewService()
+
+	// Test email configuration at startup
+	if emailService.IsConfigured() {
+		logrus.Info("Email service configured successfully")
+		logrus.Infof("SMTP Host: %s", os.Getenv("SMTP_HOST"))
+		logrus.Infof("SMTP Port: %s", os.Getenv("SMTP_PORT"))
+		logrus.Infof("SMTP Username: %s", os.Getenv("SMTP_USERNAME"))
+		logrus.Infof("From Email: %s", os.Getenv("FROM_EMAIL"))
+		logrus.Infof("Base URL: %s", os.Getenv("BASE_URL"))
+
+		// Test SMTP connection (optional - uncomment for testing)
+		// testEmailConnection()
+	} else {
+		logrus.Warn("Email service not configured - email verification will not work")
+		logrus.Warn("Missing SMTP configuration. Please set the following environment variables:")
+		if os.Getenv("SMTP_HOST") == "" {
+			logrus.Warn("  - SMTP_HOST")
+		}
+		if os.Getenv("SMTP_USERNAME") == "" {
+			logrus.Warn("  - SMTP_USERNAME")
+		}
+		if os.Getenv("SMTP_PASSWORD") == "" {
+			logrus.Warn("  - SMTP_PASSWORD")
+		}
+		if os.Getenv("FROM_EMAIL") == "" {
+			logrus.Warn("  - FROM_EMAIL")
+		}
+	}
+
+	// Initialize Goth OAuth providers
+	auth.InitializeGoth()
 
 	minioConfig := &MinioConfig{
 		bucketName: os.Getenv("MINIO_BUCKET"),
@@ -217,6 +288,7 @@ func main() {
 	// Initialize Gin
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
+	router.Use(middleware.GinLogger(), gin.Recovery(), middleware.TracingMiddleware("browser-sandbox"))
 
 	// Configure Swagger
 	docs.SwaggerInfo.BasePath = "/"
@@ -234,11 +306,6 @@ func main() {
 	router.Use(gin.Recovery())
 	router.Use(gin.Logger())
 
-	// Initialize Guacamole handlers
-	// servlet := guac.NewServer(DemoDoConnect) // We'll adjust this if DemoDoConnect's signature changes, or use a wrapper
-	// wsServer := guac.NewWebsocketServer(DemoDoConnect) // Same here
-
-	// Pass tunnelStore to DemoDoConnect by wrapping it
 	doConnectWrapper := func(request *http.Request) (guac2.Tunnel, error) {
 		return api.DemoDoConnect(request, tunnelStore, redisClient, guacdAddr, cleanupService)
 	}
@@ -251,12 +318,7 @@ func main() {
 		cleanupService.Start()
 		defer cleanupService.Stop()
 	}
-	// sessions := guac.NewMemorySessionStore() // Old store
-	// wsServer.OnConnect = sessions.Add // Old OnConnect
-	// wsServer.OnDisconnect = sessions.Delete // Old OnDisconnect
 
-	// OnConnect is implicitly handled by DemoDoConnect now adding to tunnelStore.
-	// We still need OnDisconnect to remove from the store when a tunnel closes for any reason.
 	wsServer.OnDisconnect = func(connectionID string, req *http.Request, tunnel guac2.Tunnel) {
 		logrus.Debugf("Websocket disconnected, removing tunnel: %s", connectionID)
 

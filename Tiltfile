@@ -3,26 +3,6 @@ load('ext://restart_process', 'docker_build_with_restart')
 allow_k8s_contexts("default")
 print("Tilt starting up...")
 
-# Local compilation for backend Go app
-local_resource(
-  'kubebrowse-compile',
-  '''
-  # Build Go binary
-  mkdir -p ./.tilt
-  CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o ./.tilt/guac cmd/guac/main.go
-  chmod +x ./.tilt/guac
-  ''',
-  deps=[
-    './api',
-    './cmd',
-    './internal',
-    './docs',
-    './go.mod',
-    './go.sum'
-  ],
-  dir='.'
-)
-
 # Backend API (Go) with restart support - include all necessary files
 docker_build_with_restart(
     'ghcr.io/browsersec/kubebrowse',
