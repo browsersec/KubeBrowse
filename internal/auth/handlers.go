@@ -47,8 +47,17 @@ func InitializeGoth() {
 	// Configure session store for Gothic
 	sessionSecret := os.Getenv("SESSION_SECRET")
 	if sessionSecret == "" {
-		sessionSecret = "default-secret-change-this-in-production"
-		logrus.Warn("SESSION_SECRET not set, using default secret - this is insecure for production")
+		// Check if running in production (GIN_MODE=release or ENV=production)
+		env := os.Getenv("GIN_MODE")
+		if env == "" {
+			env = os.Getenv("ENV")
+		}
+		if env == "release" || env == "production" {
+			logrus.Fatal("SESSION_SECRET must be set in production environments. Refusing to start.")
+			os.Exit(1)
+		}
+		sessionSecret = "default-secret-change-this-in-development"
+		logrus.Warn("SESSION_SECRET not set, using default secret - this is insecure for production. Only allowed in development.")
 	}
 
 	// Create session store with more permissive settings for development
