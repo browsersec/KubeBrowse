@@ -18,9 +18,9 @@ WHERE provider != 'email' OR provider IS NULL;
 
 -- Set email_verified to TRUE for existing email users (backward compatibility)
 -- In production, you might want to require re-verification instead
-UPDATE users 
-SET email_verified = TRUE 
-WHERE provider = 'email' AND (email_verified = FALSE OR email_verified IS NULL);
+-- Consider leaving email users unverified, or only carry forward prior explicit verifications.
+-- Example safer option (no-op for email users):
+-- UPDATE users SET email_verified = TRUE WHERE provider != 'email' OR provider IS NULL;
 
 -- Verify the changes
 SELECT 
