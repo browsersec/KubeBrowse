@@ -102,8 +102,7 @@ func (s *Service) RegisterWithEmail(email, password string) (*User, error) {
 		name := email // Use email as name if no name provided
 		err = s.emailService.SendVerificationEmail(email, name, verificationToken)
 		if err != nil {
-			// Log error but don't fail registration
-			fmt.Printf("Failed to send verification email: %v\n", err)
+			logrus.Errorf("Failed to send verification email: %v", err)
 		}
 	}
 
