@@ -94,15 +94,6 @@ VITE_API_URL=http://localhost:4567
 ### 4. Backend Setup
 
 #### Install Dependencies
-```bash
-# Install Go dependencies
-go mod tidy
-
-# Install required packages
-go get github.com/markbates/goth@latest
-go get github.com/gorilla/sessions@latest
-go get golang.org/x/crypto/bcrypt@latest
-```
 
 #### Build and Run
 ```bash
