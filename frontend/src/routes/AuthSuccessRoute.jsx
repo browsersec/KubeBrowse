@@ -7,118 +7,67 @@ export function AuthSuccessRoute() {
   const { checkAuthStatus, user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const [status, setStatus] = useState('checking');
-  const [retryCount, setRetryCount] = useState(0);
+  const authRef = React.useRef({ user, isAuthenticated });
+  useEffect(() => { authRef.current = { user, isAuthenticated }; }, [user, isAuthenticated]);
 
   useEffect(() => {
-    console.log('AuthSuccessRoute: Starting OAuth success flow');
-    
-    const attemptAuth = async () => {
+    let cancelled = false;
+    let redirectTimer;
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const run = async () => {
       try {
-        setStatus('checking');
-        await checkAuthStatus();
-        
-        // Wait a bit for the session to be established
-        setTimeout(async () => {
-          if (isAuthenticated && user) {
-            console.log('User authenticated successfully:', user);
+        for (let attempt = 1; attempt <= 3; attempt++) {
+          setStatus('checking');
+          await checkAuthStatus();
+          await sleep(1000);
+          const { user: u, isAuthenticated: ok } = authRef.current;
+          if (cancelled) return;
+          if (ok && u) {
             setStatus('success');
-            
-            // Show success toast
-            toast.success(
-              `Welcome back, ${user.name || user.email}!`,
-              {
-                duration: 3000,
-                position: 'top-right',
-                style: {
-                  background: '#10B981',
-                  color: '#fff',
-                  fontWeight: '600',
-                },
-                iconTheme: {
-                  primary: '#fff',
-                  secondary: '#10B981',
-                },
-              }
-            );
-            
-            // Redirect to home page after toast
-            setTimeout(() => {
-              navigate('/');
-            }, 2000);
-          } else {
-            console.log('User not authenticated yet, retrying...');
-            setStatus('retrying');
-            if (retryCount < 3) {
-              setRetryCount(prev => prev + 1);
-              // Show retry toast
-              toast(
-                `Authentication attempt ${retryCount + 1}/3...`,
-                {
-                  duration: 2000,
-                  position: 'top-right',
-                  style: {
-                    background: '#F59E0B',
-                    color: '#fff',
-                    fontWeight: '600',
-                  },
-                  iconTheme: {
-                    primary: '#fff',
-                    secondary: '#F59E0B',
-                  },
-                }
-              );
-              setTimeout(attemptAuth, 2000);
-            } else {
-              setStatus('failed');
-              // Show error toast
-              toast.error(
-                'Authentication failed. Please try again.',
-                {
-                  duration: 4000,
-                  position: 'top-right',
-                  style: {
-                    background: '#EF4444',
-                    color: '#fff',
-                    fontWeight: '600',
-                  },
-                  iconTheme: {
-                    primary: '#fff',
-                    secondary: '#EF4444',
-                  },
-                }
-              );
-            }
+            toast.success(`Welcome back, ${u.name || u.email}!`, {
+              duration: 3000, position: 'top-right',
+              style: { background: '#10B981', color: '#fff', fontWeight: '600' },
+              iconTheme: { primary: '#fff', secondary: '#10B981' },
+            });
+            redirectTimer = setTimeout(() => navigate('/', { replace: true }), 2000);
+            return;
           }
-        }, 1000);
+          setStatus('retrying');
+          toast(`Authentication attempt ${attempt}/3...`, {
+            duration: 2000, position: 'top-right',
+            style: { background: '#F59E0B', color: '#fff', fontWeight: '600' },
+            iconTheme: { primary: '#fff', secondary: '#F59E0B' },
+          });
+          await sleep(2000);
+        }
+        if (!cancelled) {
+          setStatus('failed');
+          toast.error('Authentication failed. Please try again.', {
+            duration: 4000, position: 'top-right',
+            style: { background: '#EF4444', color: '#fff', fontWeight: '600' },
+            iconTheme: { primary: '#fff', secondary: '#EF4444' },
+          });
+        }
       } catch (error) {
-        console.error('Auth check failed:', error);
-        setStatus('failed');
-        // Show error toast
-        toast.error(
-          'Authentication check failed. Please try again.',
-          {
-            duration: 4000,
-            position: 'top-right',
-            style: {
-              background: '#EF4444',
-              color: '#fff',
-              fontWeight: '600',
-            },
-            iconTheme: {
-              primary: '#fff',
-              secondary: '#EF4444',
-            },
-          }
-        );
+        if (!cancelled) {
+          console.error('Auth check failed:', error);
+          setStatus('failed');
+          toast.error('Authentication check failed. Please try again.', {
+            duration: 4000, position: 'top-right',
+            style: { background: '#EF4444', color: '#fff', fontWeight: '600' },
+            iconTheme: { primary: '#fff', secondary: '#EF4444' },
+          });
+        }
       }
     };
-
-    // Start the auth check process
-    attemptAuth();
-  }, [checkAuthStatus, user, isAuthenticated, navigate, retryCount]);
+    run();
+    return () => {
+      cancelled = true;
+      if (redirectTimer) clearTimeout(redirectTimer);
+    };
+  }, [checkAuthStatus, navigate]);
 
   const handleRetry = () => {
-    setRetryCount(0);
     setStatus('checking');
     
     // Show retry toast
@@ -189,7 +138,7 @@ export function AuthSuccessRoute() {
               Almost there...
             </h2>
             <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-              Setting up your session (attempt {retryCount + 1}/3)
+              Setting up your session...
             </p>
           </div>
           

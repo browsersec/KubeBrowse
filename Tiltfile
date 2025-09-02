@@ -29,6 +29,16 @@ docker_build_with_restart(
     ]
 )
 
+# Frontend (optional dev build) - uses Caddyfile.dev via build arg
+# Build only when needed; does not deploy any k8s resources here
+docker_build(
+    'ghcr.io/browsersec/kubebrowse-frontend',
+    './frontend',
+    dockerfile='frontend/Dockerfile',
+    build_args={'CADDYFILE': 'Caddyfile.dev'},
+    ignore=['frontend/dist']
+)
+
 # Clean up dangling images and build cache periodically
 local_resource(
     'docker-cleanup',

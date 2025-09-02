@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"mime/multipart"
 	"net/http"
+	"net/url"
 	"sync"
 	"time"
 
@@ -41,53 +43,40 @@ type FileBuffer struct {
 	Size     int64
 }
 
-import (
-    "bytes"
-    "context"
-    "encoding/json"
-    "errors"
-    "fmt"
-    "io"
-    "mime/multipart"
-    "net/http"
-    "net/url"
-    "sync"
-    "time"
+func getFQDNURL(ctx context.Context, connectionID string, redisClient *redis.Client) (string, error) {
+	val, err := redisClient.Get(ctx, "session:"+connectionID).Result()
+	if err != nil {
+		if errors.Is(err, redis.Nil) {
+			return "", fmt.Errorf("session not found")
+		}
+		return "", fmt.Errorf("redis get session: %w", err)
+	}
 
-    "github.com/go-redis/redis/v8"
-    "github.com/sirupsen/logrus"
-    redis2 "your/module/path/redis2"
-)
+	var session redis2.SessionData
+	if err := json.Unmarshal([]byte(val), &session); err != nil {
+		return "", fmt.Errorf("failed to unmarshal session data")
+	}
 
-func getFQDNURL(connectionID string, redisClient *redis.Client) (string, error) {
-    val, err := redisClient.Get(context.Background(), "session:"+connectionID).Result()
-    if err != nil {
-        if errors.Is(err, redis.Nil) {
-            return "", fmt.Errorf("session not found")
-        }
-        return "", fmt.Errorf("redis get session: %w", err)
-    }
-
-    var session redis2.SessionData
-    if err := json.Unmarshal([]byte(val), &session); err != nil {
-        return "", fmt.Errorf("failed to unmarshal session data")
-    }
-
-    u := url.URL{
-        Scheme: "http", // TODO: make configurable
-        Host:   fmt.Sprintf("%s:%d", session.FQDN, 8080),
-        Path:   "upload",
-    }
-    logrus.Debugf("Resolved upload URL for %s", connectionID)
-    return u.String(), nil
+	u := url.URL{
+		Scheme: "http", // TODO: make configurable
+		Host:   fmt.Sprintf("%s:%d", session.FQDN, 8080),
+		Path:   "upload",
+	}
+	logrus.Debugf("Resolved upload URL for %s", connectionID)
+	return u.String(), nil
 }
 
 // HandlerUploadFile handles file uploads to multiple destinations concurrently
 func HandlerUploadFile(c *gin.Context, redisClient *redis.Client, k8sClient *kubernetes.Clientset, minioClient *minio.Client, minioBucket string, clamavurl string, timeout time.Duration) {
 	start := time.Now()
 
+	// Create context with timeout for all operations
+	ctx := c.Request.Context()
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
 	// Get connection URL
-	url, err := getFQDNURL(c.Param("connectionID"), redisClient)
+	url, err := getFQDNURL(ctx, c.Param("connectionID"), redisClient)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -105,16 +94,18 @@ func HandlerUploadFile(c *gin.Context, redisClient *redis.Client, k8sClient *kub
 		return
 	}
 
+	const maxUploadBytes = int64(100 << 20) // 50 MiB; make configurable
+	if fileHeader.Size <= 0 || fileHeader.Size > maxUploadBytes {
+		c.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": "file too large"})
+		return
+	}
+
 	// Read file once into memory buffer
-	fileBuffer, err := readFileToBuffer(fileHeader)
+	fileBuffer, err := readFileToBuffer(fileHeader, maxUploadBytes)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to read file: " + err.Error()})
 		return
 	}
-
-	// Create context with timeout for all operations
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
 
 	// Perform concurrent uploads
 	results := performConcurrentUploads(ctx, fileBuffer, url, minioClient, minioBucket, clamavurl, timeout)
@@ -143,7 +134,7 @@ func HandlerUploadFile(c *gin.Context, redisClient *redis.Client, k8sClient *kub
 }
 
 // readFileToBuffer reads the uploaded file into a buffer for concurrent use
-func readFileToBuffer(fileHeader *multipart.FileHeader) (*FileBuffer, error) {
+func readFileToBuffer(fileHeader *multipart.FileHeader, limit int64) (*FileBuffer, error) {
 	srcFile, err := fileHeader.Open()
 	if err != nil {
 		return nil, fmt.Errorf("cannot open uploaded file: %w", err)
@@ -155,9 +146,13 @@ func readFileToBuffer(fileHeader *multipart.FileHeader) (*FileBuffer, error) {
 	}()
 
 	// Read entire file into memory
-	data, err := io.ReadAll(srcFile)
+	lr := &io.LimitedReader{R: srcFile, N: limit + 1}
+	data, err := io.ReadAll(lr)
 	if err != nil {
 		return nil, fmt.Errorf("cannot read file data: %w", err)
+	}
+	if int64(len(data)) > limit {
+		return nil, fmt.Errorf("file exceeds limit")
 	}
 
 	return &FileBuffer{
@@ -171,8 +166,13 @@ func readFileToBuffer(fileHeader *multipart.FileHeader) (*FileBuffer, error) {
 func HandlerUploadFileWithoutMinio(c *gin.Context, redisClient *redis.Client, k8sClient *kubernetes.Clientset, clamavurl string, timeout time.Duration) {
 	start := time.Now()
 
+	// Create context with timeout for all operations
+	ctx := c.Request.Context()
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
 	// Get connection URL
-	url, err := getFQDNURL(c.Param("connectionID"), redisClient)
+	url, err := getFQDNURL(ctx, c.Param("connectionID"), redisClient)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -190,16 +190,18 @@ func HandlerUploadFileWithoutMinio(c *gin.Context, redisClient *redis.Client, k8
 		return
 	}
 
+	const maxUploadBytes = int64(50 << 20) // 50 MiB; make configurable
+	if fileHeader.Size <= 0 || fileHeader.Size > maxUploadBytes {
+		c.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": "file too large"})
+		return
+	}
+
 	// Read file once into memory buffer
-	fileBuffer, err := readFileToBuffer(fileHeader)
+	fileBuffer, err := readFileToBuffer(fileHeader, maxUploadBytes)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to read file: " + err.Error()})
 		return
 	}
-
-	// Create context with timeout for all operations
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
 
 	// Perform limited uploads (only to container and ClamAV)
 	results := make([]UploadResult, 2)
@@ -210,10 +212,10 @@ func HandlerUploadFileWithoutMinio(c *gin.Context, redisClient *redis.Client, k8
 	// Try ClamAV scan if URL is provided
 	if clamavurl != "" {
 		// Use a shorter timeout for ClamAV scan
-		scanCtx, scanCancel := context.WithTimeout(ctx, timeout*time.Second)
+		scanCtx, scanCancel := context.WithTimeout(ctx, timeout)
 		defer scanCancel()
 
-		results[1] = uploadToClamAV(scanCtx, fileBuffer, clamavurl, timeout*time.Second)
+		results[1] = uploadToClamAV(scanCtx, fileBuffer, clamavurl, timeout)
 	} else {
 		results[1] = UploadResult{
 			Service: "clamav",
@@ -261,10 +263,10 @@ func performConcurrentUploads(ctx context.Context, fileBuffer *FileBuffer, offic
 		go func() {
 			defer wg.Done()
 			// Create a shorter context for ClamAV to prevent blocking other operations
-			scanCtx, scanCancel := context.WithTimeout(ctx, timeout*time.Second)
+			scanCtx, scanCancel := context.WithTimeout(ctx, timeout)
 			defer scanCancel()
 
-			result := uploadToClamAV(scanCtx, fileBuffer, clamavAddr, timeout*time.Second)
+			result := uploadToClamAV(scanCtx, fileBuffer, clamavAddr, timeout)
 			mutex.Lock()
 			results[1] = result
 			mutex.Unlock()

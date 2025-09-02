@@ -148,19 +148,19 @@ func DemoDoConnect(request *http.Request, tunnelStore *guac2.ActiveTunnelStore, 
 
 	var err error
 	if query.Get("width") != "" {
-		config.OptimalScreenHeight, err = strconv.Atoi(query.Get("width"))
-		if err != nil || config.OptimalScreenHeight == 0 {
-			logrus.Errorf("Invalid height value '%s': %v", query.Get("width"), err)
-			config.OptimalScreenHeight = 600
+		config.OptimalScreenWidth, err = strconv.Atoi(query.Get("width"))
+		if err != nil || config.OptimalScreenWidth == 0 {
+			logrus.Errorf("Invalid width value '%s': %v", query.Get("width"), err)
+			config.OptimalScreenWidth = 800
 		}
 	}
 	if query.Get("height") != "" {
-		config.OptimalScreenWidth, err = strconv.Atoi(query.Get("height"))
-		if err != nil || config.OptimalScreenWidth == 0 {
+		config.OptimalScreenHeight, err = strconv.Atoi(query.Get("height"))
+		if err != nil || config.OptimalScreenHeight == 0 {
 
 			// InitRedis initializes the Redis client
-			logrus.Errorf("Invalid width value '%s': %v", query.Get("height"), err)
-			config.OptimalScreenWidth = 800
+			logrus.Errorf("Invalid height value '%s': %v", query.Get("height"), err)
+			config.OptimalScreenHeight = 600
 		}
 	}
 	config.AudioMimetypes = []string{"audio/L16", "rate=44100", "channels=2"}
@@ -327,15 +327,15 @@ func DoConnectShare(request http.Request, tunnelStore *guac2.ActiveTunnelStore, 
 	}
 
 	if query.Get("width") != "" {
-		config.OptimalScreenHeight, _ = strconv.Atoi(query.Get("width"))
-		if config.OptimalScreenHeight == 0 {
-			config.OptimalScreenHeight = 600 // Default height
+		config.OptimalScreenWidth, _ = strconv.Atoi(query.Get("width"))
+		if config.OptimalScreenWidth == 0 {
+			config.OptimalScreenWidth = 800 // Default width
 		}
 	}
 	if query.Get("height") != "" {
-		config.OptimalScreenWidth, _ = strconv.Atoi(query.Get("height"))
-		if config.OptimalScreenWidth == 0 {
-			config.OptimalScreenWidth = 800 // Default width
+		config.OptimalScreenHeight, _ = strconv.Atoi(query.Get("height"))
+		if config.OptimalScreenHeight == 0 {
+			config.OptimalScreenHeight = 600 // Default height
 		}
 	}
 

@@ -4,7 +4,7 @@ WHERE id = $1 LIMIT 1;
 
 -- name: GetUserByEmail :one
 SELECT * FROM users
-WHERE email = $1 LIMIT 1;
+WHERE LOWER(email) = LOWER($1) LIMIT 1;
 
 -- name: GetUserByProvider :one
 SELECT * FROM users
@@ -98,13 +98,13 @@ RETURNING *;
 -- Email verification queries
 -- name: GetUserByEmailVerificationToken :one
 SELECT * FROM users
-WHERE email_verification_token = $1 AND email_verification_expires_at > NOW()
+WHERE email_verification_token = $1::text AND email_verification_expires_at > NOW()
 LIMIT 1;
 
 -- name: VerifyUserEmail :one
 UPDATE users
 SET email_verified = TRUE, email_verification_token = NULL, email_verification_expires_at = NULL, updated_at = NOW()
-WHERE email_verification_token = $1 AND email_verification_expires_at > NOW()
+WHERE email_verification_token = $1::text AND email_verification_expires_at > NOW()
 RETURNING *;
 
 -- name: UpdateEmailVerificationToken :one

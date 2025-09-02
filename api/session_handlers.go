@@ -64,7 +64,7 @@ func HandlerExtendSession(c *gin.Context, redisClient *redis.Client, cleanupServ
 		if timeLeft <= 0 {
 			message = "Session has already expired"
 		} else {
-			message = fmt.Sprintf("Session can only be extended within the last 2 minutes. Time remaining: %v", timeLeft)
+			message = fmt.Sprintf("Session can only be extended close to expiry. Time remaining: %v", timeLeft)
 		}
 
 		c.JSON(http.StatusForbidden, ExtendSessionResponse{

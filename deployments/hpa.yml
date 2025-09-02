@@ -15,21 +15,21 @@ spec:
       resource:
         name: cpu
         target:
-          type: Utilization
-          averageUtilization: 50
+          type: AverageValue
+          averageValue: "100"
     - type: Resource
       resource:
         name: memory
         target:
-          type: Utilization
-          averageUtilization: 50
+          type: AverageValue
+          averageValue: "100"
     - type: Pods
       pods:
         metric:
           name: http_requests
         target:
-          type: Utilization
-          averageUtilization: 50
+          type: AverageValue
+          averageValue: "100"
 --- 
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
@@ -48,21 +48,21 @@ spec:
       resource:
         name: cpu
         target:
-          type: Utilization
-          averageUtilization: 50
+          type: AverageValue
+          averageValue: "100"
     - type: Resource
       resource:
         name: memory
         target:
-          type: Utilization
-          averageUtilization: 50
+          type: AverageValue
+          averageValue: "100"
     - type: Pods
       pods:
         metric:
           name: http_requests
         target:
-          type: Utilization
-          averageUtilization: 50
+          type: AverageValue
+          averageValue: "100"
 ---
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
@@ -81,18 +81,18 @@ spec:
       resource:
         name: cpu
         target:
-          type: Utilization
-          averageUtilization: 50
+          type: AverageValue
+          averageValue: "100"
     - type: Resource
       resource:
         name: memory
         target:
-          type: Utilization
-          averageUtilization: 50
+          type: AverageValue
+          averageValue: "100"
     - type: Pods
       pods:
         metric:
           name: http_requests
         target:
-          type: Utilization
-          averageUtilization: 50
+          type: AverageValue
+          averageValue: "100"

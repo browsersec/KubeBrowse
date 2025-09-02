@@ -268,7 +268,11 @@ func HandlerConnectionID(c *gin.Context, tunnelStore *guac.ActiveTunnelStore, re
 	}
 
 	// Check if the connectionID is valid in redis
-	_, err := redisClient.Get(context.Background(), "session:"+connectionID).Result()
+	val, err := redisClient.Get(context.Background(), "session:"+connectionID).Result()
+	if err == redis.Nil || val == "" {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Session not found"})
+		return
+	}
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get session data"})
 		return

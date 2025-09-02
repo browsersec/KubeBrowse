@@ -288,11 +288,11 @@ func (q *Queries) GetUser(ctx context.Context, id uuid.UUID) (User, error) {
 
 const getUserByEmail = `-- name: GetUserByEmail :one
 SELECT id, username, email, password_hash, provider, provider_id, avatar_url, name, email_verified, email_verification_token, email_verification_expires_at, created_at, updated_at FROM users
-WHERE email = $1 LIMIT 1
+WHERE LOWER(email) = LOWER($1) LIMIT 1
 `
 
-func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
-	row := q.db.QueryRowContext(ctx, getUserByEmail, email)
+func (q *Queries) GetUserByEmail(ctx context.Context, lower string) (User, error) {
+	row := q.db.QueryRowContext(ctx, getUserByEmail, lower)
 	var i User
 	err := row.Scan(
 		&i.ID,
@@ -314,13 +314,13 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 
 const getUserByEmailVerificationToken = `-- name: GetUserByEmailVerificationToken :one
 SELECT id, username, email, password_hash, provider, provider_id, avatar_url, name, email_verified, email_verification_token, email_verification_expires_at, created_at, updated_at FROM users
-WHERE email_verification_token = $1 AND email_verification_expires_at > NOW()
+WHERE email_verification_token = $1::text AND email_verification_expires_at > NOW()
 LIMIT 1
 `
 
 // Email verification queries
-func (q *Queries) GetUserByEmailVerificationToken(ctx context.Context, emailVerificationToken sql.NullString) (User, error) {
-	row := q.db.QueryRowContext(ctx, getUserByEmailVerificationToken, emailVerificationToken)
+func (q *Queries) GetUserByEmailVerificationToken(ctx context.Context, dollar_1 string) (User, error) {
+	row := q.db.QueryRowContext(ctx, getUserByEmailVerificationToken, dollar_1)
 	var i User
 	err := row.Scan(
 		&i.ID,
@@ -632,12 +632,12 @@ func (q *Queries) UpdateUserSettings(ctx context.Context, arg UpdateUserSettings
 const verifyUserEmail = `-- name: VerifyUserEmail :one
 UPDATE users
 SET email_verified = TRUE, email_verification_token = NULL, email_verification_expires_at = NULL, updated_at = NOW()
-WHERE email_verification_token = $1 AND email_verification_expires_at > NOW()
+WHERE email_verification_token = $1::text AND email_verification_expires_at > NOW()
 RETURNING id, username, email, password_hash, provider, provider_id, avatar_url, name, email_verified, email_verification_token, email_verification_expires_at, created_at, updated_at
 `
 
-func (q *Queries) VerifyUserEmail(ctx context.Context, emailVerificationToken sql.NullString) (User, error) {
-	row := q.db.QueryRowContext(ctx, verifyUserEmail, emailVerificationToken)
+func (q *Queries) VerifyUserEmail(ctx context.Context, dollar_1 string) (User, error) {
+	row := q.db.QueryRowContext(ctx, verifyUserEmail, dollar_1)
 	var i User
 	err := row.Scan(
 		&i.ID,

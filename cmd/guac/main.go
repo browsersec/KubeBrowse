@@ -297,7 +297,6 @@ func main() {
 	docs.SwaggerInfo.Version = "1.0"
 	docs.SwaggerInfo.Host = "localhost:4567"
 	docs.SwaggerInfo.Schemes = []string{"http", "https"}
-	coors := cors.DefaultConfig()
 	cfg := cors.DefaultConfig()
 	cfg.AllowCredentials = true
 	if origin := os.Getenv("FRONTEND_URL"); origin != "" {

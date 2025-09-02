@@ -2,13 +2,13 @@ import { Badge } from '@/components/ui/badge';
 import { Users, Share2 } from 'lucide-react';
 
 const SessionCollaborationInfo = ({ 
-  sessionInfo, 
+  sessionInfo = { userCount: 1, isShared: false },
   connectionState, 
   isSessionOwner, 
-  sessionUUID, 
+  sharingEnabled = false, 
   enableSharing 
 }) => {
-  if (!enableSharing || !sessionInfo.isShared) {
+  if (!sharingEnabled || !sessionInfo?.isShared) {
     return null;
   }
 

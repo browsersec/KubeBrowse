@@ -178,7 +178,7 @@ const OfficeSession = () => {  const [sessionState, setSessionState] = useState(
       newUrl.searchParams.set('uuid', data.connection_id);
       window.history.replaceState({}, '', newUrl);
       
-      console.log(connectData);
+      // console.log(connectData);
     } catch (error) {
       setSessionState((prev) => ({
         ...prev,

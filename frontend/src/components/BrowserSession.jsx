@@ -32,10 +32,12 @@ const BrowserSession = () => {
 
   // Session persistence functions - memoized with useCallback
   const saveSessionToStorage = useCallback((sessionData) => {
+    // Only store non-sensitive session data (UUID and metadata)
     const sessionInfo = {
-      ...sessionData,
+      connectionId: sessionData.connectionId,
       timestamp: Date.now(),
       expiresAt: Date.now() + SESSION_TIMEOUT
+      // Note: websocketUrl and other sensitive connection data are excluded
     };
     localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(sessionInfo));
   }, []);
@@ -86,12 +88,8 @@ const BrowserSession = () => {
           const newUrl = new URL(window.location);
           newUrl.searchParams.set('uuid', storedSession.connectionId);
           window.history.replaceState({}, '', newUrl);
-          setSessionState({
-            connectionId: storedSession.connectionId,
-            websocketUrl: storedSession.websocketUrl,
-            status: 'ready',
-            error: null
-          });
+          // Re-fetch websocketUrl from server using stored UUID (no sensitive data in localStorage)
+          joinExistingSession(storedSession.connectionId);
         }
       }
     }
@@ -168,7 +166,7 @@ const BrowserSession = () => {
       newUrl.searchParams.set('uuid', data.connection_id);
       window.history.replaceState({}, '', newUrl);
       
-      console.log(connectData)
+      // console.log(connectData)
     } catch (error) {
       setSessionState(prev => ({
         ...prev,

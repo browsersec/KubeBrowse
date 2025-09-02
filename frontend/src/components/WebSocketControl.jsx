@@ -169,16 +169,27 @@ function WebSocketControl({
     } catch (err) {
       setUploading(false);
       setUploadError("Upload failed");
+      console.error("Upload error:", err);
     }
   };
   
   // function to check for malware in the upload response
   const checkForMalware = (response) => {
     try {
+      // Check if results exists and is an array
+      if (!response || !Array.isArray(response.results) || response.results.length === 0) {
+        return false;
+      }
+
       // Find the ClamAV result
       const clamavResult = response.results.find(result => result.service === "clamav");
       
-      if (clamavResult && clamavResult.success && clamavResult.data?.response?.infected) {
+      // Return early if no ClamAV result was found
+      if (!clamavResult) {
+        return false;
+      }
+      
+      if (clamavResult.success && clamavResult.data?.response?.infected) {
         // Get the viruses list if available
         const viruses = clamavResult.data.response.viruses || [];
         const virusNames = viruses.length > 0 ? viruses.join(', ') : 'Unknown threat';
@@ -211,9 +222,14 @@ function WebSocketControl({
           // Log detailed information about infected files
           console.warn('Infected files detected:', infectedFiles);
         }
+        
+        return true;
       }
+      
+      return false;
     } catch (err) {
       console.error("Error checking for malware:", err);
+      return false;
     }
   };
 
@@ -540,4 +556,3 @@ function formatBytes(bytes, decimals = 2) {
 }
 
 export default WebSocketControl;
-

@@ -9,8 +9,9 @@ export default function EmailVerificationSuccessRoute() {
   const { user } = useAuth();
 
   useEffect(() => {
-    console.log('EmailVerificationSuccessRoute: Component mounted');
-    console.log('EmailVerificationSuccessRoute: User:', user);
+    // PII Data should not be logged
+    // console.log('EmailVerificationSuccessRoute: Component mounted');
+    // console.log('EmailVerificationSuccessRoute: User:', user);
     
     // Show welcome toast immediately
     toast.success('🎉 Welcome! Your email has been verified successfully!', {
@@ -29,7 +30,7 @@ export default function EmailVerificationSuccessRoute() {
 
     // Redirect to home page after a short delay
     const redirectTimer = setTimeout(() => {
-      console.log('EmailVerificationSuccessRoute: Redirecting to home page...');
+      // console.log('EmailVerificationSuccessRoute: Redirecting to home page...');
       navigate('/', { replace: true });
     }, 2000);
 

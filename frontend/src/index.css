@@ -59,6 +59,11 @@
     --chart-5: 340 75% 55%;
   }
   
+  /* Ensure all elements use proper border colors */
+  * {
+    border-color: hsl(var(--border));
+  }
+  
   body {
     @apply bg-background text-foreground;
     transition-property: background-color, border-color, color, fill, stroke;
@@ -70,56 +75,32 @@
 @layer components {
   .guac-display {
     @apply outline-none transition-all duration-100 ease-in-out;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
   }
   
   .guac-display:focus {
     @apply outline-none;
   }
   
-  /* Custom context menu prevention still needed */
-  .guac-display {
-    -webkit-touch-callout: none;
-    -webkit-user-select: none;
-    -khtml-user-select: none;
-    -moz-user-select: none;
-    -ms-user-select: none;
-    user-select: none;
-  }
-}
-
-/* Custom animations that extend Tailwind's defaults */
-@keyframes pulse-glow {
-  0%, 100% {
-    opacity: 1;
-    box-shadow: 0 0 5px currentColor;
-  }
-  50% {
-    opacity: 0.5;
-    box-shadow: 0 0 10px currentColor;
-  }
-}
-
-.animate-pulse-glow {
-  animation: pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-}
-
-@layer components {
-  .guac-display {
-    @apply outline-none transition-all duration-100 ease-in-out;
+  /* Ensure all form elements use proper border colors */
+  input, textarea, select, button {
+    border-color: hsl(var(--border)) !important;
   }
   
-  .guac-display:focus {
-    @apply outline-none;
+  /* Fix any potential white borders on cards and containers */
+  .card, [class*="card"], [class*="border"] {
+    border-color: hsl(var(--border)) !important;
   }
   
-  /* Custom context menu prevention still needed */
-  .guac-display {
-    -webkit-touch-callout: none;
-    -webkit-user-select: none;
-    -khtml-user-select: none;
-    -moz-user-select: none;
-    -ms-user-select: none;
-    user-select: none;
+  /* Additional border fixes for common UI elements */
+  [data-radix-select-content],
+  [data-radix-dropdown-content],
+  [data-radix-popover-content] {
+    border-color: hsl(var(--border)) !important;
   }
 }
 
