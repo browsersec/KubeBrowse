@@ -421,6 +421,7 @@ func uploadToClamAV(ctx context.Context, fileBuffer *FileBuffer, clamavurl strin
 	// Parse the ClamAV specific response format
 	var scanResult ClamAVScanResult
 	var responseData map[string]interface{}
+	infected := false
 
 	// Try to parse as structured ClamAV response first
 	err = json.Unmarshal(body, &scanResult)
@@ -443,9 +444,7 @@ func uploadToClamAV(ctx context.Context, fileBuffer *FileBuffer, clamavurl strin
 		}
 
 		// Check if any viruses were detected
-		infected := false
 		detectedViruses := []string{}
-
 		for _, result := range scanResult.Data.Result {
 			if result.IsInfected {
 				infected = true
@@ -460,6 +459,18 @@ func uploadToClamAV(ctx context.Context, fileBuffer *FileBuffer, clamavurl strin
 	}
 
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		if infected {
+			return UploadResult{
+				Service: "clamav",
+				Success: false,
+				Error:   "infected",
+				Data: map[string]interface{}{
+					"status_code": resp.StatusCode,
+					"response":    responseData,
+					"endpoint":    scanURL,
+				},
+			}
+		}
 		return UploadResult{
 			Service: "clamav",
 			Success: true,
