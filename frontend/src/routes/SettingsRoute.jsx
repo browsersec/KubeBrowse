@@ -175,8 +175,13 @@ export default function SettingsRoute() {
                   type="number"
                   id="inactivityTimeout"
                   value={settings.inactivityTimeout}
-                  onChange={(e) => handleInputChange('inactivityTimeout', parseInt(e.target.value) || 0)}
+                  onChange={(e) => {
+                    const v = Math.max(0, Math.min(1440, parseInt(e.target.value, 10) || 0));
+                    handleInputChange('inactivityTimeout', v);
+                  }}
                   min="0"
+                  max="1440"
+                  step="1"
                   className="mt-1"
                 />
                 <p className="text-sm text-muted-foreground mt-1">Set to 0 to disable timeout</p>
