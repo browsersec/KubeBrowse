@@ -46,18 +46,20 @@ func NewHandlerWithRedis(service *Service, redisClient *redis.Client) *Handler {
 func InitializeGoth() {
 	// Configure session store for Gothic
 	sessionSecret := os.Getenv("SESSION_SECRET")
+	env := os.Getenv("GIN_MODE")
+	if env == "" {
+		env = os.Getenv("ENV")
+	}
+	isProduction := env == "release" || env == "production"
+
 	if sessionSecret == "" {
-		// Check if running in production (GIN_MODE=release or ENV=production)
-		env := os.Getenv("GIN_MODE")
-		if env == "" {
-			env = os.Getenv("ENV")
-		}
-		if env == "release" || env == "production" {
+		if isProduction {
 			logrus.Fatal("SESSION_SECRET must be set in production environments. Refusing to start.")
 			os.Exit(1)
+		} else {
+			sessionSecret = "default-secret-change-this-in-development"
+			logrus.Warn("SESSION_SECRET not set, using default secret - this is insecure for production. Only allowed in development.")
 		}
-		sessionSecret = "default-secret-change-this-in-development"
-		logrus.Warn("SESSION_SECRET not set, using default secret - this is insecure for production. Only allowed in development.")
 	}
 
 	// Create session store with more permissive settings for development

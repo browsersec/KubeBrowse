@@ -13,7 +13,7 @@ import (
 	"github.com/go-redis/redis/v8"
 	"github.com/google/uuid"
 	"github.com/lib/pq"
-
+	"golang.org/x/crypto/bcrypt"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -180,16 +180,17 @@ func (m *KubeBrowseManager) RegisterUser(c *gin.Context) {
 	}
 
 	// Hash password (in a real app, use bcrypt)
-	// passwordHash := hashPassword(user.Password)
-
-	// For simplicity, we're not hashing the password in this example
-	passwordHash := user.Password
+	passwordHash, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash password"})
+		return
+	}
 
 	// Generate UUID for user
 	userID := uuid.New().String()
 
 	// Insert user into database
-	_, err := m.DB.Exec(
+	_, err = m.DB.Exec(
 		"INSERT INTO users (id, username, password_hash, email) VALUES ($1, $2, $3, $4)",
 		userID, user.Username, passwordHash, user.Email,
 	)
@@ -243,8 +244,8 @@ func (m *KubeBrowseManager) LoginUser(c *gin.Context) {
 		return
 	}
 
-	// Generate JWT token (in a real app)
-	token := "dummy-token-" + user.ID
+	// Generate a random token
+	token := uuid.NewString()
 
 	c.JSON(http.StatusOK, gin.H{"token": token, "user_id": user.ID})
 }
