@@ -22,7 +22,11 @@ class WebSocketSessionDuplicator {
     if (queuedMessages.length > 0) {
       queuedMessages.forEach(message => {
         try {
-          websocket.send(message);
+          if (websocket && websocket.readyState === WebSocket.OPEN) {
+            websocket.send(message);
+          } else {
+            console.warn('Skipped queued send; socket not OPEN');
+          }
         } catch (error) {
           console.warn('Failed to send queued message to new connection:', error);
         }
