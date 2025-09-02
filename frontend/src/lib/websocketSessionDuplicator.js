@@ -67,8 +67,14 @@ class WebSocketSessionDuplicator {
     sessionConnections.forEach((websocket, connectionId) => {
       if (connectionId !== excludeConnectionId) {
         try {
-          websocket.send(message);
-          sentCount++;
+          if (websocket && websocket.readyState === WebSocket.OPEN) {
+            websocket.send(message);
+            sentCount++;
+          } else {
+            // Socket not open—drop quietly and record failure
+            failedConnections.push(connectionId);
+            return;
+          }
         } catch (error) {
           console.warn(`Failed to send message to connection ${connectionId}:`, error);
           failedConnections.push(connectionId);
