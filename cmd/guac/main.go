@@ -298,11 +298,16 @@ func main() {
 	docs.SwaggerInfo.Host = "localhost:4567"
 	docs.SwaggerInfo.Schemes = []string{"http", "https"}
 	coors := cors.DefaultConfig()
-	coors.AllowAllOrigins = true
-	coors.AllowMethods = []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"}
-	coors.AllowHeaders = []string{"Origin", "Content-Length", "Content-Type", "Authorization"}
-	coors.AllowCredentials = true
-	router.Use(cors.New(coors))
+	cfg := cors.DefaultConfig()
+	cfg.AllowCredentials = true
+	if origin := os.Getenv("FRONTEND_URL"); origin != "" {
+		cfg.AllowOrigins = []string{origin}
+	} else {
+		cfg.AllowOrigins = []string{"http://localhost:5173"}
+	}
+	cfg.AllowMethods = []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"}
+	cfg.AllowHeaders = []string{"Origin", "Content-Length", "Content-Type", "Authorization"}
+	router.Use(cors.New(cfg))
 	router.Use(gin.Recovery())
 	router.Use(gin.Logger())
 
