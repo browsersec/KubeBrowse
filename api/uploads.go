@@ -41,22 +41,45 @@ type FileBuffer struct {
 	Size     int64
 }
 
+import (
+    "bytes"
+    "context"
+    "encoding/json"
+    "errors"
+    "fmt"
+    "io"
+    "mime/multipart"
+    "net/http"
+    "net/url"
+    "sync"
+    "time"
+
+    "github.com/go-redis/redis/v8"
+    "github.com/sirupsen/logrus"
+    redis2 "your/module/path/redis2"
+)
+
 func getFQDNURL(connectionID string, redisClient *redis.Client) (string, error) {
-	val, err := redisClient.Get(context.Background(), "session:"+connectionID).Result()
-	if err != nil {
-		return "", fmt.Errorf("session not found")
-	}
+    val, err := redisClient.Get(context.Background(), "session:"+connectionID).Result()
+    if err != nil {
+        if errors.Is(err, redis.Nil) {
+            return "", fmt.Errorf("session not found")
+        }
+        return "", fmt.Errorf("redis get session: %w", err)
+    }
 
-	var session redis2.SessionData
-	err = json.Unmarshal([]byte(val), &session)
-	if err != nil {
-		return "", fmt.Errorf("failed to unmarshal session data")
-	}
+    var session redis2.SessionData
+    if err := json.Unmarshal([]byte(val), &session); err != nil {
+        return "", fmt.Errorf("failed to unmarshal session data")
+    }
 
-	fqdn := session.FQDN
-	url := fmt.Sprintf("http://%s:%d/%s", fqdn, 8080, "upload")
-	logrus.Infof("File URL: %s", url)
-	return url, nil
+    u := url.URL{
+        Scheme: "http", // TODO: make configurable
+        Host:   fmt.Sprintf("%s:%d", session.FQDN, 8080),
+        Path:   "upload",
+    }
+    logrus.Debugf("Resolved upload URL for %s", connectionID)
+    return u.String(), nil
 }
 
 // HandlerUploadFile handles file uploads to multiple destinations concurrently
