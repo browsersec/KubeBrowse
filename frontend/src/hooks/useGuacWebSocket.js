@@ -591,10 +591,7 @@ const useGuacWebSocket = (
         }
       },
       shouldReconnect: () =>
-        !enableSharing &&
-        !!sessionUUID &&
-        reconnectAttemptsRef.current < MAX_RECONNECT_ATTEMPTS &&
-        tunnelRef.current?.reconnectOnClose !== false,
+        !enableSharing && tunnelRef.current?.reconnectOnClose !== false,
       reconnectAttempts: MAX_RECONNECT_ATTEMPTS,
       reconnectInterval: (attempt) =>
         RECONNECT_BASE_DELAY * Math.pow(2, attempt),
