@@ -44,3 +44,9 @@ dist/
 # remove openssl certs
 certs/*.key
 certs/*.crt
+
+# remove local .env file
+.env
+
+# ignore .tilt builds folder
+.tilt/

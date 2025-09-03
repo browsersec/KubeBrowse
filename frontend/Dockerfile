@@ -1,36 +1,33 @@
 # Build stage
-FROM node:lts-slim AS build
+FROM node:18-alpine as builder
 
 WORKDIR /app
 
-# Copy package.json first
-COPY package.json ./
-# Use npm install instead of npm ci since there's no package-lock.json
-RUN npm install
+# Copy package files and lock file
+COPY package.json package-lock.json ./
 
-# Copy the rest of the application code
+# Install dependencies
+RUN npm ci
+
+# Copy source code (excluding node_modules via .dockerignore)
 COPY . .
 
-# Build the application (default guacClient URL will be used unless overridden)
-ARG GUAC_CLIENT_URL
-ENV GUAC_CLIENT_URL=${GUAC_CLIENT_URL}
+# Build the application
 RUN npm run build
 
 # Production stage
-FROM nginx:alpine
+FROM caddy:alpine
 
-# Copy the built application from the build stage
-COPY --from=build /app/dist /usr/share/nginx/html
+ARG CADDYFILE=Caddyfile
 
-# Copy a custom nginx configuration if needed
-# COPY ./nginx.conf /etc/nginx/conf.d/default.conf
+# Copy built application
+COPY --from=builder /app/dist /srv
 
-# Add healthcheck
-HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:80/ || exit 1
+# Copy Caddyfile
+COPY ${CADDYFILE} /etc/caddy/Caddyfile
 
-# Expose the port
+# Expose port 80
 EXPOSE 80
 
-# Start nginx with daemon off to keep the container running
-CMD ["nginx", "-g", "daemon off;"]
+# Start Caddy
+CMD ["caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]

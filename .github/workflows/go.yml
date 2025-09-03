@@ -2,12 +2,17 @@ name: Go
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main , "chore/improve-back" ]
     tags:
       - 'v*'
+    paths-ignore:
+      - 'cmd/cleanup/**'
+      - 'deployments/**'
   pull_request:
     branches: [ main ]
-
+    paths-ignore:
+      - 'cmd/cleanup/**'
+      - 'deployments/**'
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
@@ -20,7 +25,7 @@ jobs:
     - name: Set up Go 1.x
       uses: actions/setup-go@v2
       with:
-        go-version: '^1.23'
+        go-version: '^1.24'
 
     - name: Check out code into the Go module directory
       uses: actions/checkout@v3
@@ -34,9 +39,12 @@ jobs:
         fi
 
     - name: Build
+      working-directory: ./cmd/guac
       run: go build -v .
 
+
     - name: Test
+      working-directory: ./cmd/guac
       run: go test -race -v .
       
   docker-build-push:
