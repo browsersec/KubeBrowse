@@ -9,24 +9,24 @@
     <meta name="generator" content="Retype 3.11.0">
 
     <!-- Primary Meta Tags -->
-    <title>Contributing to KubeBrowse</title>
-    <meta name="title" content="Contributing to KubeBrowse">
-    <meta name="description" content="Thank you for your interest in contributing to GUAC! This document provides guidelines and instructions for contributing to this project.">
+    <title>KubeBrowse Authentication Setup Guide</title>
+    <meta name="title" content="KubeBrowse Authentication Setup Guide">
+    <meta name="description" content="This guide explains how to set up GitHub OAuth and email-based authentication for KubeBrowse.">
 
     <!-- Canonical -->
-    <link rel="canonical" href="/contributing/">
+    <link rel="canonical" href="/authentication_setup/">
 
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website">
-    <meta property="og:url" content="/contributing/">
-    <meta property="og:title" content="Contributing to KubeBrowse">
-    <meta property="og:description" content="Thank you for your interest in contributing to GUAC! This document provides guidelines and instructions for contributing to this project.">
+    <meta property="og:url" content="/authentication_setup/">
+    <meta property="og:title" content="KubeBrowse Authentication Setup Guide">
+    <meta property="og:description" content="This guide explains how to set up GitHub OAuth and email-based authentication for KubeBrowse.">
 
     <!-- Twitter -->
     <meta property="twitter:card" content="summary_large_image">
-    <meta property="twitter:url" content="/contributing/">
-    <meta property="twitter:title" content="Contributing to KubeBrowse">
-    <meta property="twitter:description" content="Thank you for your interest in contributing to GUAC! This document provides guidelines and instructions for contributing to this project.">
+    <meta property="twitter:url" content="/authentication_setup/">
+    <meta property="twitter:title" content="KubeBrowse Authentication Setup Guide">
+    <meta property="twitter:description" content="This guide explains how to set up GitHub OAuth and email-based authentication for KubeBrowse.">
 
     <script data-cfasync="false">(function(){var cl=document.documentElement.classList,ls=localStorage.getItem("retype_scheme"),hd=cl.contains("dark"),hl=cl.contains("light"),wm=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches;if(ls==="dark"||(!ls&&wm&&!hd&&!hl)){cl.remove("light");cl.add("dark")}else if(ls==="light"||(!ls&&!wm&&!hd&&!hl)){cl.remove("dark");cl.add("light")}})();</script>
 
@@ -182,343 +182,505 @@
                                 <!-- Rendered if sidebar right is enabled -->
                                 <div id="retype-sidebar-right-toggle"></div>
                                 <!-- Page content  -->
-<doc-anchor-target id="contributing-to-kubebrowse" class="break-words">
+<doc-anchor-target id="kubebrowse-authentication-setup-guide" class="break-words">
     <h1>
-        <doc-anchor-trigger class="header-anchor-trigger" to="#contributing-to-kubebrowse">#</doc-anchor-trigger>
-        <span>Contributing to KubeBrowse</span>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#kubebrowse-authentication-setup-guide">#</doc-anchor-trigger>
+        <span>KubeBrowse Authentication Setup Guide</span>
     </h1>
 </doc-anchor-target>
-<p>Thank you for your interest in contributing to GUAC! This document provides guidelines and instructions for contributing to this project.</p>
-<doc-anchor-target id="table-of-contents">
+<p>This guide explains how to set up GitHub OAuth and email-based authentication for KubeBrowse.</p>
+<doc-anchor-target id="features">
     <h2>
-        <doc-anchor-trigger class="header-anchor-trigger" to="#table-of-contents">#</doc-anchor-trigger>
-        <span>Table of Contents</span>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#features">#</doc-anchor-trigger>
+        <span>Features</span>
     </h2>
 </doc-anchor-target>
 <ul>
-<li><doc-anchor-trigger to="#contributing-to-kubebrowse">Contributing to KubeBrowse</doc-anchor-trigger>
-<ul>
-<li><doc-anchor-trigger to="#table-of-contents">Table of Contents</doc-anchor-trigger></li>
-<li><doc-anchor-trigger to="#code-of-conduct">Code of Conduct</doc-anchor-trigger></li>
-<li><doc-anchor-trigger to="#getting-started">Getting Started</doc-anchor-trigger>
-<ul>
-<li><doc-anchor-trigger to="#development-environment-setup">Development Environment Setup</doc-anchor-trigger></li>
-<li><doc-anchor-trigger to="#troubleshooting-common-issues">Troubleshooting Common Issues</doc-anchor-trigger></li>
-<li><doc-anchor-trigger to="#project-structure">Project Structure</doc-anchor-trigger></li>
+<li><strong>GitHub OAuth</strong>: Sign in with GitHub account</li>
+<li><strong>Email/Password Authentication</strong>: Traditional email and password sign-in</li>
+<li><strong>Server-side Sessions</strong>: Secure session management with database persistence</li>
+<li><strong>Frontend Integration</strong>: React components with authentication context</li>
+<li><strong>Session Management</strong>: Automatic session validation and cleanup</li>
 </ul>
-</li>
-<li><doc-anchor-trigger to="#development-workflow">Development Workflow</doc-anchor-trigger>
-<ul>
-<li><doc-anchor-trigger to="#branching-strategy">Branching Strategy</doc-anchor-trigger></li>
-<li><doc-anchor-trigger to="#commit-guidelines">Commit Guidelines</doc-anchor-trigger></li>
-<li><doc-anchor-trigger to="#pre-commit-hooks">Pre-commit Hooks</doc-anchor-trigger></li>
-</ul>
-</li>
-<li><doc-anchor-trigger to="#pull-requests">Pull Requests</doc-anchor-trigger>
-<ul>
-<li><doc-anchor-trigger to="#pr-process">PR Process</doc-anchor-trigger></li>
-<li><doc-anchor-trigger to="#pr-requirements">PR Requirements</doc-anchor-trigger></li>
-</ul>
-</li>
-<li><doc-anchor-trigger to="#coding-standards">Coding Standards</doc-anchor-trigger>
-<ul>
-<li><doc-anchor-trigger to="#go-guidelines">Go Guidelines</doc-anchor-trigger></li>
-<li><doc-anchor-trigger to="#testing">Testing</doc-anchor-trigger></li>
-<li><doc-anchor-trigger to="#documentation">Documentation</doc-anchor-trigger></li>
-</ul>
-</li>
-<li><doc-anchor-trigger to="#release-process">Release Process</doc-anchor-trigger></li>
-</ul>
-</li>
-</ul>
-<doc-anchor-target id="code-of-conduct">
+<doc-anchor-target id="prerequisites">
     <h2>
-        <doc-anchor-trigger class="header-anchor-trigger" to="#code-of-conduct">#</doc-anchor-trigger>
-        <span>Code of Conduct</span>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#prerequisites">#</doc-anchor-trigger>
+        <span>Prerequisites</span>
     </h2>
-</doc-anchor-target>
-<p>We are committed to fostering a welcoming community. Please read and adhere to our <a href="code_of_conduct.md">Code of Conduct</a> in all interactions.</p>
-<doc-anchor-target id="getting-started">
-    <h2>
-        <doc-anchor-trigger class="header-anchor-trigger" to="#getting-started">#</doc-anchor-trigger>
-        <span>Getting Started</span>
-    </h2>
-</doc-anchor-target>
-<doc-anchor-target id="development-environment-setup">
-    <h3>
-        <doc-anchor-trigger class="header-anchor-trigger" to="#development-environment-setup">#</doc-anchor-trigger>
-        <span>Development Environment Setup</span>
-    </h3>
 </doc-anchor-target>
 <ol>
-<li><p><strong>Fork and clone the repository</strong></p>
-<div class="codeblock-wrapper"><doc-codeblock>
-<pre translate="no" class="language-bash"><code v-pre class="language-bash">git clone https://github.com/browsersec/KubeBrowse.git
-cd KubeBrowse</code></pre>
-</doc-codeblock></div>
-</li>
-<li><p><strong>Set up the development environment</strong></p>
-<div class="codeblock-wrapper"><doc-codeblock>
-<pre translate="no" class="language-bash"><code v-pre class="language-bash"># Install dependencies and Git hooks
-make setup</code></pre>
-</doc-codeblock></div>
-</li>
-<li><p><strong>Run the application</strong></p>
-<div class="codeblock-wrapper"><doc-codeblock>
-<pre translate="no" class="language-bash"><code v-pre class="language-bash">make run</code></pre>
-</doc-codeblock></div>
-</li>
-<li><p><strong>Access the application</strong></p>
-<ul>
-<li>Open a browser and navigate to <code v-pre>http://localhost:4567/connect</code></li>
-</ul>
-</li>
+<li><strong>Database</strong>: PostgreSQL database for user and session storage</li>
+<li><strong>GitHub OAuth App</strong>: GitHub OAuth application for OAuth authentication</li>
+<li><strong>Environment Variables</strong>: Properly configured environment variables</li>
 </ol>
-<doc-anchor-target id="troubleshooting-common-issues">
+<doc-anchor-target id="setup-instructions">
+    <h2>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#setup-instructions">#</doc-anchor-trigger>
+        <span>Setup Instructions</span>
+    </h2>
+</doc-anchor-target>
+<doc-anchor-target id="1-database-setup">
     <h3>
-        <doc-anchor-trigger class="header-anchor-trigger" to="#troubleshooting-common-issues">#</doc-anchor-trigger>
-        <span>Troubleshooting Common Issues</span>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#1-database-setup">#</doc-anchor-trigger>
+        <span>1. Database Setup</span>
     </h3>
 </doc-anchor-target>
-<doc-anchor-target id="go-version-mismatch">
+<doc-anchor-target id="create-database">
     <h4>
-        <doc-anchor-trigger class="header-anchor-trigger" to="#go-version-mismatch">#</doc-anchor-trigger>
-        <span>Go Version Mismatch</span>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#create-database">#</doc-anchor-trigger>
+        <span>Create Database</span>
     </h4>
 </doc-anchor-target>
-<p>If you encounter errors like <code v-pre>compile: version &quot;go1.24.0&quot; does not match go tool version &quot;go1.24.3&quot;</code>, follow these steps:</p>
-<ol>
-<li><p><strong>Check your Go version</strong></p>
 <div class="codeblock-wrapper"><doc-codeblock>
-<pre translate="no" class="language-bash"><code v-pre class="language-bash">go version</code></pre>
-</doc-codeblock></div>
-</li>
-<li><p><strong>Clean the Go module cache</strong></p>
-<div class="codeblock-wrapper"><doc-codeblock>
-<pre translate="no" class="language-bash"><code v-pre class="language-bash">go clean -modcache</code></pre>
-</doc-codeblock></div>
-</li>
-<li><p><strong>Clean the Go build cache</strong></p>
-<div class="codeblock-wrapper"><doc-codeblock>
-<pre translate="no" class="language-bash"><code v-pre class="language-bash">go clean -cache</code></pre>
-</doc-codeblock></div>
-</li>
-<li><p><strong>Reset the build system</strong></p>
-<div class="codeblock-wrapper"><doc-codeblock>
-<pre translate="no" class="language-bash"><code v-pre class="language-bash">rm -rf $GOPATH/pkg/mod/cache/build</code></pre>
-</doc-codeblock></div>
-</li>
-<li><p><strong>Install or update to a consistent Go version</strong></p>
-<p>Using Go&#x27;s official installation:</p>
-<div class="codeblock-wrapper"><doc-codeblock>
-<pre translate="no" class="language-bash"><code v-pre class="language-bash"># Download the latest version
-wget https://go.dev/dl/go1.24.3.linux-amd64.tar.gz
+<pre translate="no" class="language-bash"><code v-pre class="language-bash"># Connect to PostgreSQL
+psql -U postgres
 
-# Remove old installation (if needed)
-sudo rm -rf /usr/local/go
+# Create database
+CREATE DATABASE kubebrowse;
 
-# Install the new version
-sudo tar -C /usr/local -xzf go1.24.3.linux-amd64.tar.gz</code></pre>
+# Connect to the database
+\c kubebrowse;</code></pre>
 </doc-codeblock></div>
-<p>Or using a version manager like <code v-pre>asdf</code>:</p>
+<doc-anchor-target id="run-migrations">
+    <h4>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#run-migrations">#</doc-anchor-trigger>
+        <span>Run Migrations</span>
+    </h4>
+</doc-anchor-target>
 <div class="codeblock-wrapper"><doc-codeblock>
-<pre translate="no" class="language-bash"><code v-pre class="language-bash">asdf install golang 1.24.3
-asdf global golang 1.24.3</code></pre>
+<pre translate="no" class="language-bash"><code v-pre class="language-bash"># Apply database migrations
+migrate -path db/migrations -database &quot;postgres://user:password@localhost:5432/kubebrowse?sslmode=disable&quot; up
+
+# Or using your preferred migration tool</code></pre>
 </doc-codeblock></div>
-</li>
-<li><p><strong>Check your environment variables</strong></p>
-<p>Ensure your PATH and GOROOT are set correctly:</p>
+<doc-anchor-target id="generate-sqlc-code">
+    <h4>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#generate-sqlc-code">#</doc-anchor-trigger>
+        <span>Generate SQLC Code</span>
+    </h4>
+</doc-anchor-target>
 <div class="codeblock-wrapper"><doc-codeblock>
-<pre translate="no" class="language-bash"><code v-pre class="language-bash"># Add to your shell profile (.bashrc, .zshrc, etc.)
-export GOROOT=/usr/local/go
-export PATH=$GOROOT/bin:$PATH</code></pre>
+<pre translate="no" class="language-bash"><code v-pre class="language-bash"># Generate Go code from SQL queries
+sqlc generate</code></pre>
 </doc-codeblock></div>
-</li>
-<li><p><strong>Regenerate the Go modules</strong></p>
-<div class="codeblock-wrapper"><doc-codeblock>
-<pre translate="no" class="language-bash"><code v-pre class="language-bash">go mod tidy</code></pre>
-</doc-codeblock></div>
-</li>
-</ol>
-<doc-anchor-target id="project-structure">
+<doc-anchor-target id="2-github-oauth-setup">
     <h3>
-        <doc-anchor-trigger class="header-anchor-trigger" to="#project-structure">#</doc-anchor-trigger>
-        <span>Project Structure</span>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#2-github-oauth-setup">#</doc-anchor-trigger>
+        <span>2. GitHub OAuth Setup</span>
     </h3>
 </doc-anchor-target>
-<ul>
-<li><code v-pre>/cmd/guac/</code> - Main application entry point</li>
-<li><code v-pre>/utils/</code> - Utility functions</li>
-<li><code v-pre>/certs/</code> - Certificate files for TLS</li>
-<li><code v-pre>/.githooks/</code> - Git hooks for development</li>
-</ul>
-<doc-anchor-target id="development-workflow">
-    <h2>
-        <doc-anchor-trigger class="header-anchor-trigger" to="#development-workflow">#</doc-anchor-trigger>
-        <span>Development Workflow</span>
-    </h2>
-</doc-anchor-target>
-<doc-anchor-target id="branching-strategy">
-    <h3>
-        <doc-anchor-trigger class="header-anchor-trigger" to="#branching-strategy">#</doc-anchor-trigger>
-        <span>Branching Strategy</span>
-    </h3>
-</doc-anchor-target>
-<ul>
-<li><code v-pre>main</code> - Stable branch containing the latest release</li>
-<li><code v-pre>dev</code> - Development branch for integrating features</li>
-<li>Feature branches should be created from <code v-pre>dev</code> and named using the format: <code v-pre>feature/short-description</code> or <code v-pre>fix/issue-description</code></li>
-</ul>
-<doc-anchor-target id="commit-guidelines">
-    <h3>
-        <doc-anchor-trigger class="header-anchor-trigger" to="#commit-guidelines">#</doc-anchor-trigger>
-        <span>Commit Guidelines</span>
-    </h3>
-</doc-anchor-target>
-<p>We follow <a href="https://www.conventionalcommits.org/">Conventional Commits</a> for commit messages:</p>
-<div class="codeblock-wrapper"><doc-codeblock>
-<pre translate="no" class="language-none"><code v-pre class="language-none">&lt;type&gt;(&lt;scope&gt;): &lt;description&gt;
-
-&lt;body&gt;
-
-&lt;footer&gt;</code></pre>
-</doc-codeblock></div>
-<p>Types include:</p>
-<ul>
-<li><code v-pre>feat</code>: A new feature</li>
-<li><code v-pre>fix</code>: A bug fix</li>
-<li><code v-pre>docs</code>: Documentation changes</li>
-<li><code v-pre>style</code>: Code style changes (formatting, etc.)</li>
-<li><code v-pre>refactor</code>: Code changes that neither fix bugs nor add features</li>
-<li><code v-pre>test</code>: Adding or modifying tests</li>
-<li><code v-pre>chore</code>: Changes to the build process or auxiliary tools</li>
-</ul>
-<p>Example:</p>
-<div class="codeblock-wrapper"><doc-codeblock>
-<pre translate="no" class="language-none"><code v-pre class="language-none">feat(api): add endpoint for user authentication
-
-- Implement JWT token generation
-- Add middleware for token validation
-
-Fixes #123</code></pre>
-</doc-codeblock></div>
-<doc-anchor-target id="pre-commit-hooks">
-    <h3>
-        <doc-anchor-trigger class="header-anchor-trigger" to="#pre-commit-hooks">#</doc-anchor-trigger>
-        <span>Pre-commit Hooks</span>
-    </h3>
-</doc-anchor-target>
-<p>This project uses <a href="https://github.com/evilmartians/lefthook">Lefthook</a> for managing Git hooks to ensure code quality. The pre-commit hook checks:</p>
-<ul>
-<li>Code formatting</li>
-<li>Static analysis</li>
-<li>Linting</li>
-<li>Tests</li>
-<li>Potential secrets</li>
-</ul>
-<p>Install the hooks with:</p>
-<div class="codeblock-wrapper"><doc-codeblock>
-<pre translate="no" class="language-bash"><code v-pre class="language-bash">make hooks</code></pre>
-</doc-codeblock></div>
-<p>You can manually run the pre-commit checks:</p>
-<div class="codeblock-wrapper"><doc-codeblock>
-<pre translate="no" class="language-bash"><code v-pre class="language-bash"># Check only staged files
-make lint
-
-# Check all files in the repository
-make lint-all</code></pre>
-</doc-codeblock></div>
-<p>If Lefthook is not found, you&#x27;ll be prompted to install it. Lefthook hooks are automatically installed when you run <code v-pre>make setup</code>.</p>
-<doc-anchor-target id="pull-requests">
-    <h2>
-        <doc-anchor-trigger class="header-anchor-trigger" to="#pull-requests">#</doc-anchor-trigger>
-        <span>Pull Requests</span>
-    </h2>
-</doc-anchor-target>
-<doc-anchor-target id="pr-process">
-    <h3>
-        <doc-anchor-trigger class="header-anchor-trigger" to="#pr-process">#</doc-anchor-trigger>
-        <span>PR Process</span>
-    </h3>
+<doc-anchor-target id="create-github-oauth-app">
+    <h4>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#create-github-oauth-app">#</doc-anchor-trigger>
+        <span>Create GitHub OAuth App</span>
+    </h4>
 </doc-anchor-target>
 <ol>
-<li>Create a new branch from <code v-pre>dev</code></li>
-<li>Implement your changes</li>
-<li>Ensure tests pass and code meets quality standards</li>
-<li>Push your branch and create a pull request against <code v-pre>dev</code></li>
-<li>Address any feedback from reviewers</li>
+<li>Go to GitHub Settings → Developer settings → OAuth Apps</li>
+<li>Click &quot;New OAuth App&quot;</li>
+<li>Fill in the details:
+<ul>
+<li><strong>Application name</strong>: KubeBrowse</li>
+<li><strong>Homepage URL</strong>: <code v-pre>http://localhost:3000</code> (or your domain)</li>
+<li><strong>Authorization callback URL</strong>: <code v-pre>http://localhost:4567/auth/oauth/github/callback</code></li>
+</ul>
+</li>
+<li>Click &quot;Register application&quot;</li>
+<li>Note down the <strong>Client ID</strong> and <strong>Client Secret</strong></li>
 </ol>
-<doc-anchor-target id="pr-requirements">
+<doc-anchor-target id="3-environment-configuration">
     <h3>
-        <doc-anchor-trigger class="header-anchor-trigger" to="#pr-requirements">#</doc-anchor-trigger>
-        <span>PR Requirements</span>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#3-environment-configuration">#</doc-anchor-trigger>
+        <span>3. Environment Configuration</span>
     </h3>
 </doc-anchor-target>
-<ul>
-<li>PRs must have a clear description of changes</li>
-<li>All tests must pass</li>
-<li>Code must be properly formatted</li>
-<li>Documentation must be updated if necessary</li>
-<li>Changes should be covered by tests</li>
-</ul>
-<doc-anchor-target id="coding-standards">
+<doc-anchor-target id="backend-env">
+    <h4>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#backend-env">#</doc-anchor-trigger>
+        <span>Backend (.env)</span>
+    </h4>
+</doc-anchor-target>
+<p>Create or update your <code v-pre>.env</code> file:</p>
+<div class="codeblock-wrapper"><doc-codeblock>
+<pre translate="no" class="language-bash"><code v-pre class="language-bash"># Database Configuration
+DATABASE_URL=postgres://postgresuser:postgrespassword@localhost:5432/kubebrowse?sslmode=disable
+
+# GitHub OAuth Configuration
+GITHUB_CLIENT_ID=your_github_client_id_here
+GITHUB_CLIENT_SECRET=your_github_client_secret_here
+GITHUB_CALLBACK_URL=http://localhost:4567/auth/oauth/github/callback
+
+# Frontend URL for OAuth redirects
+FRONTEND_URL=http://localhost:3000
+
+# Session Configuration
+SESSION_SECRET=your_long_random_session_secret_here_make_it_very_secure
+
+# Other existing configuration...
+GUACD_ADDRESS=localhost:4822
+REDIS_HOST=localhost
+# ... etc</code></pre>
+</doc-codeblock></div>
+<doc-anchor-target id="frontend-envlocal">
+    <h4>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#frontend-envlocal">#</doc-anchor-trigger>
+        <span>Frontend (.env.local)</span>
+    </h4>
+</doc-anchor-target>
+<p>Create a <code v-pre>.env.local</code> file in the frontend directory:</p>
+<div class="codeblock-wrapper"><doc-codeblock>
+<pre translate="no" class="language-bash"><code v-pre class="language-bash">VITE_API_URL=http://localhost:4567</code></pre>
+</doc-codeblock></div>
+<doc-anchor-target id="4-backend-setup">
+    <h3>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#4-backend-setup">#</doc-anchor-trigger>
+        <span>4. Backend Setup</span>
+    </h3>
+</doc-anchor-target>
+<doc-anchor-target id="install-dependencies">
+    <h4>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#install-dependencies">#</doc-anchor-trigger>
+        <span>Install Dependencies</span>
+    </h4>
+</doc-anchor-target>
+<doc-anchor-target id="build-and-run">
+    <h4>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#build-and-run">#</doc-anchor-trigger>
+        <span>Build and Run</span>
+    </h4>
+</doc-anchor-target>
+<div class="codeblock-wrapper"><doc-codeblock>
+<pre translate="no" class="language-bash"><code v-pre class="language-bash"># Build the application
+go build ./cmd/guac
+
+# Run the application
+./guac</code></pre>
+</doc-codeblock></div>
+<doc-anchor-target id="5-frontend-setup">
+    <h3>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#5-frontend-setup">#</doc-anchor-trigger>
+        <span>5. Frontend Setup</span>
+    </h3>
+</doc-anchor-target>
+<doc-anchor-target id="install-dependencies-1">
+    <h4>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#install-dependencies-1">#</doc-anchor-trigger>
+        <span>Install Dependencies</span>
+    </h4>
+</doc-anchor-target>
+<div class="codeblock-wrapper"><doc-codeblock>
+<pre translate="no" class="language-bash"><code v-pre class="language-bash">cd frontend
+npm install
+# or
+pnpm install</code></pre>
+</doc-codeblock></div>
+<doc-anchor-target id="run-development-server">
+    <h4>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#run-development-server">#</doc-anchor-trigger>
+        <span>Run Development Server</span>
+    </h4>
+</doc-anchor-target>
+<div class="codeblock-wrapper"><doc-codeblock>
+<pre translate="no" class="language-bash"><code v-pre class="language-bash">npm run dev
+# or
+pnpm dev</code></pre>
+</doc-codeblock></div>
+<doc-anchor-target id="api-endpoints">
     <h2>
-        <doc-anchor-trigger class="header-anchor-trigger" to="#coding-standards">#</doc-anchor-trigger>
-        <span>Coding Standards</span>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#api-endpoints">#</doc-anchor-trigger>
+        <span>API Endpoints</span>
     </h2>
 </doc-anchor-target>
-<doc-anchor-target id="go-guidelines">
+<doc-anchor-target id="authentication-endpoints">
     <h3>
-        <doc-anchor-trigger class="header-anchor-trigger" to="#go-guidelines">#</doc-anchor-trigger>
-        <span>Go Guidelines</span>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#authentication-endpoints">#</doc-anchor-trigger>
+        <span>Authentication Endpoints</span>
     </h3>
 </doc-anchor-target>
-<ul>
-<li>Follow the <a href="https://github.com/golang/go/wiki/CodeReviewComments">Go Code Review Comments</a></li>
-<li>Use the standard Go formatting (<code v-pre>gofmt</code>)</li>
-<li>Write idiomatic Go code</li>
-<li>Keep functions small and focused</li>
-<li>Add comments for exported functions, types, and packages</li>
-</ul>
-<doc-anchor-target id="testing">
+<div class="table-wrapper scrollbar overflow-hidden">
+<table class="comfortable">
+<thead>
+<tr>
+<th>Method</th>
+<th>Endpoint</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>POST</td>
+<td><code v-pre>/auth/register</code></td>
+<td>Register with email/password</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code v-pre>/auth/login</code></td>
+<td>Login with email/password</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code v-pre>/auth/logout</code></td>
+<td>Logout current user</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code v-pre>/auth/oauth/github</code></td>
+<td>Start GitHub OAuth flow</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code v-pre>/auth/oauth/github/callback</code></td>
+<td>GitHub OAuth callback</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code v-pre>/auth/me</code></td>
+<td>Get current user info</td>
+</tr>
+</tbody>
+</table>
+</div>
+<doc-anchor-target id="requestresponse-examples">
     <h3>
-        <doc-anchor-trigger class="header-anchor-trigger" to="#testing">#</doc-anchor-trigger>
-        <span>Testing</span>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#requestresponse-examples">#</doc-anchor-trigger>
+        <span>Request/Response Examples</span>
     </h3>
 </doc-anchor-target>
-<ul>
-<li>Write tests for all new features and bug fixes</li>
-<li>Aim for high test coverage, especially for critical paths</li>
-<li>Use table-driven tests when appropriate</li>
-<li>Run tests with <code v-pre>make test</code></li>
-</ul>
-<doc-anchor-target id="documentation">
-    <h3>
-        <doc-anchor-trigger class="header-anchor-trigger" to="#documentation">#</doc-anchor-trigger>
-        <span>Documentation</span>
-    </h3>
+<doc-anchor-target id="register-with-email">
+    <h4>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#register-with-email">#</doc-anchor-trigger>
+        <span>Register with Email</span>
+    </h4>
 </doc-anchor-target>
-<ul>
-<li>Document all exported functions, types, and packages</li>
-<li>Update the README.md if adding new features or changing existing functionality</li>
-<li>Add examples for complex features</li>
-</ul>
-<doc-anchor-target id="release-process">
+<div class="codeblock-wrapper"><doc-codeblock>
+<pre translate="no" class="language-bash"><code v-pre class="language-bash">curl -X POST http://localhost:4567/auth/register \
+  -H &quot;Content-Type: application/json&quot; \
+  -d '{
+    &quot;email&quot;: &quot;user@example.com&quot;,
+    &quot;password&quot;: &quot;securepassword123&quot;
+  }'</code></pre>
+</doc-codeblock></div>
+<doc-anchor-target id="login-with-email">
+    <h4>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#login-with-email">#</doc-anchor-trigger>
+        <span>Login with Email</span>
+    </h4>
+</doc-anchor-target>
+<div class="codeblock-wrapper"><doc-codeblock>
+<pre translate="no" class="language-bash"><code v-pre class="language-bash">curl -X POST http://localhost:4567/auth/login \
+  -H &quot;Content-Type: application/json&quot; \
+  -d '{
+    &quot;email&quot;: &quot;user@example.com&quot;,
+    &quot;password&quot;: &quot;securepassword123&quot;
+  }'</code></pre>
+</doc-codeblock></div>
+<doc-anchor-target id="get-current-user">
+    <h4>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#get-current-user">#</doc-anchor-trigger>
+        <span>Get Current User</span>
+    </h4>
+</doc-anchor-target>
+<div class="codeblock-wrapper"><doc-codeblock>
+<pre translate="no" class="language-bash"><code v-pre class="language-bash">curl -X GET http://localhost:4567/auth/me \
+  -H &quot;Cookie: kubebrowse_session=your_session_token&quot;</code></pre>
+</doc-codeblock></div>
+<doc-anchor-target id="frontend-usage">
     <h2>
-        <doc-anchor-trigger class="header-anchor-trigger" to="#release-process">#</doc-anchor-trigger>
-        <span>Release Process</span>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#frontend-usage">#</doc-anchor-trigger>
+        <span>Frontend Usage</span>
+    </h2>
+</doc-anchor-target>
+<doc-anchor-target id="authentication-context">
+    <h3>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#authentication-context">#</doc-anchor-trigger>
+        <span>Authentication Context</span>
+    </h3>
+</doc-anchor-target>
+<p>The authentication state is managed by <code v-pre>AuthContext</code> and can be accessed using the <code v-pre>useAuth</code> hook:</p>
+<div class="codeblock-wrapper"><doc-codeblock>
+<pre translate="no" class="language-jsx"><code v-pre class="language-jsx">import { useAuth } from '../context/AuthContext';
+
+function MyComponent() {
+  const { 
+    user, 
+    isAuthenticated, 
+    isLoading, 
+    login, 
+    register, 
+    logout, 
+    loginWithGitHub 
+  } = useAuth();
+
+  if (isLoading) return &lt;div&gt;Loading...&lt;/div&gt;;
+
+  if (!isAuthenticated) {
+    return &lt;LoginForm /&gt;;
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Welcome, {user.name || user.email}!&lt;/h1&gt;
+      &lt;button onClick={logout}&gt;Logout&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</code></pre>
+</doc-codeblock></div>
+<doc-anchor-target id="authentication-components">
+    <h3>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#authentication-components">#</doc-anchor-trigger>
+        <span>Authentication Components</span>
+    </h3>
+</doc-anchor-target>
+<ul>
+<li><strong><code v-pre>AuthModal</code></strong>: Modal dialog for login/register</li>
+<li><strong><code v-pre>LoginForm</code></strong>: Email/password login form</li>
+<li><strong><code v-pre>RegisterForm</code></strong>: Email/password registration form</li>
+<li><strong><code v-pre>UserMenu</code></strong>: Dropdown menu for authenticated users</li>
+</ul>
+<doc-anchor-target id="database-schema">
+    <h2>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#database-schema">#</doc-anchor-trigger>
+        <span>Database Schema</span>
+    </h2>
+</doc-anchor-target>
+<doc-anchor-target id="users-table">
+    <h3>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#users-table">#</doc-anchor-trigger>
+        <span>Users Table</span>
+    </h3>
+</doc-anchor-target>
+<doc-anchor-target id="sessions-table">
+    <h3>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#sessions-table">#</doc-anchor-trigger>
+        <span>Sessions Table</span>
+    </h3>
+</doc-anchor-target>
+<div class="codeblock-wrapper"><doc-codeblock>
+<pre translate="no" class="language-sql"><code v-pre class="language-sql">CREATE TABLE user_sessions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  session_token VARCHAR(255) NOT NULL UNIQUE,
+  expires_at TIMESTAMP NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);</code></pre>
+</doc-codeblock></div>
+<doc-anchor-target id="security-considerations">
+    <h2>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#security-considerations">#</doc-anchor-trigger>
+        <span>Security Considerations</span>
     </h2>
 </doc-anchor-target>
 <ol>
-<li>Create a release branch from <code v-pre>dev</code></li>
-<li>Update version information</li>
-<li>Run comprehensive tests</li>
-<li>Merge to <code v-pre>main</code> once approved</li>
-<li>Tag the release with the version number</li>
-<li>Update documentation with release notes</li>
+<li><strong>Session Tokens</strong>: Use cryptographically secure random tokens</li>
+<li><strong>Password Hashing</strong>: Passwords are hashed using bcrypt with default cost</li>
+<li><strong>HTTPS</strong>: Use HTTPS in production for secure cookie transmission</li>
+<li><strong>Session Expiration</strong>: Sessions expire after 7 days by default</li>
+<li><strong>CORS</strong>: Configure CORS appropriately for your domain</li>
+<li><strong>Environment Variables</strong>: Never commit secrets to version control</li>
 </ol>
-<p>Thank you for contributing to GUAC!
-*</p>
+<doc-anchor-target id="troubleshooting">
+    <h2>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#troubleshooting">#</doc-anchor-trigger>
+        <span>Troubleshooting</span>
+    </h2>
+</doc-anchor-target>
+<doc-anchor-target id="common-issues">
+    <h3>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#common-issues">#</doc-anchor-trigger>
+        <span>Common Issues</span>
+    </h3>
+</doc-anchor-target>
+<ol>
+<li><p><strong>Database Connection Error</strong></p>
+<ul>
+<li>Verify PostgreSQL is running</li>
+<li>Check DATABASE_URL format</li>
+<li>Ensure database exists and user has permissions</li>
+</ul>
+</li>
+<li><p><strong>GitHub OAuth Not Working</strong></p>
+<ul>
+<li>Verify GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET</li>
+<li>Check callback URL matches GitHub app settings</li>
+<li>Ensure FRONTEND_URL is correct</li>
+</ul>
+</li>
+<li><p><strong>Session Not Persisting</strong></p>
+<ul>
+<li>Check cookie settings (secure, httpOnly, domain)</li>
+<li>Verify session secret is set</li>
+<li>Check session expiration times</li>
+</ul>
+</li>
+<li><p><strong>CORS Issues</strong></p>
+<ul>
+<li>Verify CORS configuration allows your frontend domain</li>
+<li>Check credentials: &#x27;include&#x27; in frontend requests</li>
+</ul>
+</li>
+</ol>
+<doc-anchor-target id="debug-mode">
+    <h3>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#debug-mode">#</doc-anchor-trigger>
+        <span>Debug Mode</span>
+    </h3>
+</doc-anchor-target>
+<p>Enable debug logging:</p>
+<div class="codeblock-wrapper"><doc-codeblock>
+<pre translate="no" class="language-bash"><code v-pre class="language-bash">export LOG_LEVEL=debug
+./guac</code></pre>
+</doc-codeblock></div>
+<doc-anchor-target id="production-deployment">
+    <h2>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#production-deployment">#</doc-anchor-trigger>
+        <span>Production Deployment</span>
+    </h2>
+</doc-anchor-target>
+<doc-anchor-target id="environment-variables-for-production">
+    <h3>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#environment-variables-for-production">#</doc-anchor-trigger>
+        <span>Environment Variables for Production</span>
+    </h3>
+</doc-anchor-target>
+<div class="codeblock-wrapper"><doc-codeblock>
+<pre translate="no" class="language-bash"><code v-pre class="language-bash"># Use secure values in production
+DATABASE_URL=postgres://user:password@prod-db:5432/kubebrowse?sslmode=require
+GITHUB_CLIENT_ID=prod_github_client_id
+GITHUB_CLIENT_SECRET=prod_github_client_secret
+GITHUB_CALLBACK_URL=https://yourdomain.com/auth/oauth/github/callback
+FRONTEND_URL=https://yourdomain.com
+SESSION_SECRET=very_long_random_string_for_production</code></pre>
+</doc-codeblock></div>
+<doc-anchor-target id="security-checklist">
+    <h3>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#security-checklist">#</doc-anchor-trigger>
+        <span>Security Checklist</span>
+    </h3>
+</doc-anchor-target>
+<ul class="contains-task-list">
+<li class="task-list-item"><input disabled="disabled" type="checkbox" /> Use HTTPS for all communications</li>
+<li class="task-list-item"><input disabled="disabled" type="checkbox" /> Set secure session cookie flags</li>
+<li class="task-list-item"><input disabled="disabled" type="checkbox" /> Use strong, unique session secrets</li>
+<li class="task-list-item"><input disabled="disabled" type="checkbox" /> Configure proper CORS settings</li>
+<li class="task-list-item"><input disabled="disabled" type="checkbox" /> Set up database connection pooling</li>
+<li class="task-list-item"><input disabled="disabled" type="checkbox" /> Enable database SSL/TLS</li>
+<li class="task-list-item"><input disabled="disabled" type="checkbox" /> Set up proper logging and monitoring</li>
+<li class="task-list-item"><input disabled="disabled" type="checkbox" /> Configure rate limiting for auth endpoints</li>
+</ul>
+<doc-anchor-target id="support">
+    <h2>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#support">#</doc-anchor-trigger>
+        <span>Support</span>
+    </h2>
+</doc-anchor-target>
+<p>For issues and questions:</p>
+<ol>
+<li>Check the troubleshooting section</li>
+<li>Review the logs for error messages</li>
+<li>Verify environment configuration</li>
+<li>Check database connectivity and migrations</li>
+</ol>
 
                                 
                                 <!-- Required only on API pages -->
@@ -528,20 +690,20 @@ make lint-all</code></pre>
                             
                                 <nav id="retype-nextprev" class="print:hidden flex mt-14">
                                     <div class="w-1/2">
-                                        <a class="px-5 py-4 h-full flex items-center break-normal font-medium text-body-link border border-base-border hover:border-base-border-hover rounded-l-lg transition-colors duration-150 relative hover:z-5" href="../future-plan/">
+                                        <a class="px-5 py-4 h-full flex items-center break-normal font-medium text-body-link border border-base-border hover:border-base-border-hover rounded-l-lg transition-colors duration-150 relative hover:z-5" href="../acknowledgements/">
                                             <svg xmlns="http://www.w3.org/2000/svg" class="mr-3" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" overflow="visible"><path d="M19 11H7.41l5.29-5.29a.996.996 0 10-1.41-1.41l-7 7a1 1 0 000 1.42l7 7a1.024 1.024 0 001.42-.01.996.996 0 000-1.41L7.41 13H19c.55 0 1-.45 1-1s-.45-1-1-1z" /><path fill="none" d="M0 0h24v24H0z" /></svg>
                                             <span>
                                                 <span class="block text-xs font-normal text-base-text-muted">Previous</span>
-                                                <span class="block mt-1">Future Plan</span>
+                                                <span class="block mt-1">Acknowledgements</span>
                                             </span>
                                         </a>
                                     </div>
                             
                                     <div class="w-1/2">
-                                        <a class="px-5 py-4 -mx-px h-full flex items-center justify-end break-normal font-medium text-body-link border border-base-border hover:border-base-border-hover rounded-r-lg transition-colors duration-150 relative hover:z-5" href="../architecture/">
+                                        <a class="px-5 py-4 -mx-px h-full flex items-center justify-end break-normal font-medium text-body-link border border-base-border hover:border-base-border-hover rounded-r-lg transition-colors duration-150 relative hover:z-5" href="../tiltdevelopment/">
                                             <span>
                                                 <span class="block text-xs font-normal text-right text-base-text-muted">Next</span>
-                                                <span class="block mt-1">Architecture</span>
+                                                <span class="block mt-1">Local Development with Tilt</span>
                                             </span>
                                             <svg xmlns="http://www.w3.org/2000/svg" class="ml-3" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" overflow="visible"><path d="M19.92 12.38a1 1 0 00-.22-1.09l-7-7a.996.996 0 10-1.41 1.41l5.3 5.3H5c-.55 0-1 .45-1 1s.45 1 1 1h11.59l-5.29 5.29a.996.996 0 000 1.41c.19.2.44.3.7.3s.51-.1.71-.29l7-7c.09-.09.16-.21.21-.33z" /><path fill="none" d="M0 0h24v24H0z" /></svg>
                                         </a>
@@ -585,6 +747,6 @@ make lint-all</code></pre>
 
     <div id="retype-overlay-target"></div>
 
-    <script data-cfasync="false">window.__DOCS__ = { "title": "Contributing to KubeBrowse", level: 1, icon: "file", hasPrism: true, hasMermaid: false, hasMath: false, tocDepth: 23 }</script>
+    <script data-cfasync="false">window.__DOCS__ = { "title": "KubeBrowse Authentication Setup Guide", level: 1, icon: "file", hasPrism: true, hasMermaid: false, hasMath: false, tocDepth: 23 }</script>
 </body>
 </html>

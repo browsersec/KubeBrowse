@@ -9,24 +9,24 @@
     <meta name="generator" content="Retype 3.11.0">
 
     <!-- Primary Meta Tags -->
-    <title>Architecture</title>
-    <meta name="title" content="Architecture">
-    <meta name="description" content="View on Eraser">
+    <title>OAuth Setup Guide for KubeBrowse</title>
+    <meta name="title" content="OAuth Setup Guide for KubeBrowse">
+    <meta name="description" content="This guide explains how to set up and troubleshoot the OAuth authentication flow between the frontend and backend in your KubeBrowse application.">
 
     <!-- Canonical -->
-    <link rel="canonical" href="/architecture/">
+    <link rel="canonical" href="/oauth_setup_guide/">
 
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website">
-    <meta property="og:url" content="/architecture/">
-    <meta property="og:title" content="Architecture">
-    <meta property="og:description" content="View on Eraser">
+    <meta property="og:url" content="/oauth_setup_guide/">
+    <meta property="og:title" content="OAuth Setup Guide for KubeBrowse">
+    <meta property="og:description" content="This guide explains how to set up and troubleshoot the OAuth authentication flow between the frontend and backend in your KubeBrowse application.">
 
     <!-- Twitter -->
     <meta property="twitter:card" content="summary_large_image">
-    <meta property="twitter:url" content="/architecture/">
-    <meta property="twitter:title" content="Architecture">
-    <meta property="twitter:description" content="View on Eraser">
+    <meta property="twitter:url" content="/oauth_setup_guide/">
+    <meta property="twitter:title" content="OAuth Setup Guide for KubeBrowse">
+    <meta property="twitter:description" content="This guide explains how to set up and troubleshoot the OAuth authentication flow between the frontend and backend in your KubeBrowse application.">
 
     <script data-cfasync="false">(function(){var cl=document.documentElement.classList,ls=localStorage.getItem("retype_scheme"),hd=cl.contains("dark"),hl=cl.contains("light"),wm=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches;if(ls==="dark"||(!ls&&wm&&!hd&&!hl)){cl.remove("light");cl.add("dark")}else if(ls==="light"||(!ls&&!wm&&!hd&&!hl)){cl.remove("dark");cl.add("light")}})();</script>
 
@@ -35,6 +35,7 @@
     <script data-cfasync="false" src="../resources/js/config.js?v=3.11.0.810216527027" data-turbo-eval="false" defer></script>
     <script data-cfasync="false" src="../resources/js/retype.js?v=3.11.0" data-turbo-eval="false" defer></script>
     <script id="lunr-js" data-cfasync="false" src="../resources/js/lunr.js?v=3.11.0.810216527027" data-turbo-eval="false" defer></script>
+    <script id="prism-js" data-cfasync="false" src="../resources/js/prism.js?v=3.11.0.810216527027" defer></script>
 </head>
 <body>
     <div id="retype-app" class="relative text-base antialiased text-base-text bg-base-bg font-body">
@@ -181,13 +182,433 @@
                                 <!-- Rendered if sidebar right is enabled -->
                                 <div id="retype-sidebar-right-toggle"></div>
                                 <!-- Page content  -->
-<doc-anchor-target id="architecture" class="break-words">
+<doc-anchor-target id="oauth-setup-guide-for-kubebrowse" class="break-words">
     <h1>
-        <doc-anchor-trigger class="header-anchor-trigger" to="#architecture">#</doc-anchor-trigger>
-        <span>Architecture</span>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#oauth-setup-guide-for-kubebrowse">#</doc-anchor-trigger>
+        <span>OAuth Setup Guide for KubeBrowse</span>
     </h1>
 </doc-anchor-target>
-<p><a href="https://app.eraser.io/workspace/J9d4quTJ7EraqZevnMcV">View on Eraser<br /><img src="https://app.eraser.io/workspace/J9d4quTJ7EraqZevnMcV/preview" /></a></p>
+<p>This guide explains how to set up and troubleshoot the OAuth authentication flow between the frontend and backend in your KubeBrowse application.</p>
+<doc-anchor-target id="overview">
+    <h2>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#overview">#</doc-anchor-trigger>
+        <span>Overview</span>
+    </h2>
+</doc-anchor-target>
+<p>The OAuth flow works as follows:</p>
+<ol>
+<li>User clicks &quot;Continue with GitHub&quot; on the frontend</li>
+<li>Frontend redirects to <code v-pre>/auth/oauth/github</code> (proxied to backend via Caddy)</li>
+<li>Backend redirects to GitHub OAuth</li>
+<li>User authenticates with GitHub</li>
+<li>GitHub redirects back to backend callback</li>
+<li>Backend creates session and sets cookie</li>
+<li>Backend redirects to frontend <code v-pre>/auth/success</code></li>
+<li>Frontend detects OAuth success and establishes session</li>
+<li>User is redirected to dashboard</li>
+</ol>
+<doc-anchor-target id="prerequisites">
+    <h2>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#prerequisites">#</doc-anchor-trigger>
+        <span>Prerequisites</span>
+    </h2>
+</doc-anchor-target>
+<ul>
+<li>Kind Kubernetes cluster running</li>
+<li>Tilt development environment</li>
+<li>GitHub OAuth app configured</li>
+<li>PostgreSQL and Redis running</li>
+</ul>
+<doc-anchor-target id="configuration">
+    <h2>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#configuration">#</doc-anchor-trigger>
+        <span>Configuration</span>
+    </h2>
+</doc-anchor-target>
+<doc-anchor-target id="1-environment-variables">
+    <h3>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#1-environment-variables">#</doc-anchor-trigger>
+        <span>1. Environment Variables</span>
+    </h3>
+</doc-anchor-target>
+<p>Ensure these environment variables are set in your backend:</p>
+<div class="codeblock-wrapper"><doc-codeblock>
+<pre translate="no" class="language-bash"><code v-pre class="language-bash"># GitHub OAuth
+GITHUB_CLIENT_ID=your_github_client_id
+GITHUB_CLIENT_SECRET=your_github_client_secret
+GITHUB_CALLBACK_URL=https://localhost:4567/auth/oauth/github/callback
+
+# Frontend URL
+FRONTEND_URL=http://localhost:3000
+
+# Session
+SESSION_SECRET=your_long_random_secret</code></pre>
+</doc-codeblock></div>
+<doc-anchor-target id="2-github-oauth-app-setup">
+    <h3>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#2-github-oauth-app-setup">#</doc-anchor-trigger>
+        <span>2. GitHub OAuth App Setup</span>
+    </h3>
+</doc-anchor-target>
+<ol>
+<li>Go to GitHub Settings &gt; Developer settings &gt; OAuth Apps</li>
+<li>Create a new OAuth App</li>
+<li>Set Authorization callback URL to: <code v-pre>https://localhost:4567/auth/oauth/github/callback</code></li>
+<li>Copy Client ID and Client Secret</li>
+</ol>
+<doc-anchor-target id="3-frontend-proxy-configuration">
+    <h3>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#3-frontend-proxy-configuration">#</doc-anchor-trigger>
+        <span>3. Frontend Proxy Configuration</span>
+    </h3>
+</doc-anchor-target>
+<p>The frontend uses <strong>Caddy</strong> as a reverse proxy to forward API requests:</p>
+<div class="codeblock-wrapper"><doc-codeblock>
+<div class="codeblock-title">caddyfile</div>
+<pre translate="no" class="language-none"><code v-pre class="language-none"># Caddyfile
+handle /auth/* {
+    reverse_proxy {$CADDY_GUAC_CLIENT_URL} {
+        transport http {
+            tls
+            tls_insecure_skip_verify
+        }
+        header_up Host {http.reverse_proxy.upstream.hostport}
+        
+        # Cookie handling for session management
+        header_down Set-Cookie &quot;Domain=localhost&quot;
+        header_down Set-Cookie &quot;Path=/&quot;
+    }
+}</code></pre>
+</doc-codeblock></div>
+<p><strong>Environment Variable:</strong></p>
+<ul>
+<li><code v-pre>CADDY_GUAC_CLIENT_URL=https://browser-sandbox-api.browser-sandbox.svc.cluster.local:4567</code></li>
+</ul>
+<doc-anchor-target id="troubleshooting">
+    <h2>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#troubleshooting">#</doc-anchor-trigger>
+        <span>Troubleshooting</span>
+    </h2>
+</doc-anchor-target>
+<doc-anchor-target id="common-issues">
+    <h3>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#common-issues">#</doc-anchor-trigger>
+        <span>Common Issues</span>
+    </h3>
+</doc-anchor-target>
+<doc-anchor-target id="1-cookies-not-being-set">
+    <h4>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#1-cookies-not-being-set">#</doc-anchor-trigger>
+        <span>1. Cookies Not Being Set</span>
+    </h4>
+</doc-anchor-target>
+<p><strong>Symptoms:</strong></p>
+<ul>
+<li>User completes OAuth but session is not established</li>
+<li><code v-pre>/auth/me</code> returns 401 after OAuth</li>
+<li>No session cookie in browser</li>
+</ul>
+<p><strong>Solutions:</strong></p>
+<ul>
+<li>Check cookie domain settings in backend</li>
+<li>Ensure <code v-pre>SameSite=None</code> is not set for localhost</li>
+<li>Verify Caddy is forwarding cookies correctly</li>
+<li>Check <code v-pre>CADDY_GUAC_CLIENT_URL</code> environment variable</li>
+</ul>
+<doc-anchor-target id="2-cors-issues">
+    <h4>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#2-cors-issues">#</doc-anchor-trigger>
+        <span>2. CORS Issues</span>
+    </h4>
+</doc-anchor-target>
+<p><strong>Symptoms:</strong></p>
+<ul>
+<li>OAuth redirect fails</li>
+<li>Browser console shows CORS errors</li>
+</ul>
+<p><strong>Solutions:</strong></p>
+<ul>
+<li>Backend should not set CORS for OAuth endpoints</li>
+<li>Caddy proxy handles CORS automatically</li>
+</ul>
+<doc-anchor-target id="3-session-validation-fails">
+    <h4>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#3-session-validation-fails">#</doc-anchor-trigger>
+        <span>3. Session Validation Fails</span>
+    </h4>
+</doc-anchor-target>
+<p><strong>Symptoms:</strong></p>
+<ul>
+<li>User appears authenticated but requests fail</li>
+<li>Session token mismatch</li>
+</ul>
+<p><strong>Solutions:</strong></p>
+<ul>
+<li>Check Redis connection</li>
+<li>Verify session cleanup is working</li>
+<li>Check session token format</li>
+</ul>
+<doc-anchor-target id="debugging-steps">
+    <h3>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#debugging-steps">#</doc-anchor-trigger>
+        <span>Debugging Steps</span>
+    </h3>
+</doc-anchor-target>
+<doc-anchor-target id="1-check-backend-logs">
+    <h4>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#1-check-backend-logs">#</doc-anchor-trigger>
+        <span>1. Check Backend Logs</span>
+    </h4>
+</doc-anchor-target>
+<div class="codeblock-wrapper"><doc-codeblock>
+<pre translate="no" class="language-bash"><code v-pre class="language-bash">kubectl logs -l app=browser-sandbox-api -n browser-sandbox -f</code></pre>
+</doc-codeblock></div>
+<p>Look for:</p>
+<ul>
+<li>OAuth flow logs</li>
+<li>Session creation logs</li>
+<li>Cookie setting logs</li>
+</ul>
+<doc-anchor-target id="2-check-frontend-logs">
+    <h4>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#2-check-frontend-logs">#</doc-anchor-trigger>
+        <span>2. Check Frontend Logs</span>
+    </h4>
+</doc-anchor-target>
+<div class="codeblock-wrapper"><doc-codeblock>
+<pre translate="no" class="language-bash"><code v-pre class="language-bash">kubectl logs -l app=browser-sandbox-frontend -n browser-sandbox -f</code></pre>
+</doc-codeblock></div>
+<p>Look for:</p>
+<ul>
+<li>Caddy proxy errors</li>
+<li>Authentication attempts</li>
+</ul>
+<doc-anchor-target id="3-check-caddy-configuration">
+    <h4>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#3-check-caddy-configuration">#</doc-anchor-trigger>
+        <span>3. Check Caddy Configuration</span>
+    </h4>
+</doc-anchor-target>
+<p>Verify the <code v-pre>CADDY_GUAC_CLIENT_URL</code> environment variable is set:</p>
+<div class="codeblock-wrapper"><doc-codeblock>
+<pre translate="no" class="language-bash"><code v-pre class="language-bash">kubectl get deployment browser-sandbox-frontend -n browser-sandbox -o yaml | grep -A 10 env:</code></pre>
+</doc-codeblock></div>
+<doc-anchor-target id="4-check-browser-network-tab">
+    <h4>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#4-check-browser-network-tab">#</doc-anchor-trigger>
+        <span>4. Check Browser Network Tab</span>
+    </h4>
+</doc-anchor-target>
+<ol>
+<li>Open Developer Tools &gt; Network</li>
+<li>Complete OAuth flow</li>
+<li>Check:
+<ul>
+<li>OAuth redirect requests</li>
+<li>Cookie headers</li>
+<li>Response status codes</li>
+</ul>
+</li>
+</ol>
+<doc-anchor-target id="5-test-api-endpoints">
+    <h4>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#5-test-api-endpoints">#</doc-anchor-trigger>
+        <span>5. Test API Endpoints</span>
+    </h4>
+</doc-anchor-target>
+<div class="codeblock-wrapper"><doc-codeblock>
+<pre translate="no" class="language-bash"><code v-pre class="language-bash"># Test OAuth initiation
+curl -v &quot;https://localhost:4567/auth/oauth/github&quot;
+
+# Test session endpoint (should return 401)
+curl -v &quot;https://localhost:4567/auth/me&quot;
+
+# Test with session cookie
+curl -v -H &quot;Cookie: session=your_session_token&quot; &quot;https://localhost:4567/auth/me&quot;</code></pre>
+</doc-codeblock></div>
+<doc-anchor-target id="cookie-debugging">
+    <h3>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#cookie-debugging">#</doc-anchor-trigger>
+        <span>Cookie Debugging</span>
+    </h3>
+</doc-anchor-target>
+<doc-anchor-target id="check-cookie-settings">
+    <h4>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#check-cookie-settings">#</doc-anchor-trigger>
+        <span>Check Cookie Settings</span>
+    </h4>
+</doc-anchor-target>
+<div class="codeblock-wrapper"><doc-codeblock>
+<pre translate="no" class="language-bash"><code v-pre class="language-bash"># In browser console
+document.cookie
+
+# Check specific cookie
+document.cookie.split(';').find(c =&gt; c.trim().startsWith('session='))</code></pre>
+</doc-codeblock></div>
+<doc-anchor-target id="cookie-attributes">
+    <h4>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#cookie-attributes">#</doc-anchor-trigger>
+        <span>Cookie Attributes</span>
+    </h4>
+</doc-anchor-target>
+<p>Ensure cookies have:</p>
+<ul>
+<li><code v-pre>Domain=localhost</code> (for local development)</li>
+<li><code v-pre>Path=/</code></li>
+<li><code v-pre>HttpOnly=true</code></li>
+<li><code v-pre>Secure=false</code> (for local development)</li>
+</ul>
+<doc-anchor-target id="testing">
+    <h2>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#testing">#</doc-anchor-trigger>
+        <span>Testing</span>
+    </h2>
+</doc-anchor-target>
+<doc-anchor-target id="1-manual-testing">
+    <h3>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#1-manual-testing">#</doc-anchor-trigger>
+        <span>1. Manual Testing</span>
+    </h3>
+</doc-anchor-target>
+<ol>
+<li><p>Start your development environment:</p>
+<div class="codeblock-wrapper"><doc-codeblock>
+<pre translate="no" class="language-bash"><code v-pre class="language-bash">tilt up</code></pre>
+</doc-codeblock></div>
+</li>
+<li><p>Open frontend in browser: <code v-pre>http://localhost:3000</code></p>
+</li>
+<li><p>Click &quot;Sign In&quot; &gt; &quot;Continue with GitHub&quot;</p>
+</li>
+<li><p>Complete GitHub OAuth</p>
+</li>
+<li><p>Verify you&#x27;re redirected to <code v-pre>/auth/success</code></p>
+</li>
+<li><p>Check if session is established</p>
+</li>
+</ol>
+<doc-anchor-target id="2-automated-testing">
+    <h3>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#2-automated-testing">#</doc-anchor-trigger>
+        <span>2. Automated Testing</span>
+    </h3>
+</doc-anchor-target>
+<p>Use the provided test script:</p>
+<div class="codeblock-wrapper"><doc-codeblock>
+<pre translate="no" class="language-bash"><code v-pre class="language-bash">./test-oauth-flow.sh</code></pre>
+</doc-codeblock></div>
+<p>This script will:</p>
+<ul>
+<li>Check cluster status</li>
+<li>Verify services are running</li>
+<li>Test OAuth endpoints</li>
+<li>Validate session management</li>
+</ul>
+<doc-anchor-target id="production-considerations">
+    <h2>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#production-considerations">#</doc-anchor-trigger>
+        <span>Production Considerations</span>
+    </h2>
+</doc-anchor-target>
+<doc-anchor-target id="1-https">
+    <h3>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#1-https">#</doc-anchor-trigger>
+        <span>1. HTTPS</span>
+    </h3>
+</doc-anchor-target>
+<ul>
+<li>Set <code v-pre>Secure=true</code> for cookies</li>
+<li>Use proper SSL certificates</li>
+<li>Update OAuth callback URLs</li>
+</ul>
+<doc-anchor-target id="2-domain-configuration">
+    <h3>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#2-domain-configuration">#</doc-anchor-trigger>
+        <span>2. Domain Configuration</span>
+    </h3>
+</doc-anchor-target>
+<ul>
+<li>Update cookie domains for production</li>
+<li>Configure proper CORS policies</li>
+<li>Set appropriate SameSite cookie attributes</li>
+</ul>
+<doc-anchor-target id="3-session-management">
+    <h3>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#3-session-management">#</doc-anchor-trigger>
+        <span>3. Session Management</span>
+    </h3>
+</doc-anchor-target>
+<ul>
+<li>Implement session rotation</li>
+<li>Add rate limiting</li>
+<li>Monitor session usage</li>
+</ul>
+<doc-anchor-target id="architecture-notes">
+    <h2>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#architecture-notes">#</doc-anchor-trigger>
+        <span>Architecture Notes</span>
+    </h2>
+</doc-anchor-target>
+<doc-anchor-target id="frontend-react--caddy">
+    <h3>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#frontend-react--caddy">#</doc-anchor-trigger>
+        <span>Frontend (React + Caddy)</span>
+    </h3>
+</doc-anchor-target>
+<ul>
+<li>Uses React Context for auth state</li>
+<li><strong>Caddy reverse proxy</strong> for API communication</li>
+<li>Handles OAuth callback routing</li>
+</ul>
+<doc-anchor-target id="backend-go--gin">
+    <h3>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#backend-go--gin">#</doc-anchor-trigger>
+        <span>Backend (Go + Gin)</span>
+    </h3>
+</doc-anchor-target>
+<ul>
+<li>Goth library for OAuth providers</li>
+<li>Redis for session storage</li>
+<li>Cookie-based session management</li>
+</ul>
+<doc-anchor-target id="infrastructure">
+    <h3>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#infrastructure">#</doc-anchor-trigger>
+        <span>Infrastructure</span>
+    </h3>
+</doc-anchor-target>
+<ul>
+<li>Kind cluster for local development</li>
+<li>Tilt for development workflow</li>
+<li><strong>Caddy</strong> for frontend serving and proxying (instead of nginx)</li>
+</ul>
+<doc-anchor-target id="support">
+    <h2>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#support">#</doc-anchor-trigger>
+        <span>Support</span>
+    </h2>
+</doc-anchor-target>
+<p>If you continue to have issues:</p>
+<ol>
+<li>Check the troubleshooting section above</li>
+<li>Review backend and frontend logs</li>
+<li>Verify environment configuration</li>
+<li>Test with the provided test script</li>
+<li>Check GitHub OAuth app settings</li>
+<li>Verify Caddy configuration and environment variables</li>
+</ol>
+<doc-anchor-target id="references">
+    <h2>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#references">#</doc-anchor-trigger>
+        <span>References</span>
+    </h2>
+</doc-anchor-target>
+<ul>
+<li><a href="https://tilt.dev">Tilt Documentation</a></li>
+<li><a href="https://github.com/markbates/goth">Goth OAuth Library</a></li>
+<li><a href="https://caddy.community/t/reverse-proxy-with-caddy/1100">Caddy Reverse Proxy</a></li>
+<li><a href="https://reactrouter.com/en/main/start/concepts#authentication">React Router Authentication</a></li>
+</ul>
 
                                 
                                 <!-- Required only on API pages -->
@@ -197,23 +618,16 @@
                             
                                 <nav id="retype-nextprev" class="print:hidden flex mt-14">
                                     <div class="w-1/2">
-                                        <a class="px-5 py-4 h-full flex items-center break-normal font-medium text-body-link border border-base-border hover:border-base-border-hover rounded-l-lg transition-colors duration-150 relative hover:z-5" href="../contributing/">
+                                        <a class="px-5 py-4 h-full flex items-center break-normal font-medium text-body-link border border-base-border hover:border-base-border-hover rounded-r rounded-l-lg transition-colors duration-150 relative hover:z-5" href="../tiltdevelopment/">
                                             <svg xmlns="http://www.w3.org/2000/svg" class="mr-3" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" overflow="visible"><path d="M19 11H7.41l5.29-5.29a.996.996 0 10-1.41-1.41l-7 7a1 1 0 000 1.42l7 7a1.024 1.024 0 001.42-.01.996.996 0 000-1.41L7.41 13H19c.55 0 1-.45 1-1s-.45-1-1-1z" /><path fill="none" d="M0 0h24v24H0z" /></svg>
                                             <span>
                                                 <span class="block text-xs font-normal text-base-text-muted">Previous</span>
-                                                <span class="block mt-1">Contributing to Kube​Browse</span>
+                                                <span class="block mt-1">Local Development with Tilt</span>
                                             </span>
                                         </a>
                                     </div>
                             
                                     <div class="w-1/2">
-                                        <a class="px-5 py-4 -mx-px h-full flex items-center justify-end break-normal font-medium text-body-link border border-base-border hover:border-base-border-hover rounded-r-lg transition-colors duration-150 relative hover:z-5" href="../acknowledgements/">
-                                            <span>
-                                                <span class="block text-xs font-normal text-right text-base-text-muted">Next</span>
-                                                <span class="block mt-1">Acknowledgements</span>
-                                            </span>
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="ml-3" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" overflow="visible"><path d="M19.92 12.38a1 1 0 00-.22-1.09l-7-7a.996.996 0 10-1.41 1.41l5.3 5.3H5c-.55 0-1 .45-1 1s.45 1 1 1h11.59l-5.29 5.29a.996.996 0 000 1.41c.19.2.44.3.7.3s.51-.1.71-.29l7-7c.09-.09.16-.21.21-.33z" /><path fill="none" d="M0 0h24v24H0z" /></svg>
-                                        </a>
                                     </div>
                                 </nav>
                             </footer>
@@ -254,6 +668,6 @@
 
     <div id="retype-overlay-target"></div>
 
-    <script data-cfasync="false">window.__DOCS__ = { "title": "Architecture", level: 1, icon: "file", hasPrism: false, hasMermaid: false, hasMath: false, tocDepth: 23 }</script>
+    <script data-cfasync="false">window.__DOCS__ = { "title": "OAuth Setup Guide for KubeBrowse", level: 1, icon: "file", hasPrism: true, hasMermaid: false, hasMath: false, tocDepth: 23 }</script>
 </body>
 </html>

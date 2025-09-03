@@ -9,24 +9,24 @@
     <meta name="generator" content="Retype 3.11.0">
 
     <!-- Primary Meta Tags -->
-    <title>Architecture</title>
-    <meta name="title" content="Architecture">
-    <meta name="description" content="View on Eraser">
+    <title>Local Development with Tilt</title>
+    <meta name="title" content="Local Development with Tilt">
+    <meta name="description" content="This document describes how to use Tilt for local development of the Kubebrowse project on Kubernetes.">
 
     <!-- Canonical -->
-    <link rel="canonical" href="/architecture/">
+    <link rel="canonical" href="/tiltdevelopment/">
 
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website">
-    <meta property="og:url" content="/architecture/">
-    <meta property="og:title" content="Architecture">
-    <meta property="og:description" content="View on Eraser">
+    <meta property="og:url" content="/tiltdevelopment/">
+    <meta property="og:title" content="Local Development with Tilt">
+    <meta property="og:description" content="This document describes how to use Tilt for local development of the Kubebrowse project on Kubernetes.">
 
     <!-- Twitter -->
     <meta property="twitter:card" content="summary_large_image">
-    <meta property="twitter:url" content="/architecture/">
-    <meta property="twitter:title" content="Architecture">
-    <meta property="twitter:description" content="View on Eraser">
+    <meta property="twitter:url" content="/tiltdevelopment/">
+    <meta property="twitter:title" content="Local Development with Tilt">
+    <meta property="twitter:description" content="This document describes how to use Tilt for local development of the Kubebrowse project on Kubernetes.">
 
     <script data-cfasync="false">(function(){var cl=document.documentElement.classList,ls=localStorage.getItem("retype_scheme"),hd=cl.contains("dark"),hl=cl.contains("light"),wm=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches;if(ls==="dark"||(!ls&&wm&&!hd&&!hl)){cl.remove("light");cl.add("dark")}else if(ls==="light"||(!ls&&!wm&&!hd&&!hl)){cl.remove("dark");cl.add("light")}})();</script>
 
@@ -35,6 +35,7 @@
     <script data-cfasync="false" src="../resources/js/config.js?v=3.11.0.810216527027" data-turbo-eval="false" defer></script>
     <script data-cfasync="false" src="../resources/js/retype.js?v=3.11.0" data-turbo-eval="false" defer></script>
     <script id="lunr-js" data-cfasync="false" src="../resources/js/lunr.js?v=3.11.0.810216527027" data-turbo-eval="false" defer></script>
+    <script id="prism-js" data-cfasync="false" src="../resources/js/prism.js?v=3.11.0.810216527027" defer></script>
 </head>
 <body>
     <div id="retype-app" class="relative text-base antialiased text-base-text bg-base-bg font-body">
@@ -181,13 +182,128 @@
                                 <!-- Rendered if sidebar right is enabled -->
                                 <div id="retype-sidebar-right-toggle"></div>
                                 <!-- Page content  -->
-<doc-anchor-target id="architecture" class="break-words">
+<doc-anchor-target id="local-development-with-tilt" class="break-words">
     <h1>
-        <doc-anchor-trigger class="header-anchor-trigger" to="#architecture">#</doc-anchor-trigger>
-        <span>Architecture</span>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#local-development-with-tilt">#</doc-anchor-trigger>
+        <span>Local Development with Tilt</span>
     </h1>
 </doc-anchor-target>
-<p><a href="https://app.eraser.io/workspace/J9d4quTJ7EraqZevnMcV">View on Eraser<br /><img src="https://app.eraser.io/workspace/J9d4quTJ7EraqZevnMcV/preview" /></a></p>
+<p>This document describes how to use Tilt for local development of the Kubebrowse project on Kubernetes. Tilt provides a streamlined workflow with live updates, automated builds, and easy resource management.</p>
+<doc-anchor-target id="prerequisites">
+    <h2>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#prerequisites">#</doc-anchor-trigger>
+        <span>Prerequisites</span>
+    </h2>
+</doc-anchor-target>
+<ol>
+<li><strong>Docker</strong>: Ensure Docker is installed and running. Tilt uses Docker to build container images. (<a href="https://docs.docker.com/get-docker/">https://docs.docker.com/get-docker/</a>)</li>
+<li><strong>Kubernetes Cluster</strong>: You need a local Kubernetes cluster. Options include:
+<ul>
+<li><a href="https://kind.sigs.k8s.io/docs/user/quick-start/">Kind (Kubernetes IN Docker)</a></li>
+<li><a href="https://minikube.sigs.k8s.io/docs/start/">Minikube</a></li>
+<li>Docker Desktop&#x27;s built-in Kubernetes cluster.
+Ensure your <code v-pre>kubectl</code> context is pointing to your local development cluster (<code v-pre>kubectl config current-context</code>).</li>
+</ul>
+</li>
+<li><strong>Tilt</strong>: Install Tilt by following the instructions on the official Tilt website: <a href="https://docs.tilt.dev/install.html">Install Tilt</a></li>
+</ol>
+<doc-anchor-target id="getting-started">
+    <h2>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#getting-started">#</doc-anchor-trigger>
+        <span>Getting Started</span>
+    </h2>
+</doc-anchor-target>
+<ol>
+<li><p><strong>Clone the Repository</strong>:
+If you haven&#x27;t already, clone the project repository:</p>
+<div class="codeblock-wrapper"><doc-codeblock>
+<pre translate="no" class="language-bash"><code v-pre class="language-bash">git clone https://github.com/browsersec/KubeBrowse
+cd KubeBrowse</code></pre>
+</doc-codeblock></div>
+</li>
+<li><p><strong>Configure Kubernetes Context (if needed)</strong>:
+The <code v-pre>Tiltfile</code> attempts to use your current Kubernetes context. If Tilt has trouble connecting or you need to specify a context:</p>
+<ul>
+<li><p>Uncomment and modify the <code v-pre>allow_k8s_contexts</code> line in the <code v-pre>Tiltfile</code> at the root of the project. For example:</p>
+<div class="codeblock-wrapper"><doc-codeblock>
+<pre translate="no" class="language-python"><code v-pre class="language-python"># allow_k8s_contexts('kind-kind', 'docker-desktop')</code></pre>
+</doc-codeblock></div>
+</li>
+<li><p>Replace <code v-pre>'kind-kind'</code> or <code v-pre>'docker-desktop'</code> with the name of your <code v-pre>kubectl</code> context.</p>
+</li>
+</ul>
+</li>
+<li><p><strong>Start Tilt</strong>:
+Navigate to the root directory of the project in your terminal and run:</p>
+<div class="codeblock-wrapper"><doc-codeblock>
+<pre translate="no" class="language-bash"><code v-pre class="language-bash">tilt up</code></pre>
+</doc-codeblock></div>
+<p>Tilt will:</p>
+<ul>
+<li>Build the container images for the frontend and backend services.</li>
+<li>Deploy all resources defined in <code v-pre>deployments/manifest.yml</code> to your Kubernetes cluster.</li>
+<li>Set up port forwarding for accessing the services locally:
+<ul>
+<li>Backend API (<code v-pre>browser-sandbox-api</code>): <code v-pre>localhost:4567</code></li>
+<li>Frontend (<code v-pre>browser-sandbox-frontend</code>): <code v-pre>localhost:3000</code></li>
+</ul>
+</li>
+<li>Open a web browser with the Tilt UI, where you can monitor the status of your services, view logs, and manage resources.</li>
+</ul>
+</li>
+<li><p><strong>Accessing the Application</strong>:</p>
+<ul>
+<li>Frontend: Open your browser and go to <code v-pre>http://localhost:3000</code></li>
+<li>API: Accessible at <code v-pre>http://localhost:4567</code></li>
+</ul>
+</li>
+</ol>
+<doc-anchor-target id="development-workflow">
+    <h2>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#development-workflow">#</doc-anchor-trigger>
+        <span>Development Workflow</span>
+    </h2>
+</doc-anchor-target>
+<ul>
+<li><p><strong>Live Updates</strong>:</p>
+<ul>
+<li><strong>Backend (Go)</strong>: When you save changes to Go files in the <code v-pre>./api</code>, <code v-pre>./cmd</code>, or <code v-pre>./internal</code> directories, Tilt will automatically sync the changes to the running container, rebuild the Go application, and restart the pod.</li>
+<li><strong>Frontend (Vite/React)</strong>: When you save changes to files in the <code v-pre>./frontend/src</code> directory (or other relevant frontend paths like <code v-pre>index.html</code>, <code v-pre>package.json</code>), Tilt will sync the files.
+<ul>
+<li>If <code v-pre>package.json</code> or <code v-pre>bun.lockb</code> changes, dependencies will be reinstalled, and static assets will be rebuilt.</li>
+<li>Caddy will serve the updated static files. You may need to refresh your browser to see these changes.<em>(Note: For a Hot Module Replacement (HMR) experience with Vite, the frontend Dockerfile&#x27;s CMD and Tiltfile&#x27;s port-forwarding would need to be adjusted to use Vite&#x27;s dev server directly.)</em></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><p><strong>Logs</strong>: View real-time logs for each service in the Tilt UI.</p>
+</li>
+<li><p><strong>Resource Management</strong>: The Tilt UI allows you to manually trigger updates, restart pods, and view Kubernetes resource details.</p>
+</li>
+</ul>
+<doc-anchor-target id="stopping-tilt">
+    <h2>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#stopping-tilt">#</doc-anchor-trigger>
+        <span>Stopping Tilt</span>
+    </h2>
+</doc-anchor-target>
+<ul>
+<li>To stop Tilt and remove the deployed resources from your Kubernetes cluster, press <code v-pre>Ctrl+C</code> in the terminal where <code v-pre>tilt up</code> is running.</li>
+<li>Alternatively, you can use <code v-pre>tilt down</code>.</li>
+</ul>
+<doc-anchor-target id="troubleshooting">
+    <h2>
+        <doc-anchor-trigger class="header-anchor-trigger" to="#troubleshooting">#</doc-anchor-trigger>
+        <span>Troubleshooting</span>
+    </h2>
+</doc-anchor-target>
+<ul>
+<li><strong><code v-pre>tilt doctor</code></strong>: Run <code v-pre>tilt doctor</code> in your terminal. This command checks your Tilt and Kubernetes setup and provides suggestions for fixing common issues.</li>
+<li><strong>Kubernetes Context</strong>: Ensure <code v-pre>kubectl config current-context</code> points to the correct local cluster. If not, use <code v-pre>kubectl config use-context &lt;your-local-cluster-context&gt;</code>.</li>
+<li><strong>Image Pull Issues</strong>: If Kubernetes has trouble pulling images, ensure your <code v-pre>imagePullPolicy</code> in <code v-pre>deployments/manifest.yml</code> is <code v-pre>IfNotPresent</code> for the services managed by Tilt (api, frontend). This should already be set by a previous step. Also, check your local Docker environment and Kubernetes cluster&#x27;s ability to access local images (e.g., if using Minikube, you might need <code v-pre>minikube image load &lt;image_name&gt;</code> or configure Docker environment sharing). The <code v-pre>update_mode(UPDATE_MODE_AUTO)</code> in Tiltfile usually handles this for local clusters.</li>
+<li><strong>Port Conflicts</strong>: If the default ports (4567 for API, 3000 for frontend) are already in use on your local machine, you can change the local port in the <code v-pre>port_forwards</code> section of the <code v-pre>Tiltfile</code>. For example, change <code v-pre>port_forwards=['3000:80']</code> to <code v-pre>port_forwards=['3001:80']</code> to use <code v-pre>localhost:3001</code> for the frontend.</li>
+</ul>
+<p>This setup should significantly improve the local development experience when working with Kubernetes.</p>
 
                                 
                                 <!-- Required only on API pages -->
@@ -197,20 +313,20 @@
                             
                                 <nav id="retype-nextprev" class="print:hidden flex mt-14">
                                     <div class="w-1/2">
-                                        <a class="px-5 py-4 h-full flex items-center break-normal font-medium text-body-link border border-base-border hover:border-base-border-hover rounded-l-lg transition-colors duration-150 relative hover:z-5" href="../contributing/">
+                                        <a class="px-5 py-4 h-full flex items-center break-normal font-medium text-body-link border border-base-border hover:border-base-border-hover rounded-l-lg transition-colors duration-150 relative hover:z-5" href="../authentication_setup/">
                                             <svg xmlns="http://www.w3.org/2000/svg" class="mr-3" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" overflow="visible"><path d="M19 11H7.41l5.29-5.29a.996.996 0 10-1.41-1.41l-7 7a1 1 0 000 1.42l7 7a1.024 1.024 0 001.42-.01.996.996 0 000-1.41L7.41 13H19c.55 0 1-.45 1-1s-.45-1-1-1z" /><path fill="none" d="M0 0h24v24H0z" /></svg>
                                             <span>
                                                 <span class="block text-xs font-normal text-base-text-muted">Previous</span>
-                                                <span class="block mt-1">Contributing to Kube​Browse</span>
+                                                <span class="block mt-1">Kube​Browse Authentication Setup Guide</span>
                                             </span>
                                         </a>
                                     </div>
                             
                                     <div class="w-1/2">
-                                        <a class="px-5 py-4 -mx-px h-full flex items-center justify-end break-normal font-medium text-body-link border border-base-border hover:border-base-border-hover rounded-r-lg transition-colors duration-150 relative hover:z-5" href="../acknowledgements/">
+                                        <a class="px-5 py-4 -mx-px h-full flex items-center justify-end break-normal font-medium text-body-link border border-base-border hover:border-base-border-hover rounded-r-lg transition-colors duration-150 relative hover:z-5" href="../oauth_setup_guide/">
                                             <span>
                                                 <span class="block text-xs font-normal text-right text-base-text-muted">Next</span>
-                                                <span class="block mt-1">Acknowledgements</span>
+                                                <span class="block mt-1">O​Auth Setup Guide for Kube​Browse</span>
                                             </span>
                                             <svg xmlns="http://www.w3.org/2000/svg" class="ml-3" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" overflow="visible"><path d="M19.92 12.38a1 1 0 00-.22-1.09l-7-7a.996.996 0 10-1.41 1.41l5.3 5.3H5c-.55 0-1 .45-1 1s.45 1 1 1h11.59l-5.29 5.29a.996.996 0 000 1.41c.19.2.44.3.7.3s.51-.1.71-.29l7-7c.09-.09.16-.21.21-.33z" /><path fill="none" d="M0 0h24v24H0z" /></svg>
                                         </a>
@@ -254,6 +370,6 @@
 
     <div id="retype-overlay-target"></div>
 
-    <script data-cfasync="false">window.__DOCS__ = { "title": "Architecture", level: 1, icon: "file", hasPrism: false, hasMermaid: false, hasMath: false, tocDepth: 23 }</script>
+    <script data-cfasync="false">window.__DOCS__ = { "title": "Local Development with Tilt", level: 1, icon: "file", hasPrism: true, hasMermaid: false, hasMath: false, tocDepth: 23 }</script>
 </body>
 </html>
