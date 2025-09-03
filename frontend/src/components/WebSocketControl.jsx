@@ -337,7 +337,6 @@ function WebSocketControl({
                           <div className="text-sm mb-2">{entry.message}</div>
                           
                           <div className="space-y-3">
-                          <div className="space-y-3">
                             {Array.isArray(entry.results) && entry.results.length > 0 ? (
                               entry.results.map((result, resultIndex) => (
                                 <div key={resultIndex} className="border rounded p-3">

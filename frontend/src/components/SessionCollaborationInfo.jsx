@@ -29,7 +29,7 @@ const SessionCollaborationInfo = ({
         </span>
       </div>
       
-      {connectionState === 'CONNECTED' && (
+      {String(connectionState).toLowerCase() === 'connected' && (
         <div className="mt-2 text-xs text-green-600">
           ✓ Connected and sharing
         </div>

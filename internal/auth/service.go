@@ -361,7 +361,7 @@ func (s *Service) CleanupExpiredSessions() error {
 // VerifyEmail verifies a user's email using the verification token
 func (s *Service) VerifyEmail(token string) (*User, error) {
 	// Verify the token and update user
-	dbUser, err := s.db.VerifyUserEmail(s.ctx, sql.NullString{String: token, Valid: true})
+	dbUser, err := s.db.VerifyUserEmail(s.ctx, token)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrInvalidToken

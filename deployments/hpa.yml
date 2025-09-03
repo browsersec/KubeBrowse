@@ -16,13 +16,13 @@ spec:
         name: cpu
         target:
           type: AverageValue
-          averageValue: "100"
+          averageValue: "100m"
     - type: Resource
       resource:
         name: memory
         target:
           type: AverageValue
-          averageValue: "100"
+          averageValue: "100Mi"
     - type: Pods
       pods:
         metric:
@@ -49,13 +49,13 @@ spec:
         name: cpu
         target:
           type: AverageValue
-          averageValue: "100"
+          averageValue: "100m"
     - type: Resource
       resource:
         name: memory
         target:
           type: AverageValue
-          averageValue: "100"
+          averageValue: "100Mi"
     - type: Pods
       pods:
         metric:
@@ -82,13 +82,13 @@ spec:
         name: cpu
         target:
           type: AverageValue
-          averageValue: "100"
+          averageValue: "100m"
     - type: Resource
       resource:
         name: memory
         target:
           type: AverageValue
-          averageValue: "100"
+          averageValue: "100Mi"
     - type: Pods
       pods:
         metric:

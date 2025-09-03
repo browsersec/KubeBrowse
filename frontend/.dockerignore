@@ -116,3 +116,11 @@ __tests__
 *.test.jsx
 *.spec.js
 *.spec.jsx
+
+# Optional npm cache directory
+.npm
+.npmrc
+.yarnrc
+.yarnrc.yml
+# Optional eslint cache
+.eslintcache

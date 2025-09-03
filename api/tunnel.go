@@ -192,9 +192,16 @@ func DemoDoConnect(request *http.Request, tunnelStore *guac2.ActiveTunnelStore, 
 	}
 
 	sanitisedCfg := config
-
+	// deep-copy Parameters to avoid mutating the original
+	paramsCopy := make(map[string]string, len(config.Parameters))
+	for k, v := range config.Parameters {
+		paramsCopy[k] = v
+	}
+	sanitisedCfg.Parameters = paramsCopy
 	if session.Share {
-		sanitisedCfg.Parameters["password"] = "********"
+		if _, ok := sanitisedCfg.Parameters["password"]; ok {
+			sanitisedCfg.Parameters["password"] = "********"
+		}
 	} else {
 		sanitisedCfg.ConnectionID = ""
 	}
