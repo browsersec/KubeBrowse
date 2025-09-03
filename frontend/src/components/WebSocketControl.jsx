@@ -337,59 +337,66 @@ function WebSocketControl({
                           <div className="text-sm mb-2">{entry.message}</div>
                           
                           <div className="space-y-3">
-                            {entry.results.map((result, resultIndex) => (
-                              <div key={resultIndex} className="border rounded p-3">
-                                <div className="flex justify-between items-center mb-2">
-                                  <h4 className="font-semibold capitalize">{result.service}</h4>
-                                  <Badge variant={result.success ? "default" : "destructive"}>
-                                    {result.success ? 'Success' : 'Failed'}
-                                  </Badge>
-                                </div>
-                                
-                                {result.error && <div className="text-destructive mb-2">Error: {result.error}</div>}
-                                
-                                {result.data && (
-                                  <div className="text-sm">
-                                    {/* File Upload Service */}
-                                    {result.service === "file_upload" && result.data.status_code && (
-                                      <div>Status Code: {result.data.status_code}</div>
-                                    )}
-                                    
-                                    {/* ClamAV Service */}
-                                    {result.service === "clamav" && result.data.response && (
-                                      <div className="bg-muted p-2 rounded mt-1">
-                                        {result.data.response.infected !== undefined && (
-                                          <div className={`font-medium ${result.data.response.infected ? 'text-destructive' : 'text-emerald-600'}`}>
-                                            {result.data.response.infected 
-                                              ? '⚠️ Malware Detected' 
-                                              : '✅ No Malware Detected'}
-                                          </div>
-                                        )}
-                                        {result.data.response.data?.result?.map((file, idx) => (
-                                          <div key={idx} className="mt-1">
-                                            <div>File: {file.name}</div>
-                                            <div>Infected: {file.is_infected ? 'Yes' : 'No'}</div>
-                                            {file.viruses && file.viruses.length > 0 && (
-                                              <div>Threats: {file.viruses.join(', ')}</div>
-                                            )}
-                                          </div>
-                                        ))}
-                                      </div>
-                                    )}
-                                    
-                                    {/* MinIO Storage Service */}
-                                    {result.service === "minio" && (
-                                      <div>
-                                        <div>Bucket: {result.data.bucket}</div>
-                                        <div>File: {result.data.object_name}</div>
-                                        <div>Size: {formatBytes(result.data.size)}</div>
-                                        <div>ETag: {result.data.etag}</div>
-                                      </div>
-                                    )}
+                          <div className="space-y-3">
+                            {Array.isArray(entry.results) && entry.results.length > 0 ? (
+                              entry.results.map((result, resultIndex) => (
+                                <div key={resultIndex} className="border rounded p-3">
+                                  <div className="flex justify-between items-center mb-2">
+                                    <h4 className="font-semibold capitalize">{result.service}</h4>
+                                    <Badge variant={result.success ? "default" : "destructive"}>
+                                      {result.success ? 'Success' : 'Failed'}
+                                    </Badge>
                                   </div>
-                                )}
+                                  
+                                  {result.error && <div className="text-destructive mb-2">Error: {result.error}</div>}
+                                  
+                                  {result.data && (
+                                    <div className="text-sm">
+                                      {/* File Upload Service */}
+                                      {result.service === "file_upload" && result.data.status_code && (
+                                        <div>Status Code: {result.data.status_code}</div>
+                                      )}
+                                      
+                                      {/* ClamAV Service */}
+                                      {result.service === "clamav" && result.data.response && (
+                                        <div className="bg-muted p-2 rounded mt-1">
+                                          {result.data.response.infected !== undefined && (
+                                            <div className={`font-medium ${result.data.response.infected ? 'text-destructive' : 'text-emerald-600'}`}>
+                                              {result.data.response.infected 
+                                                ? '⚠️ Malware Detected' 
+                                                : '✅ No Malware Detected'}
+                                            </div>
+                                          )}
+                                          {result.data.response.data?.result?.map((file, idx) => (
+                                            <div key={idx} className="mt-1">
+                                              <div>File: {file.name}</div>
+                                              <div>Infected: {file.is_infected ? 'Yes' : 'No'}</div>
+                                              {file.viruses && file.viruses.length > 0 && (
+                                                <div>Threats: {file.viruses.join(', ')}</div>
+                                              )}
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+                                      
+                                      {/* MinIO Storage Service */}
+                                      {result.service === "minio" && (
+                                        <div>
+                                          <div>Bucket: {result.data.bucket}</div>
+                                          <div>File: {result.data.object_name}</div>
+                                          <div>Size: {formatBytes(result.data.size)}</div>
+                                          <div>ETag: {result.data.etag}</div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              ))
+                            ) : (
+                              <div className="text-sm text-muted-foreground">
+                                No service results reported.
                               </div>
-                            ))}
+                            )}
                           </div>
                         </div>
                       )}
