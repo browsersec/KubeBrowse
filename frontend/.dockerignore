@@ -95,7 +95,6 @@ temp/
 
 # Lock files (we'll copy package*.json separately)
 yarn.lock
-pnpm-lock.yaml
 bun.lock
 
 # Git
