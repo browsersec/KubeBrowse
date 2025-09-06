@@ -80,6 +80,7 @@ func InitializeGoth() {
 			os.Getenv("GITHUB_CLIENT_ID"),
 			os.Getenv("GITHUB_CLIENT_SECRET"),
 			os.Getenv("GITHUB_CALLBACK_URL"),
+			"user:email", // Request email scope
 		),
 	)
 
@@ -356,6 +357,20 @@ func (h *Handler) callbackOAuthWithRedis(c *gin.Context, provider, state, code s
 		return
 	}
 
+	// If email is empty, use a fallback email based on the GitHub username
+	if user.Email == "" {
+		logrus.Warnf("User email is empty, using fallback email for user: %s", user.UserID)
+		// Create a fallback email using the GitHub username
+		if user.NickName != "" {
+			user.Email = user.NickName + "@github.local"
+		} else if user.UserID != "" {
+			user.Email = user.UserID + "@github.local"
+		} else {
+			user.Email = "user@github.local"
+		}
+		logrus.Infof("Using fallback email: %s", user.Email)
+	}
+
 	logrus.Infof("Successfully authenticated user: %s (%s)", user.Email, user.Provider)
 	h.processOAuthUser(c, user)
 }
@@ -555,7 +570,8 @@ func (h *Handler) setSessionCookie(c *gin.Context, sessionToken string) {
 	// For local development with proxy, set cookie for localhost
 	if strings.Contains(host, "localhost") || strings.Contains(host, "127.0.0.1") {
 		domain = "localhost"
-		secure = false // HTTP for local development
+		// Check if the request is coming through HTTPS (even in development)
+		secure = c.Request.TLS != nil || c.GetHeader("X-Forwarded-Proto") == "https"
 	} else {
 		// For production, extract domain from host
 		if strings.Contains(host, ":") {

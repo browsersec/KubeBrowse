@@ -6,7 +6,7 @@ order: 800
 
 # Contributing to KubeBrowse
 
-Thank you for your interest in contributing to GUAC! This document provides guidelines and instructions for contributing to this project.
+Thank you for your interest in contributing to KubeBrowse! This document provides guidelines and instructions for contributing to this project.
 
 ## Table of Contents
 
@@ -16,10 +16,14 @@ Thank you for your interest in contributing to GUAC! This document provides guid
   - [Getting Started](#getting-started)
     - [Development Environment Setup](#development-environment-setup)
     - [Troubleshooting Common Issues](#troubleshooting-common-issues)
+      - [Go Version Mismatch](#go-version-mismatch)
     - [Project Structure](#project-structure)
   - [Development Workflow](#development-workflow)
     - [Branching Strategy](#branching-strategy)
     - [Commit Guidelines](#commit-guidelines)
+      - [Conventional Commits Format](#conventional-commits-format)
+      - [DCO Sign-off Requirement](#dco-sign-off-requirement)
+      - [Example Commit](#example-commit)
     - [Pre-commit Hooks](#pre-commit-hooks)
   - [Pull Requests](#pull-requests)
     - [PR Process](#pr-process)
@@ -146,9 +150,11 @@ If you encounter errors like `compile: version "go1.24.0" does not match go tool
 
 ### Commit Guidelines
 
-We follow [Conventional Commits](https://www.conventionalcommits.org/) for commit messages:
+We follow [Conventional Commits](https://www.conventionalcommits.org/) for commit messages and require [Developer Certificate of Origin (DCO)](https://developercertificate.org/) sign-off for all contributions.
 
-```
+#### Conventional Commits Format
+
+```text
 <type>(<scope>): <description>
 
 <body>
@@ -157,6 +163,7 @@ We follow [Conventional Commits](https://www.conventionalcommits.org/) for commi
 ```
 
 Types include:
+
 - `feat`: A new feature
 - `fix`: A bug fix
 - `docs`: Documentation changes
@@ -165,14 +172,50 @@ Types include:
 - `test`: Adding or modifying tests
 - `chore`: Changes to the build process or auxiliary tools
 
-Example:
+#### DCO Sign-off Requirement
+
+All commits must include a `Signed-off-by` line to certify that you have the right to submit the code under the project's license. This is required by the [Developer Certificate of Origin](https://developercertificate.org/).
+
+**To sign off your commits automatically:**
+
+```bash
+# Configure git to always sign off commits (recommended)
+git config --global format.signoff true
+
+# Or use the -s flag for individual commits
+git commit -s -m "feat(api): add new authentication endpoint"
 ```
+
+**To sign off existing commits:**
+
+```bash
+# Sign off the last commit
+git commit --amend --signoff
+
+# Sign off multiple commits using interactive rebase
+git rebase --signoff HEAD~<number-of-commits>
+
+# Force push to update the PR
+git push --force-with-lease
+```
+
+The sign-off line should look like:
+
+```text
+Signed-off-by: Your Name <your.email@example.com>
+```
+
+#### Example Commit
+
+```text
 feat(api): add endpoint for user authentication
 
 - Implement JWT token generation
 - Add middleware for token validation
 
 Fixes #123
+
+Signed-off-by: John Doe <john.doe@example.com>
 ```
 
 ### Pre-commit Hooks
@@ -186,11 +229,13 @@ This project uses [Lefthook](https://github.com/evilmartians/lefthook) for manag
 - Potential secrets
 
 Install the hooks with:
+
 ```bash
 make hooks
 ```
 
 You can manually run the pre-commit checks:
+
 ```bash
 # Check only staged files
 make lint
@@ -251,5 +296,4 @@ If Lefthook is not found, you'll be prompted to install it. Lefthook hooks are a
 5. Tag the release with the version number
 6. Update documentation with release notes
 
-Thank you for contributing to GUAC!
-*
+Thank you for contributing to KubeBrowse!

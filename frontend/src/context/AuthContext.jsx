@@ -28,14 +28,23 @@ function authReducer(state, action) {
         ...state,
         isLoading: action.payload
       };
-    case AUTH_ACTIONS.SET_USER:
+    case AUTH_ACTIONS.SET_USER: {
+      // Check if user object has meaningful data
+      const hasUserData = action.payload && (
+        action.payload.id || 
+        action.payload.email || 
+        action.payload.username ||
+        (action.payload.name && action.payload.name.trim() !== '')
+      );
+      
       return {
         ...state,
         user: action.payload,
-        isAuthenticated: !!action.payload,
+        isAuthenticated: hasUserData,
         isLoading: false,
         error: null
       };
+    }
     case AUTH_ACTIONS.SET_ERROR:
       return {
         ...state,
@@ -73,23 +82,35 @@ const AuthContext = createContext();
 // Auth provider component
 export function AuthProvider({ children }) {
   const [state, dispatch] = useReducer(authReducer, initialState);
+  const lastAuthCheck = React.useRef(0);
+  const RATE_LIMIT_MS = 1000; // Minimum 1 second between auth checks
 
   // Check if user is authenticated on app load
   useEffect(() => {
-    checkAuthStatus();
+    // Don't auto-check auth if we're on the success page - let that page handle it
+    if (window.location.pathname !== '/auth/success') {
+      checkAuthStatus();
+    }
     
     // Check if user is coming from OAuth callback
-    const urlParams = new URLSearchParams(window.location.search);
     if (window.location.pathname === '/auth/success') {
-      // User just completed OAuth, check auth status immediately
+      // User just completed OAuth, check auth status after a short delay
       console.log('OAuth callback detected, checking auth status...');
       setTimeout(() => {
         checkAuthStatus();
-      }, 1000); // Give backend time to set cookies
+      }, 1500); // Give backend time to set cookies
     }
   }, []);
 
   const checkAuthStatus = async () => {
+    // Rate limiting to prevent excessive API calls
+    const now = Date.now();
+    if (now - lastAuthCheck.current < RATE_LIMIT_MS) {
+      console.log('Auth check rate limited, skipping');
+      return;
+    }
+    lastAuthCheck.current = now;
+    
     try {
       console.log('Checking auth status...');
       const response = await fetch('/auth/me', {
@@ -106,6 +127,18 @@ export function AuthProvider({ children }) {
       if (response.ok) {
         const data = await response.json();
         console.log('Auth successful, user data:', data);
+        console.log('User object details:', {
+          id: data.user?.id,
+          email: data.user?.email,
+          username: data.user?.username,
+          name: data.user?.name,
+          provider: data.user?.provider,
+          hasId: !!data.user?.id,
+          hasEmail: !!data.user?.email,
+          hasUsername: !!data.user?.username,
+          hasName: !!(data.user?.name && data.user.name.trim() !== ''),
+          isEmpty: Object.keys(data.user || {}).length === 0
+        });
         dispatch({ type: AUTH_ACTIONS.SET_USER, payload: data.user });
       } else {
         console.log('Auth failed, status:', response.status);
@@ -145,7 +178,7 @@ export function AuthProvider({ children }) {
         dispatch({ type: AUTH_ACTIONS.SET_ERROR, payload: data.error });
         return { success: false, error: data.error };
       }
-    } catch (error) {
+    } catch {
       const errorMessage = 'Login failed. Please try again.';
       dispatch({ type: AUTH_ACTIONS.SET_ERROR, payload: errorMessage });
       return { success: false, error: errorMessage };
@@ -176,7 +209,7 @@ export function AuthProvider({ children }) {
         dispatch({ type: AUTH_ACTIONS.SET_ERROR, payload: data.error });
         return { success: false, error: data.error };
       }
-    } catch (error) {
+    } catch  {
       const errorMessage = 'Registration failed. Please try again.';
       dispatch({ type: AUTH_ACTIONS.SET_ERROR, payload: errorMessage });
       return { success: false, error: errorMessage };
@@ -228,7 +261,7 @@ export function AuthProvider({ children }) {
         dispatch({ type: AUTH_ACTIONS.SET_ERROR, payload: data.error });
         return { success: false, error: data.error };
       }
-    } catch (error) {
+    } catch {
       const errorMessage = 'Email verification failed. Please try again.';
       dispatch({ type: AUTH_ACTIONS.SET_ERROR, payload: errorMessage });
       return { success: false, error: errorMessage };
@@ -258,7 +291,7 @@ export function AuthProvider({ children }) {
         dispatch({ type: AUTH_ACTIONS.SET_ERROR, payload: data.error });
         return { success: false, error: data.error };
       }
-    } catch (error) {
+    } catch {
       const errorMessage = 'Failed to resend verification email. Please try again.';
       dispatch({ type: AUTH_ACTIONS.SET_ERROR, payload: errorMessage });
       return { success: false, error: errorMessage };

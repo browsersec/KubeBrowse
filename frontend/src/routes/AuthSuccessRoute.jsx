@@ -9,75 +9,177 @@ export function AuthSuccessRoute() {
   const [status, setStatus] = useState("checking");
   const [kick, setKick] = useState(0);
   const authRef = React.useRef({ user, isAuthenticated });
+  
   useEffect(() => {
     authRef.current = { user, isAuthenticated };
   }, [user, isAuthenticated]);
 
+  // Listen for changes in authentication state from AuthContext
+  useEffect(() => {
+    const { user: u, isAuthenticated: ok } = authRef.current;
+    
+    // More robust check for valid user data
+    const hasValidUserData = u && (
+      u.id || 
+      u.email || 
+      u.username ||
+      (u.name && u.name.trim() !== '')
+    );
+    
+    console.log('AuthSuccessRoute: Auth state changed:', {
+      isAuthenticated: ok,
+      user: u,
+      hasValidUserData,
+      userKeys: u ? Object.keys(u) : 'no user'
+    });
+    
+    if (ok && hasValidUserData) {
+      console.log('AuthSuccessRoute: Authentication detected, showing success');
+      setStatus("success");
+      toast.success(`Welcome back, ${u.name || u.email || u.username || 'User'}!`, {
+        duration: 3000,
+        position: "top-right",
+        style: {
+          background: "#10B981",
+          color: "#fff",
+          fontWeight: "600",
+        },
+        iconTheme: { primary: "#fff", secondary: "#10B981" },
+      });
+      
+      // Redirect after a short delay
+      const redirectTimer = setTimeout(
+        () => navigate("/", { replace: true }),
+        2000
+      );
+      
+      return () => clearTimeout(redirectTimer);
+    }
+  }, [user, isAuthenticated, navigate]);
+
   useEffect(() => {
     let cancelled = false;
     let redirectTimer;
-    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-    const run = async () => {
+    let pollInterval;
+    
+    // If user is already authenticated, skip the whole polling process
+    const currentAuth = authRef.current;
+    const hasValidUserData = currentAuth.user && (
+      currentAuth.user.id || 
+      currentAuth.user.email || 
+      currentAuth.user.username ||
+      (currentAuth.user.name && currentAuth.user.name.trim() !== '')
+    );
+    
+    if (currentAuth.isAuthenticated && hasValidUserData) {
+      console.log('AuthSuccessRoute: User already authenticated, redirecting immediately');
+      setStatus("success");
+      redirectTimer = setTimeout(
+        () => navigate("/", { replace: true }),
+        1000
+      );
+      return () => clearTimeout(redirectTimer);
+    }
+    
+    const checkAuth = async () => {
       try {
-        for (let attempt = 1; attempt <= 3; attempt++) {
-          setStatus("checking");
-          await checkAuthStatus();
-          await sleep(1000);
-          const { user: u, isAuthenticated: ok } = authRef.current;
-          if (cancelled) return;
-          if (ok && u) {
-            setStatus("success");
-            toast.success(`Welcome back, ${u.name || u.email}!`, {
-              duration: 3000,
-              position: "top-right",
-              style: {
-                background: "#10B981",
-                color: "#fff",
-                fontWeight: "600",
-              },
-              iconTheme: { primary: "#fff", secondary: "#10B981" },
-            });
-            redirectTimer = setTimeout(
-              () => navigate("/", { replace: true }),
-              2000
-            );
-            return;
-          }
-          setStatus("retrying");
-          toast(`Authentication attempt ${attempt}/3...`, {
-            duration: 2000,
-            position: "top-right",
-            style: { background: "#F59E0B", color: "#fff", fontWeight: "600" },
-            iconTheme: { primary: "#fff", secondary: "#F59E0B" },
-          });
-          await sleep(2000);
+        // Check if already authenticated from context first
+        const currentAuth = authRef.current;
+        const hasValidUserData = currentAuth.user && (
+          currentAuth.user.id || 
+          currentAuth.user.email || 
+          currentAuth.user.username ||
+          (currentAuth.user.name && currentAuth.user.name.trim() !== '')
+        );
+        
+        if (currentAuth.isAuthenticated && hasValidUserData) {
+          console.log('AuthSuccessRoute: Already authenticated, skipping API call');
+          return true;
         }
-        if (!cancelled) {
-          setStatus("failed");
-          toast.error("Authentication failed. Please try again.", {
-            duration: 4000,
-            position: "top-right",
-            style: { background: "#EF4444", color: "#fff", fontWeight: "600" },
-            iconTheme: { primary: "#fff", secondary: "#EF4444" },
-          });
-        }
+        
+        console.log('AuthSuccessRoute: Checking auth status with API...');
+        setStatus("checking");
+        await checkAuthStatus();
+        
+        if (cancelled) return false;
+        
+        // Check auth status again after the API call
+        const { user: u, isAuthenticated: ok } = authRef.current;
+        const hasValidUserDataAfter = u && (
+          u.id || 
+          u.email || 
+          u.username ||
+          (u.name && u.name.trim() !== '')
+        );
+        
+        console.log('AuthSuccessRoute: Auth check result:', {
+          isAuthenticated: ok,
+          user: u,
+          hasValidUserData: hasValidUserDataAfter,
+          userKeys: u ? Object.keys(u) : 'no user'
+        });
+        
+        return ok && hasValidUserDataAfter;
       } catch (error) {
         if (!cancelled) {
-          console.error("Auth check failed:", error);
-          setStatus("failed");
-          toast.error("Authentication check failed. Please try again.", {
-            duration: 4000,
-            position: "top-right",
-            style: { background: "#EF4444", color: "#fff", fontWeight: "600" },
-            iconTheme: { primary: "#fff", secondary: "#EF4444" },
-          });
+          console.error("AuthSuccessRoute: Auth check failed:", error);
         }
+        return false;
       }
     };
+
+    const run = async () => {
+      // Initial check
+      const success = await checkAuth();
+      if (success || cancelled) return;
+
+      // If not successful, start polling with exponential backoff
+      let attempt = 1;
+      const maxAttempts = 5; // Reduced from 8
+      let delay = 2000; // Start with 2 seconds
+
+      const poll = async () => {
+        if (cancelled || attempt > maxAttempts) {
+          if (!cancelled && attempt > maxAttempts) {
+            console.log('AuthSuccessRoute: Max attempts reached, showing failed state');
+            setStatus("failed");
+            toast.error("Authentication failed. Please try again.", {
+              duration: 4000,
+              position: "top-right",
+              style: { background: "#EF4444", color: "#fff", fontWeight: "600" },
+              iconTheme: { primary: "#fff", secondary: "#EF4444" },
+            });
+          }
+          return;
+        }
+
+        setStatus("retrying");
+        console.log(`AuthSuccessRoute: Authentication attempt ${attempt}/${maxAttempts}...`);
+        toast(`Authentication attempt ${attempt}/${maxAttempts}...`, {
+          duration: 2000,
+          position: "top-right",
+          style: { background: "#F59E0B", color: "#fff", fontWeight: "600" },
+          iconTheme: { primary: "#fff", secondary: "#F59E0B" },
+        });
+
+        const success = await checkAuth();
+        if (success || cancelled) return;
+
+        attempt++;
+        delay = Math.min(delay * 1.2, 4000); // Slower exponential backoff, max 4 seconds
+        
+        pollInterval = setTimeout(poll, delay);
+      };
+
+      pollInterval = setTimeout(poll, delay);
+    };
+
     run();
+    
     return () => {
       cancelled = true;
       if (redirectTimer) clearTimeout(redirectTimer);
+      if (pollInterval) clearTimeout(pollInterval);
     };
   }, [checkAuthStatus, navigate, kick]);
 
@@ -210,7 +312,7 @@ export function AuthSuccessRoute() {
               Welcome back!
             </h2>
             <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-              {user?.name || user?.email} - Showing success notification and
+              {user?.name || user?.email || user?.username || 'User'} - Showing success notification and
               redirecting to home page...
             </p>
           </div>
