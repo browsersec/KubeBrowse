@@ -253,6 +253,24 @@ spec:
         app: browser-sandbox-api
     spec:
       serviceAccountName: browser-sandbox-sa
+      initContainers:
+        - name: cert-generator
+          image: alpine:3.20
+          command: ['sh', '-c']
+          args:
+            - |
+              apk add --no-cache openssl
+              mkdir -p /app/certs
+              echo "Generating self-signed certificates..."
+              openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+                -keyout /app/certs/private.key \
+                -out /app/certs/certificate.crt \
+                -subj "/C=US/ST=California/L=San Francisco/O=My Company/CN=mydomain.com"
+              echo "Certificates generated successfully"
+              ls -la /app/certs/
+          volumeMounts:
+            - name: certs-volume
+              mountPath: /app/certs
       containers:
         - name: api
           image:  ghcr.io/browsersec/kubebrowse:sha-09dfa1f
@@ -320,15 +338,15 @@ spec:
             - name: DISTRIBUTED_TRACING
               value: "true"
             - name: GITHUB_CLIENT_ID
-              value: "Ov23li974J8UoG1CH0HJ"
+              value: "Ov23liQQQ5lMyIrOULYx"
             - name: GITHUB_CLIENT_SECRET
-              value: "f16b7dc2b85d4a7f817e273b4a2d64124153ce8f"
+              value: "47afea55e0e19231e1cc82c3a57d56aaeedb480e"
             - name: GITHUB_CALLBACK_URL
               value: "https://localhost:4567/auth/oauth/github/callback"
             - name: SESSION_SECRET
               value: "McX0xoYlJYpO0EGdUZC6aJxVh2rKYrXZM7SPMpVREeXMXoMBI20v90PICD-LfEn7jr07c5vH2CWcKzjl8hoNvQ"
             - name: FRONTEND_URL
-              value: "http://localhost:5173"
+              value: "http://localhost:8080"
             - name: ENVIRONMENT
               value: "development"
             - name: SMTP_HOST
@@ -341,11 +359,17 @@ spec:
               value: "ulagdeliigobhdgr"
             - name: FROM_EMAIL
               value: "sanjay.obsidian@gmail.com"
-            # - name: CERT_PATH
-            #   value: ""
-            # - name: CERT_KEY_PATH
-            #   value: ""
+            - name: CERT_PATH
+              value: "/app/certs/certificate.crt"
+            - name: CERT_KEY_PATH
+              value: "/app/certs/private.key"
+          volumeMounts:
+            - name: certs-volume
+              mountPath: /app/certs
           securityContext: {}
+      volumes:
+        - name: certs-volume
+          emptyDir: {}
 ---
 # API Service
 apiVersion: v1
