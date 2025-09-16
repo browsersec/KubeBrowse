@@ -33,16 +33,15 @@ services:
 
   frontend:
     build:
-      context: ./frontend
+      context: ./migrated-frontend
       dockerfile: Dockerfile
     ports:
-      - "8000:80"
+      - "8000:3000"
     depends_on:
       - backend
     restart: unless-stopped
     environment:
       - GUAC_CLIENT_URL=https://backend:4567
-      - CADDY_GUAC_CLIENT_URL=${CADDY_GUAC_CLIENT_URL:-https://backend:4567}
 
   guacd:
     image: guacamole/guacd:latest

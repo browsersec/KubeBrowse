@@ -50,3 +50,5 @@ certs/*.crt
 
 # ignore .tilt builds folder
 .tilt/
+
+migrated-frontend/node_modules/
