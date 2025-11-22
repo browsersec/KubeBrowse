@@ -6,18 +6,18 @@ WORKDIR /app
 RUN apk add --no-cache git make bash curl
 
 # Install sqlc
-RUN curl -L https://github.com/sqlc-dev/sqlc/releases/download/v1.29.0/sqlc_1.29.0_linux_amd64.tar.gz | tar -xz -C /usr/local/bin
+# RUN curl -L https://github.com/sqlc-dev/sqlc/releases/download/v1.29.0/sqlc_1.29.0_linux_amd64.tar.gz | tar -xz -C /usr/local/bin
 
 COPY go.mod go.sum ./
 RUN sed -i '/^tool github.com\/evilmartians\/lefthook/d' go.mod
 RUN go mod download
 
 # Copy source files needed for sqlc generation
-COPY sqlc.yaml ./sqlc.yaml
-COPY db/ ./db/
+# COPY sqlc.yaml ./sqlc.yaml
+# COPY db/ ./db/
 
 # Generate sqlc code
-RUN sqlc generate
+# RUN sqlc generate
 
 # Copy remaining source files (excluding db/ since it's already copied)
 COPY cmd/ ./cmd/
