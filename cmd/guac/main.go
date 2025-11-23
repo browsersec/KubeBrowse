@@ -453,14 +453,20 @@ func main() {
 		swaggerfiles.Handler))
 
 	// Start server with appropriate TLS configuration
+	// Start server with appropriate TLS configuration
 	addr := "0.0.0.0:4567"
-	if certPath != "" {
+	useHttps := os.Getenv("USE_HTTPS")
+
+	if useHttps == "true" && certPath != "" {
 		logrus.Println("Serving on https://", addr)
 		err := router.RunTLS(addr, certPath, certKeyPath)
 		if err != nil {
 			logrus.Fatal(err)
 		}
 	} else {
+		if useHttps == "true" && certPath == "" {
+			logrus.Warn("USE_HTTPS is true but CERT_PATH is not set, falling back to HTTP")
+		}
 		logrus.Println("Serving on http://", addr)
 		err := router.Run(addr)
 		if err != nil {
