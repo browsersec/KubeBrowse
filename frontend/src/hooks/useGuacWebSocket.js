@@ -24,31 +24,32 @@ const SESSION_TIMEOUT = 24 * 60 * 60 * 1000; // 24 hours
 const useGuacWebSocket = (wsUrl, httpUrl, forceHttp = false, queryString = '', sessionUUID = null, enableSharing = false, isSharedSession = false) => {
   const [connectionState, setConnectionState] = useState(states.IDLE);
   const [errorMessage, setErrorMessage] = useState('');
+  // TODO: Add metrics collection
   const [isConnectionUnstable, setIsConnectionUnstable] = useState(false);
-  const [sessionInfo, setSessionInfo] = useState({ userCount: 1, isShared: false });  const [reconnectAttempts, setReconnectAttempts] = useState(0);
+  const [sessionInfo, setSessionInfo] = useState({ userCount: 1, isShared: false }); const [reconnectAttempts, setReconnectAttempts] = useState(0);
   const clientRef = useRef(null);
   const tunnelRef = useRef(null);
   const sessionConnectionRef = useRef(null);
   const reconnectTimeoutRef = useRef(null);
   const attemptReconnectionRef = useRef(null);
   const reconnectAttemptsRef = useRef(0);
-  
+
   // Keep reconnectAttemptsRef in sync with state
   useEffect(() => {
     reconnectAttemptsRef.current = reconnectAttempts;
   }, [reconnectAttempts]);
-  
+
   // Session sharing state
   const [isSessionOwner, setIsSessionOwner] = useState(false);
 
   // Maximum reconnection attempts
   const MAX_RECONNECT_ATTEMPTS = 10;
   const RECONNECT_BASE_DELAY = 1000;
-  
+
   // Session persistence functions - using useCallback to prevent infinite loops
   const saveSessionToStorage = useCallback((sessionData) => {
     if (!sessionUUID) return;
-    
+
     const sessionInfo = {
       sessionUUID,
       queryString,
@@ -65,13 +66,13 @@ const useGuacWebSocket = (wsUrl, httpUrl, forceHttp = false, queryString = '', s
 
   const loadSessionFromStorage = useCallback(() => {
     if (!sessionUUID) return null;
-    
+
     try {
       const stored = localStorage.getItem(`${SESSION_STORAGE_KEY}_${sessionUUID}`);
       if (!stored) return null;
 
       const sessionInfo = JSON.parse(stored);
-      
+
       // Check if session has expired
       if (Date.now() > sessionInfo.expiresAt) {
         localStorage.removeItem(`${SESSION_STORAGE_KEY}_${sessionUUID}`);
@@ -93,12 +94,12 @@ const useGuacWebSocket = (wsUrl, httpUrl, forceHttp = false, queryString = '', s
   const attemptReconnection = useCallback(async () => {
     // Use a ref to get the current value to avoid stale closure
     const currentAttempts = reconnectAttemptsRef.current;
-    
+
     if (currentAttempts >= MAX_RECONNECT_ATTEMPTS) {
       console.log('Maximum reconnection attempts reached');
       setConnectionState(states.TUNNEL_ERROR);
       setErrorMessage('Connection failed after multiple attempts. Please refresh the page.');
-      
+
       // Clean up session on backend after max retries
       // Skip DELETE for shared sessions (they don't own the backend resources)
       if (sessionUUID) {
@@ -115,11 +116,11 @@ const useGuacWebSocket = (wsUrl, httpUrl, forceHttp = false, queryString = '', s
         } else {
           console.log(`Skipping backend cleanup for shared session ${sessionUUID} (not the owner)`);
         }
-        
+
         // Clear session from storage
         clearSessionFromStorage();
       }
-      
+
       return;
     }
 
@@ -131,9 +132,9 @@ const useGuacWebSocket = (wsUrl, httpUrl, forceHttp = false, queryString = '', s
 
     const delay = RECONNECT_BASE_DELAY * Math.pow(2, currentAttempts); // Exponential backoff
     console.log(`Attempting reconnection ${currentAttempts + 1}/${MAX_RECONNECT_ATTEMPTS} in ${delay}ms...`);
-    
+
     setReconnectAttempts(prev => prev + 1);
-    
+
     reconnectTimeoutRef.current = setTimeout(() => {
       if (queryString && clientRef.current && tunnelRef.current) {
         try {
@@ -154,7 +155,7 @@ const useGuacWebSocket = (wsUrl, httpUrl, forceHttp = false, queryString = '', s
           } else {
             setConnectionState(states.TUNNEL_ERROR);
             setErrorMessage('Connection failed after multiple attempts. Please refresh the page.');
-            
+
             // Clean up session on backend after max retries
             // Skip DELETE for shared sessions (they don't own the backend resources)
             if (sessionUUID) {
@@ -167,7 +168,7 @@ const useGuacWebSocket = (wsUrl, httpUrl, forceHttp = false, queryString = '', s
                 } else {
                   console.log(`Skipping backend cleanup for shared session ${sessionUUID} (not the owner)`);
                 }
-                
+
                 // Clear session from storage
                 clearSessionFromStorage();
               } catch (cleanupError) {
@@ -179,7 +180,7 @@ const useGuacWebSocket = (wsUrl, httpUrl, forceHttp = false, queryString = '', s
       }
     }, delay);
   }, [loadSessionFromStorage, queryString, sessionUUID, clearSessionFromStorage, isSharedSession]); // Removed reconnectAttempts from dependencies
-  
+
   // Store the reconnection function in a ref to avoid infinite loops
   useEffect(() => {
     attemptReconnectionRef.current = attemptReconnection;
@@ -193,7 +194,7 @@ const useGuacWebSocket = (wsUrl, httpUrl, forceHttp = false, queryString = '', s
         clearTimeout(reconnectTimeoutRef.current);
         reconnectTimeoutRef.current = null;
       }
-      
+
       // Save session state to localStorage for persistence
       if (sessionUUID) {
         saveSessionToStorage({
@@ -212,14 +213,14 @@ const useGuacWebSocket = (wsUrl, httpUrl, forceHttp = false, queryString = '', s
       this.websocket = null;
       this.sessionConnection = null;
       this.reconnectOnClose = true;
-      
+
       // Bind methods to preserve 'this' context
       this.setState = this.setState.bind(this);
       this.handleMessage = this.handleMessage.bind(this);
       this.sendMessage = this.sendMessage.bind(this);
       this.disconnect = this.disconnect.bind(this);
     }
-    
+
     /* override connect so no extra socket is created */
     connect(data) {
       this._setState(Guacamole.Tunnel.State.CONNECTING);
@@ -229,11 +230,11 @@ const useGuacWebSocket = (wsUrl, httpUrl, forceHttp = false, queryString = '', s
       }
       // react-use-websocket will now drive OPEN/CLOSED events for regular connections
     }
-    
+
     /* Connect with session sharing support */
     connectWithSharing(data) {
       const isOwner = !this.sessionConnection; // First connection in this client is owner
-      
+
       this.sessionConnection = sessionDuplicator.createSession(sessionUUID, {
         isOwner: isOwner,
         onMessage: (message) => {
@@ -251,21 +252,28 @@ const useGuacWebSocket = (wsUrl, httpUrl, forceHttp = false, queryString = '', s
           console.log('User left session:', data);
         }
       });
-      
+
       setIsSessionOwner(isOwner);
       sessionConnectionRef.current = this.sessionConnection;
-      
+
       // Send initial connection data if provided
       if (data) {
         this.sessionConnection.sendMessage(data);
       }
-      
+
       // Set tunnel state to open since session duplicator handles the connection
       this._setState(Guacamole.Tunnel.State.OPEN);
     }
-    
+
     /* outgoing traffic uses appropriate connection method */
     sendMessage(msg) {
+      // TODO: Add metrics collection
+      // Metric collection
+      if (window.guacMetrics) {
+        window.guacMetrics.messagesSent++;
+        window.guacMetrics.bytesSent += msg.length;
+      }
+
       if (this.sessionConnection) {
         // Use session duplicator for shared sessions
         this.sessionConnection.sendMessage(msg);
@@ -274,24 +282,30 @@ const useGuacWebSocket = (wsUrl, httpUrl, forceHttp = false, queryString = '', s
         this.webSocketRef.sendMessage(msg);
       }
     }
-    
+
     setWebSocketRef(ref) {
       this.webSocketRef = ref;
     }
-    
+
     setReceiveCallback(callback) {
       this.receiveCallback = callback;
     }
-    
+
     handleMessage(event) {
       if (this.receiveCallback) {
+        // TODO: Add metrics collection
+        // Metric collection
+        if (window.guacMetrics) {
+          window.guacMetrics.messagesReceived++;
+          window.guacMetrics.bytesReceived += event.data.length;
+        }
         this.receiveCallback(event.data);
       }
     }
-      setState(state) {
+    setState(state) {
       this._setState(state);
     }
-    
+
     // Override the parent's _setState method to ensure it's available
     _setState(state) {
       // Call parent implementation if it exists
@@ -306,7 +320,7 @@ const useGuacWebSocket = (wsUrl, httpUrl, forceHttp = false, queryString = '', s
         }
       }
     }
-    
+
     disconnect() {
       this.reconnectOnClose = false;
       if (this.sessionConnection) {
@@ -327,13 +341,13 @@ const useGuacWebSocket = (wsUrl, httpUrl, forceHttp = false, queryString = '', s
       return tunnel;
     }
   }, [wsUrl, httpUrl, forceHttp]);
-    // Initialize session on mount - check for existing session on page reload
+  // Initialize session on mount - check for existing session on page reload
   useEffect(() => {
     if (sessionUUID) {
       const storedSession = loadSessionFromStorage();
       if (storedSession) {
         console.log('Restoring session from storage on page load:', storedSession.sessionUUID);
-        
+
         // Check if the stored session is still valid (within timeout)
         const timeSinceLastConnection = Date.now() - (storedSession.lastConnected || storedSession.timestamp);
         if (timeSinceLastConnection < SESSION_TIMEOUT) {
@@ -355,11 +369,12 @@ const useGuacWebSocket = (wsUrl, httpUrl, forceHttp = false, queryString = '', s
 
     const tunnel = initializeTunnel();
 
-    tunnel.onerror = (status) => {      console.error(`Tunnel failed ${JSON.stringify(status)}`);
+    tunnel.onerror = (status) => {
+      console.error(`Tunnel failed ${JSON.stringify(status)}`);
       setConnectionState(states.TUNNEL_ERROR);
       setErrorMessage(status.message || 'WebSocket tunnel error');
       setIsConnectionUnstable(false);
-      
+
       // Attempt reconnection if this wasn't a deliberate disconnect
       if (tunnel.reconnectOnClose !== false && sessionUUID) {
         if (attemptReconnectionRef.current) {
@@ -384,8 +399,11 @@ const useGuacWebSocket = (wsUrl, httpUrl, forceHttp = false, queryString = '', s
           // Handle unstable connection - try to recover
           console.warn('WebSocket connection is unstable - attempting recovery');
           setIsConnectionUnstable(true);
+          // TODO: Add metrics collection
           // Give it some time to recover before considering it failed
-          setTimeout(() => {            if (tunnelRef.current && tunnelRef.current.currentState === Guacamole.Tunnel.State.UNSTABLE) {
+          // setTimeout(() => {            if (tunnelRef.current && tunnelRef.current.currentState === Guacamole.Tunnel.State.UNSTABLE) {
+          setTimeout(() => {
+            if (tunnelRef.current && tunnelRef.current.currentState === Guacamole.Tunnel.State.UNSTABLE) {
               console.warn('Connection remained unstable, attempting reconnection');
               if (sessionUUID) {
                 if (attemptReconnectionRef.current) {
@@ -401,7 +419,7 @@ const useGuacWebSocket = (wsUrl, httpUrl, forceHttp = false, queryString = '', s
         case Guacamole.Tunnel.State.CLOSED:
           setConnectionState(states.DISCONNECTED);
           setIsConnectionUnstable(false);
-            // Attempt reconnection if this wasn't a deliberate disconnect and we have a session UUID
+          // Attempt reconnection if this wasn't a deliberate disconnect and we have a session UUID
           if (tunnel.reconnectOnClose !== false && sessionUUID) {
             console.log('Connection closed unexpectedly, attempting reconnection...');
             if (attemptReconnectionRef.current) {
@@ -421,7 +439,7 @@ const useGuacWebSocket = (wsUrl, httpUrl, forceHttp = false, queryString = '', s
       console.error(`Client error ${JSON.stringify(error)}`);
       setErrorMessage(error.message || 'Client error occurred');
       setConnectionState(states.CLIENT_ERROR);
-        // Attempt reconnection for certain error types
+      // Attempt reconnection for certain error types
       if (sessionUUID && (error.code === 0x0202 || error.code === 0x0203)) {
         console.log('Client error indicates network issue, attempting reconnection...');
         if (attemptReconnectionRef.current) {
@@ -455,20 +473,20 @@ const useGuacWebSocket = (wsUrl, httpUrl, forceHttp = false, queryString = '', s
         console.error('Failed to connect client:', error);
         setConnectionState(states.CLIENT_ERROR);
         setErrorMessage('Failed to establish connection');
-          // Attempt reconnection if we have a session UUID
+        // Attempt reconnection if we have a session UUID
         if (sessionUUID) {
           if (attemptReconnectionRef.current) {
             attemptReconnectionRef.current();
           }
         }
       }
-    }    return () => {
+    } return () => {
       // Clear reconnection timeout
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
         reconnectTimeoutRef.current = null;
       }
-      
+
       if (client) {
         try {
           client.disconnect();
@@ -497,7 +515,7 @@ const useGuacWebSocket = (wsUrl, httpUrl, forceHttp = false, queryString = '', s
           console.warn('Error during session disconnect:', error);
         }
       }
-      
+
       // Only clear session from storage if this is a deliberate disconnect
       // (not a page reload or accidental disconnect)
       // Session will be preserved for automatic reconnection on page reload
@@ -520,7 +538,7 @@ const useGuacWebSocket = (wsUrl, httpUrl, forceHttp = false, queryString = '', s
           // Only set to closed if it wasn't a clean disconnect
           if (event.code !== 1000) {
             tunnelRef.current.setState(Guacamole.Tunnel.State.CLOSED);
-              // Attempt reconnection if we have a session UUID and this wasn't deliberate
+            // Attempt reconnection if we have a session UUID and this wasn't deliberate
             if (sessionUUID && tunnelRef.current.reconnectOnClose !== false) {
               console.log('WebSocket closed unexpectedly, attempting reconnection...');
               if (attemptReconnectionRef.current) {
@@ -535,12 +553,12 @@ const useGuacWebSocket = (wsUrl, httpUrl, forceHttp = false, queryString = '', s
         if (tunnelRef.current instanceof ReactWebSocketTunnel) {
           tunnelRef.current.setState(Guacamole.Tunnel.State.CLOSED);
           if (tunnelRef.current.onerror) {
-            tunnelRef.current.onerror({ 
-              code: 514, 
-              message: 'WebSocket connection error' 
+            tunnelRef.current.onerror({
+              code: 514,
+              message: 'WebSocket connection error'
             });
           }
-            // Attempt reconnection for WebSocket errors if we have a session UUID
+          // Attempt reconnection for WebSocket errors if we have a session UUID
           if (sessionUUID && tunnelRef.current.reconnectOnClose !== false) {
             console.log('WebSocket error occurred, attempting reconnection...');
             if (attemptReconnectionRef.current) {
@@ -581,12 +599,12 @@ const useGuacWebSocket = (wsUrl, httpUrl, forceHttp = false, queryString = '', s
   // Functions for session sharing
   const enableSessionSharing = async () => {
     if (!sessionUUID) return false;
-    
+
     try {
       const response = await fetch(`/test/share/${sessionUUID}`, {
         method: 'GET'
       });
-      
+
       if (response.ok) {
         setIsSessionOwner(true);
         return true;
@@ -616,7 +634,7 @@ const useGuacWebSocket = (wsUrl, httpUrl, forceHttp = false, queryString = '', s
     readyState: enableSharing ? (sessionConnectionRef.current?.isConnected() ? WebSocket.OPEN : WebSocket.CLOSED) : readyState,
     isConnectionUnstable,
     reconnectAttempts,
-    
+
     // Session sharing info
     sessionInfo,
     isSessionOwner,
