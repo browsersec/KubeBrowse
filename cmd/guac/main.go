@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	// "strings"
 	"time"
 
 	"github.com/browsersec/KubeBrowse/internal/cleanup"
@@ -234,6 +235,7 @@ func main() {
 	docs.SwaggerInfo.Host = "localhost:4567"
 	docs.SwaggerInfo.Schemes = []string{"http", "https"}
 	coors := cors.DefaultConfig()
+	// coors.AllowOrigins = strings.Split(os.Getenv("FRONTEND_URL"), ",")
 	coors.AllowAllOrigins = true
 	coors.AllowMethods = []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"}
 	coors.AllowHeaders = []string{"Origin", "Content-Length", "Content-Type", "Authorization"}

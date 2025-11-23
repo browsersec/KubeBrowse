@@ -303,6 +303,8 @@ const ShareWSSession = () => {
                   onReconnect={handleManualReconnect}
                   OfficeSession={false}
                   sharing={true}
+                  sessionUUID={sessionState.connectionId}
+                  enableSharing={true}
                   onConnectionStateChange={handleConnectionStateChange}
                 />
               </div>

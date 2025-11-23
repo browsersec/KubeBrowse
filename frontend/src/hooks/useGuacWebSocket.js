@@ -21,7 +21,7 @@ const SESSION_TIMEOUT = 24 * 60 * 60 * 1000; // 24 hours
  * @param {boolean} enableSharing - Whether to enable session sharing
  * @returns {Object} - The Guacamole client, connection state, and error message
  */
-const useGuacWebSocket = (wsUrl, httpUrl, forceHttp = false, queryString = '', sessionUUID = null, enableSharing = false) => {
+const useGuacWebSocket = (wsUrl, httpUrl, forceHttp = false, queryString = '', sessionUUID = null, enableSharing = false, isSharedSession = false) => {
   const [connectionState, setConnectionState] = useState(states.IDLE);
   const [errorMessage, setErrorMessage] = useState('');
   const [isConnectionUnstable, setIsConnectionUnstable] = useState(false);
@@ -98,6 +98,28 @@ const useGuacWebSocket = (wsUrl, httpUrl, forceHttp = false, queryString = '', s
       console.log('Maximum reconnection attempts reached');
       setConnectionState(states.TUNNEL_ERROR);
       setErrorMessage('Connection failed after multiple attempts. Please refresh the page.');
+      
+      // Clean up session on backend after max retries
+      // Skip DELETE for shared sessions (they don't own the backend resources)
+      if (sessionUUID) {
+        if (!isSharedSession) {
+          try {
+            console.log(`Cleaning up session ${sessionUUID} after failed reconnection attempts`);
+            await fetch(`/sessions/${sessionUUID}/stop`, {
+              method: 'DELETE'
+            });
+            console.log(`Session ${sessionUUID} cleanup request sent`);
+          } catch (error) {
+            console.error('Failed to cleanup session on backend:', error);
+          }
+        } else {
+          console.log(`Skipping backend cleanup for shared session ${sessionUUID} (not the owner)`);
+        }
+        
+        // Clear session from storage
+        clearSessionFromStorage();
+      }
+      
       return;
     }
 
@@ -132,11 +154,31 @@ const useGuacWebSocket = (wsUrl, httpUrl, forceHttp = false, queryString = '', s
           } else {
             setConnectionState(states.TUNNEL_ERROR);
             setErrorMessage('Connection failed after multiple attempts. Please refresh the page.');
+            
+            // Clean up session on backend after max retries
+            // Skip DELETE for shared sessions (they don't own the backend resources)
+            if (sessionUUID) {
+              try {
+                if (!isSharedSession) {
+                  console.log(`Cleaning up session ${sessionUUID} after failed reconnection attempts`);
+                  fetch(`/sessions/${sessionUUID}/stop`, {
+                    method: 'DELETE'
+                  }).catch(err => console.error('Failed to cleanup session on backend:', err));
+                } else {
+                  console.log(`Skipping backend cleanup for shared session ${sessionUUID} (not the owner)`);
+                }
+                
+                // Clear session from storage
+                clearSessionFromStorage();
+              } catch (cleanupError) {
+                console.error('Error during session cleanup:', cleanupError);
+              }
+            }
           }
         }
       }
     }, delay);
-  }, [loadSessionFromStorage, queryString]); // Removed reconnectAttempts from dependencies
+  }, [loadSessionFromStorage, queryString, sessionUUID, clearSessionFromStorage, isSharedSession]); // Removed reconnectAttempts from dependencies
   
   // Store the reconnection function in a ref to avoid infinite loops
   useEffect(() => {

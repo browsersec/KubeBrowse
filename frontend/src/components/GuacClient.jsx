@@ -32,7 +32,7 @@ const buildQueryString = (queryObj) => {
   return params.toString();
 };
 
-function GuacClient({ query, forceHttp = false, onDisconnect, connectionId , OfficeSession = true , sharing = false }) {
+function GuacClient({ query, forceHttp = false, onDisconnect, connectionId , OfficeSession = true , sharing = false, sessionUUID = null, enableSharing = false, onConnectionStateChange }) {
   const [connected, setConnected] = useState(false);
   
   // Convert query object to proper query string
@@ -43,13 +43,18 @@ function GuacClient({ query, forceHttp = false, onDisconnect, connectionId , Off
   
   console.log("GuacClient queryString:", queryString);
   console.log("GuacClient wsUrlToUse:", wsUrlToUse);
+  console.log("GuacClient sessionUUID:", sessionUUID);
+  console.log("GuacClient enableSharing:", enableSharing);
   
   // Use our custom WebSocket hook for Guacamole
-  const { client, connectionState, errorMessage, isConnectionUnstable } = useGuacWebSocket(
+  const { client, connectionState, errorMessage, isConnectionUnstable, reconnectAttempts } = useGuacWebSocket(
     wsUrlToUse, 
     httpUrl, 
     forceHttp, 
-    connected ? queryString : ''
+    connected ? queryString : '',
+    sessionUUID,
+    enableSharing,
+    sharing
   );
   
   const displayRef = useRef(null);
@@ -90,6 +95,14 @@ function GuacClient({ query, forceHttp = false, onDisconnect, connectionId , Off
       }
     };
   }, [queryString, connected]);
+
+  // Notify parent component about connection state changes and retry attempts
+  useEffect(() => {
+    if (onConnectionStateChange) {
+      onConnectionStateChange(connectionState, reconnectAttempts);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connectionState, reconnectAttempts]);
 
   // Track connection state changes and notify parent component when disconnected
   useEffect(() => {
