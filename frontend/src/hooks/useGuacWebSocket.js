@@ -3,6 +3,7 @@ import useWebSocket from 'react-use-websocket';
 import Guacamole from 'guacamole-common-js';
 import states from '../lib/states';
 import sessionDuplicator from '../lib/websocketSessionDuplicator';
+import useWebSocketMetrics from './useWebSocketMetrics';
 
 // Session persistence keys
 const SESSION_STORAGE_KEY = 'kubeBrowse_sessionConnection';
@@ -24,7 +25,8 @@ const SESSION_TIMEOUT = 24 * 60 * 60 * 1000; // 24 hours
 const useGuacWebSocket = (wsUrl, httpUrl, forceHttp = false, queryString = '', sessionUUID = null, enableSharing = false, isSharedSession = false) => {
   const [connectionState, setConnectionState] = useState(states.IDLE);
   const [errorMessage, setErrorMessage] = useState('');
-  // TODO: Add metrics collection
+  // WebSocket RTT metrics tracking
+  const wsMetrics = useWebSocketMetrics(sessionUUID);
   const [isConnectionUnstable, setIsConnectionUnstable] = useState(false);
   const [sessionInfo, setSessionInfo] = useState({ userCount: 1, isShared: false }); const [reconnectAttempts, setReconnectAttempts] = useState(0);
   const clientRef = useRef(null);
@@ -267,11 +269,9 @@ const useGuacWebSocket = (wsUrl, httpUrl, forceHttp = false, queryString = '', s
 
     /* outgoing traffic uses appropriate connection method */
     sendMessage(msg) {
-      // TODO: Add metrics collection
-      // Metric collection
-      if (window.guacMetrics) {
-        window.guacMetrics.messagesSent++;
-        window.guacMetrics.bytesSent += msg.length;
+      // RTT metrics collection - record message sent
+      if (window.guacWebSocketMetrics) {
+        window.guacWebSocketMetrics.recordMessageSent?.(msg);
       }
 
       if (this.sessionConnection) {
@@ -293,11 +293,9 @@ const useGuacWebSocket = (wsUrl, httpUrl, forceHttp = false, queryString = '', s
 
     handleMessage(event) {
       if (this.receiveCallback) {
-        // TODO: Add metrics collection
-        // Metric collection
-        if (window.guacMetrics) {
-          window.guacMetrics.messagesReceived++;
-          window.guacMetrics.bytesReceived += event.data.length;
+        // RTT metrics collection - record message received
+        if (window.guacWebSocketMetrics) {
+          window.guacWebSocketMetrics.recordMessageReceived?.(event.data);
         }
         this.receiveCallback(event.data);
       }
@@ -394,6 +392,10 @@ const useGuacWebSocket = (wsUrl, httpUrl, forceHttp = false, queryString = '', s
           setIsConnectionUnstable(false);
           setErrorMessage(''); // Clear any previous errors
           setReconnectAttempts(0); // Reset reconnection attempts on successful connection
+          // Record connection start for RTT metrics
+          if (window.guacWebSocketMetrics) {
+            window.guacWebSocketMetrics.recordConnectionStart?.();
+          }
           break;
         case Guacamole.Tunnel.State.UNSTABLE:
           // Handle unstable connection - try to recover
@@ -642,7 +644,11 @@ const useGuacWebSocket = (wsUrl, httpUrl, forceHttp = false, queryString = '', s
     enableSharing,
     enableSessionSharing,
     getShareUrl,
-    clearSession
+    clearSession,
+    
+    // WebSocket RTT metrics
+    wsMetrics: wsMetrics.metrics,
+    getWsMetricsSummary: wsMetrics.getMetricsSummary,
   };
 };
 

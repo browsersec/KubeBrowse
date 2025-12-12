@@ -342,7 +342,7 @@ spec:
             - name: FROM_EMAIL
               value: "sanjay.obsidian@gmail.com"
             - name: USE_HTTPS
-              value: "false"
+              value: "true"
             # - name: CERT_PATH
             #   value: ""
             # - name: CERT_KEY_PATH
@@ -477,7 +477,7 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: ghcr.io/browsersec/kubebrowse-frontend:chore-improve-back
+          image: ghcr.io/browsersec/kubebrowse-frontend:sha-c3aa644289d7981a88d104131ac034556185ac22
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 80

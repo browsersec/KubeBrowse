@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+
 	// "strings"
 	"time"
 
@@ -437,6 +438,17 @@ func main() {
 			api.HandlerGetSessionTimeLeft(c, redisClient)
 		})
 
+		// WebSocket metrics endpoints (for RTT tracking and benchmarking)
+		sessionRoutes.POST("/:connectionID/metrics", func(c *gin.Context) {
+			api.HandlerReportWebSocketMetrics(c, redisClient)
+		})
+		sessionRoutes.GET("/:connectionID/metrics", func(c *gin.Context) {
+			api.HandlerGetWebSocketMetrics(c, redisClient)
+		})
+		sessionRoutes.GET("/:connectionID/metrics/history", func(c *gin.Context) {
+			api.HandlerGetWebSocketMetricsHistory(c)
+		})
+
 		// Tunnel a Pod Rest API to Upload a file to a pod
 		sessionRoutes.POST("/:connectionID/upload", func(c *gin.Context) {
 			// Check if minioClient is nil before passing it to the handler
@@ -445,6 +457,17 @@ func main() {
 			} else {
 				api.HandlerUploadFile(c, redisClient, k8sClient, minioClient.Client, minioConfig.bucketName, clamavAddr, 10)
 			}
+		})
+	}
+
+	// Global metrics routes (for benchmarking tools)
+	metricsRoutes := router.Group("/metrics")
+	{
+		metricsRoutes.GET("/websocket", func(c *gin.Context) {
+			api.HandlerGetAllWebSocketMetrics(c)
+		})
+		metricsRoutes.GET("/websocket/summary", func(c *gin.Context) {
+			api.HandlerGetWebSocketMetricsSummary(c)
 		})
 	}
 

@@ -19,7 +19,3 @@ spec:
         maxAllowed:
           cpu: "1"
           memory: "1Gi"
-  selector:
-    matchLabels:
-      app: redis
-      component: redis

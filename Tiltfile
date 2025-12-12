@@ -52,6 +52,14 @@ k8s_resource(
     auto_init=False
 )
 
+# fronted
+k8s_resource(
+    'browser-sandbox-frontend',
+    port_forwards=['5173:80'],
+    labels=["browser-sandbox-frontend"],
+    auto_init=False
+)
+
 # Add Redis port forward for local development
 k8s_resource(
     'redis',

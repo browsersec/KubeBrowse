@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import WebSocketMetricsDisplay from "./WebSocketMetricsDisplay";
 
 /**
  * A collapsible control panel for WebSocket connection management
@@ -519,6 +520,12 @@ function WebSocketControl({
                 {disconnecting ? "Disconnecting..." : "Disconnect"}
               </span>
             </Button>
+            
+            {/* WebSocket RTT Metrics Display */}
+            <WebSocketMetricsDisplay 
+              sessionId={connectionId} 
+              isConnected={isConnected} 
+            />
           </div>
         )}
       </div>

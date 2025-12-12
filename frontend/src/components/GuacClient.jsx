@@ -47,7 +47,7 @@ function GuacClient({ query, forceHttp = false, onDisconnect, connectionId , Off
   console.log("GuacClient enableSharing:", enableSharing);
   
   // Use our custom WebSocket hook for Guacamole
-  const { client, connectionState, errorMessage, isConnectionUnstable, reconnectAttempts } = useGuacWebSocket(
+  const { client, connectionState, errorMessage, isConnectionUnstable, reconnectAttempts, wsMetrics } = useGuacWebSocket(
     wsUrlToUse, 
     httpUrl, 
     forceHttp, 
@@ -71,17 +71,8 @@ function GuacClient({ query, forceHttp = false, onDisconnect, connectionId , Off
   useEffect(() => {
     clientRef.current = client;
     if (client && connected) {
-      // TODO: Add metrics collection
       // Expose client to window for benchmarking
       window.guacClient = client;
-      if (!window.guacMetrics) {
-        window.guacMetrics = {
-          bytesReceived: 0,
-          bytesSent: 0,
-          messagesReceived: 0,
-          messagesSent: 0
-        };
-      }
 
       // Set up display and clipboard when client becomes available
       setupClientDisplay();
