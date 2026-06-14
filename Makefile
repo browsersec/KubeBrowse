@@ -78,6 +78,16 @@ test_coverage:
 build: deps
 	go build -v -o guac cmd/guac/main.go
 
+# MkDocs documentation targets
+docs-setup:
+	pip install mkdocs mkdocs-material
+
+docs-serve:
+	mkdocs serve
+
+docs-build:
+	mkdocs build
+
 # Setup development environment
 setup: deps hooks
 	@echo "Development environment setup complete"
@@ -93,5 +103,8 @@ help:
 	@echo "  lint-all     - Run lefthook pre-commit checks on all files"
 	@echo "  test         - Run tests"
 	@echo "  build        - Build the project"
+	@echo "  docs-setup   - Install MkDocs and Material theme via pip"
+	@echo "  docs-serve   - Serve documentation locally"
+	@echo "  docs-build   - Build documentation into static files"
 	@echo "  generate     - Generate self-signed certificates"
 	@echo "  generate_prod - Generate Let's Encrypt certificates"

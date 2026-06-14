@@ -1,6 +1,6 @@
 ---
 label: Architecture
-icon:  server
+icon: material/server
 order: 700
 ---
 

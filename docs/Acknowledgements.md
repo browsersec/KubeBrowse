@@ -1,6 +1,6 @@
 ---
 label: Acknowledgements
-icon:  megaphone
+icon: material/bullhorn
 order: 600
 ---
 
@@ -9,5 +9,5 @@ order: 600
 
 This research is carried out in [Centre of Excellence, Artificial Intelligence and Robotics (AIR)](https://air.vitap.ac.in). A kind mention for providing mentorship, computational resources, and infrastructure support critical to the successful development of the project.
 
-![digitalfortress](../attachments/df.png)
+![digitalfortress](attachments/df.png)
 

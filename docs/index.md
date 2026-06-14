@@ -1,6 +1,6 @@
 ---
 label: Welcome
-icon:  home
+icon: material/home
 order: 1000
 ---
 

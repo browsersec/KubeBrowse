@@ -49,4 +49,6 @@ certs/*.crt
 .env
 
 # ignore .tilt builds folder
-.tilt/
+.tilt/site/
+
+site/*

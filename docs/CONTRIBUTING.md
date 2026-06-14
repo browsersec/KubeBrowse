@@ -1,6 +1,6 @@
 ---
 label: Contributing to KubeBrowse
-icon:  book
+icon: material/book
 order: 800
 ---
 
