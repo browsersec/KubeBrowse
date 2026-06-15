@@ -150,6 +150,18 @@ func (s *Service) LoginWithEmail(email, password string) (*User, *Session, error
 
 // CreateOrUpdateOAuthUser creates or updates a user from OAuth provider
 func (s *Service) CreateOrUpdateOAuthUser(email, provider, providerID, avatarURL, name, username string) (*User, error) {
+	// If email is empty, create a fallback email
+	if email == "" {
+		if username != "" {
+			email = username + "@github.local"
+		} else if providerID != "" {
+			email = providerID + "@github.local"
+		} else {
+			email = "user@github.local"
+		}
+		logrus.Infof("Using fallback email for OAuth user: %s", email)
+	}
+
 	// Try to find existing user by provider
 	existingUser, err := s.db.GetUserByProvider(s.ctx, sqlc.GetUserByProviderParams{
 		Provider:   sql.NullString{String: provider, Valid: true},
@@ -157,7 +169,25 @@ func (s *Service) CreateOrUpdateOAuthUser(email, provider, providerID, avatarURL
 	})
 
 	if err == nil {
-		// User exists, return it
+		// User exists, update email if it's empty
+		if existingUser.Email == "" {
+			logrus.Infof("Updating empty email for existing user %s to %s", existingUser.ID, email)
+			// Update the user's email
+			_, updateErr := s.db.UpdateUser(s.ctx, sqlc.UpdateUserParams{
+				ID:       existingUser.ID,
+				Username: existingUser.Username,
+				Email:    email,
+			})
+			if updateErr != nil {
+				logrus.Errorf("Failed to update user email: %v", updateErr)
+			} else {
+				// Refresh the user data
+				existingUser, err = s.db.GetUser(s.ctx, existingUser.ID)
+				if err != nil {
+					logrus.Errorf("Failed to refresh user data: %v", err)
+				}
+			}
+		}
 		return s.convertDBUser(existingUser), nil
 	}
 
@@ -304,9 +334,22 @@ func (s *Service) ValidateSession(token string) (*User, *Session, error) {
 	logrus.Debugf("ValidateSession: Retrieved session data - UserID: %s, Email: %s, Provider: %s",
 		dbSession.UserID, dbSession.Email, dbSession.Provider.String)
 
+	// Ensure email is not empty - if it is, try to get fresh user data
+	email := dbSession.Email
+	if email == "" {
+		logrus.Warnf("ValidateSession: Email is empty for user %s, fetching fresh user data", dbSession.UserID)
+		freshUser, err := s.db.GetUser(s.ctx, dbSession.UserID)
+		if err != nil {
+			logrus.Errorf("ValidateSession: Failed to get fresh user data: %v", err)
+		} else {
+			email = freshUser.Email
+			logrus.Infof("ValidateSession: Fresh user data - Email: %s", email)
+		}
+	}
+
 	user := &User{
 		ID:       dbSession.UserID,
-		Email:    dbSession.Email,
+		Email:    email,
 		Provider: dbSession.Provider.String,
 	}
 

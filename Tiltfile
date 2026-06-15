@@ -25,8 +25,16 @@ docker_build_with_restart(
     live_update=[
         sync('./.tilt/guac', '/app/guac'),
         sync('./templates', '/app/templates'),
+        sync('./certs', '/app/certs'),
         run('chmod +x /app/guac')  # Ensure binary is executable
     ]
+)
+
+k8s_resource(
+    'browser-sandbox-frontend',
+    port_forwards=['8080:80'],
+    labels=["frontend"],
+    auto_init=False
 )
 
 # Frontend (optional dev build) - uses Caddyfile.dev via build arg

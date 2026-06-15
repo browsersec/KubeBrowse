@@ -8,14 +8,50 @@
     root * /srv
     file_server
 
-    # Handle OAuth callback redirects
-    handle /auth/success {
-        file_server
-        header Cache-Control "no-cache, no-store, must-revalidate"
+    # Authentication endpoints - proxy to backend API (excluding frontend routes)
+    handle /auth/oauth/* {
+        reverse_proxy {$CADDY_GUAC_CLIENT_URL} {
+            transport http {
+                tls
+                tls_insecure_skip_verify
+            }
+            header_up Host {http.reverse_proxy.upstream.hostport}
+            header_up Connection {header.Connection}
+            header_up Upgrade {header.Upgrade}
+            
+            # Cookie handling for session management
+        }
     }
 
-    # Authentication endpoints - proxy to backend API
-    handle /auth/* {
+    handle /auth/login {
+        reverse_proxy {$CADDY_GUAC_CLIENT_URL} {
+            transport http {
+                tls
+                tls_insecure_skip_verify
+            }
+            header_up Host {http.reverse_proxy.upstream.hostport}
+            header_up Connection {header.Connection}
+            header_up Upgrade {header.Upgrade}
+        
+            # Cookie handling for session management
+        }
+    }
+    
+    handle /auth/me {
+        reverse_proxy {$CADDY_GUAC_CLIENT_URL} {
+            transport http {
+                tls
+                tls_insecure_skip_verify
+            }
+            header_up Host {http.reverse_proxy.upstream.hostport}
+            header_up Connection {header.Connection}
+            header_up Upgrade {header.Upgrade}
+            
+            # Cookie handling for session management
+        }
+    }
+    
+    handle /auth/logout {
         reverse_proxy {$CADDY_GUAC_CLIENT_URL} {
             transport http {
                 tls

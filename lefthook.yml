@@ -53,3 +53,17 @@ commit-msg:
           exit 1
         fi
 
+    dco-check:
+      run: |
+        # if no arg was passed, fallback to the usual commit-msg file
+        file="${1:-$(git rev-parse --git-dir)/COMMIT_EDITMSG}"
+        message="$(cat "$file")"
+
+        if ! echo "$message" | grep -q "Signed-off-by:"; then
+          echo "DCO check failed!"
+          echo "Commit message must include a 'Signed-off-by' line."
+          echo "To fix this, commit with: git commit -s"
+          echo "Or amend your commit: git commit --amend -s"
+          exit 1
+        fi
+

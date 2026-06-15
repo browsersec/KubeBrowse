@@ -6,6 +6,7 @@ import { Label } from '../ui/label';
 import { Card } from '../ui/card';
 import { Alert } from '../ui/alert';
 import EmailVerification from './EmailVerification';
+import toast from 'react-hot-toast';
 
 export function LoginForm({ onSwitchToRegister }) {
   const [formData, setFormData] = useState({
@@ -32,13 +33,25 @@ export function LoginForm({ onSwitchToRegister }) {
 
     const result = await login(formData.email, formData.password);
     
-    if (!result.success) {
+    if (result.success) {
+      // Show success toast similar to OAuth flow
+      toast.success(`Welcome back, ${result.user?.name || result.user?.email || 'User'}!`, {
+        duration: 3000,
+        position: "top-right",
+        style: {
+          background: "#10B981",
+          color: "#fff",
+          fontWeight: "600",
+        },
+        iconTheme: { primary: "#fff", secondary: "#10B981" },
+      });
+      setIsSubmitting(false);
+    } else {
       if (result.needsVerification) {
         setShowEmailVerification(true);
       }
       setIsSubmitting(false);
     }
-    // If successful, the auth context will handle the state update
   };
 
   const handleGitHubLogin = () => {

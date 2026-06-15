@@ -37,22 +37,24 @@ spec:
     - browser-sandbox-gateway
   http:
     - match:
-        - uri:
-            prefix: "/api"
+        - headers:
+            ":authority":
+              exact: "api.kubebrowse1.ghcat.tech"
       route:
         - destination:
             host: browser-sandbox-api
             port:
               number: 4567
     - match:
-        - uri:
-            prefix: "/websocket"
+        - headers:
+            ":authority":
+              exact: "app.kubebrowse1.ghcat.tech"
       route:
         - destination:
-            host: browser-sandbox-api
+            host: browser-sandbox-frontend
             port:
-              number: 4567
-    - route:  # Default route for frontend
+              number: 80
+    - route:  # Default route (fallback)
         - destination:
             host: browser-sandbox-frontend
             port:
