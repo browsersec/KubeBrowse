@@ -65,7 +65,7 @@ func CreateOfficeSandboxPod(clientset *kubernetes.Clientset, namespace, userID s
 			Containers: []corev1.Container{
 				{
 					Name:  "rdp-onlyoffice",
-					Image: "ghcr.io/browsersec/rdp-onlyoffice-lxde:sha-e6fbfe0",
+					Image: "ghcr.io/browsersec/rdp-onlyoffice-lxde:latest",
 					Ports: []corev1.ContainerPort{
 						{
 							Name:          "rdp",

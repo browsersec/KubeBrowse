@@ -45,7 +45,7 @@ lint:
 	@echo "Running pre-commit checks on staged files using lefthook..."
 	@lefthook run pre-commit --files $(git diff --name-only --cached)
 
-# run the server 
+# run the server
 run: deps
 	@echo "Running server..."
 	@echo "Using certs from $(CERT_PATH) and $(CERT_KEY_PATH)"
@@ -55,8 +55,8 @@ run: deps
 run_frontend:
 	@echo "Running frontend..."
 	@echo "Starting frontend..."
-	pnpm --dir frontend run dev 
-	
+	bun --dir frontend run dev
+
 generate:
 	bash ./certs/generate.sh
 
@@ -92,6 +92,41 @@ docs-build:
 setup: deps hooks
 	@echo "Development environment setup complete"
 
+KIND_CLUSTER ?= kubebrowse-cluster
+ARCH := $(shell uname -m)
+ifeq ($(ARCH),x86_64)
+  PLATFORM := linux/amd64
+else ifeq ($(ARCH),arm64)
+  PLATFORM := linux/arm64
+else
+  PLATFORM := linux/$(ARCH)
+endif
+CHROMIUM_IMAGE := ghcr.io/browsersec/rdp-chromium:latest
+OFFICE_IMAGE := ghcr.io/browsersec/rdp-onlyoffice-lxde:latest
+
+# Load chromium image into KIND
+load-chromium:
+	@echo "Pulling $(CHROMIUM_IMAGE)..."
+	docker pull --platform $(PLATFORM) $(CHROMIUM_IMAGE)
+	@echo "Loading $(CHROMIUM_IMAGE) into KIND cluster $(KIND_CLUSTER)..."
+	docker save $(CHROMIUM_IMAGE) -o /tmp/chromium.tar
+	kind load image-archive /tmp/chromium.tar --name $(KIND_CLUSTER)
+	@rm -f /tmp/chromium.tar
+	@echo "Chromium image loaded."
+
+# Load onlyoffice image into KIND
+load-office:
+	@echo "Pulling $(OFFICE_IMAGE)..."
+	docker pull --platform $(PLATFORM) $(OFFICE_IMAGE)
+	@echo "Loading $(OFFICE_IMAGE) into KIND cluster $(KIND_CLUSTER)..."
+	docker save $(OFFICE_IMAGE) -o /tmp/onlyoffice.tar
+	kind load image-archive /tmp/onlyoffice.tar --name $(KIND_CLUSTER)
+	@rm -f /tmp/onlyoffice.tar
+	@echo "Onlyoffice image loaded."
+
+# Load all sandbox images into KIND
+load-images: load-chromium load-office
+
 help:
 	go run cmd/guac/main.go -h
 	@echo ""
@@ -106,5 +141,8 @@ help:
 	@echo "  docs-setup   - Install MkDocs and Material theme via pip"
 	@echo "  docs-serve   - Serve documentation locally"
 	@echo "  docs-build   - Build documentation into static files"
+	@echo "  load-images  - Pull all sandbox images from GHCR and load into KIND"
+	@echo "  load-chromium - Pull and load chromium image into KIND"
+	@echo "  load-office  - Pull and load onlyoffice image into KIND"
 	@echo "  generate     - Generate self-signed certificates"
 	@echo "  generate_prod - Generate Let's Encrypt certificates"

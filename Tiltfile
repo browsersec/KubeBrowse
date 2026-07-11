@@ -3,30 +3,31 @@ load('ext://restart_process', 'docker_build_with_restart')
 allow_k8s_contexts("default")
 print("Tilt starting up...")
 
-# Backend API (Go) with restart support - include all necessary files
+# Local Go compilation 
+local_resource(
+    'go-build',
+    cmd='CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o .tilt/guac cmd/guac/main.go',
+    deps=['./cmd', './internal', './api', './go.mod', './go.sum'],
+    auto_init=True
+)
+
+# Backend API (Go) - uses pre-compiled binary
 docker_build_with_restart(
     'ghcr.io/browsersec/kubebrowse',
     '.',
-    dockerfile='Dockerfile',
+    dockerfile='Dockerfile.tilt',
     entrypoint='/app/guac',
     only=[
         './.tilt/guac',
         './templates',
         './certs',
-        './go.mod',
-        './go.sum',
-        './api',
-        './cmd',
-        './internal',
-        './docs',
-        './db',
-        './sqlc.yaml'
     ],
     live_update=[
         sync('./.tilt/guac', '/app/guac'),
         sync('./templates', '/app/templates'),
-        run('chmod +x /app/guac')  # Ensure binary is executable
-    ]
+        run('chmod +x /app/guac')
+    ],
+    resource_deps=['go-build']
 )
 
 # Clean up dangling images and build cache periodically
