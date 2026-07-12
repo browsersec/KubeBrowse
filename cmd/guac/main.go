@@ -178,6 +178,19 @@ func main() {
 		k8sNamespace = os.Getenv("KUBERNETES_NAMESPACE")
 	}
 
+	// Determine sandbox images. Defaults are selected by runtime architecture
+	// (latest-amd64 or latest-arm64) to match the images loaded by make.
+	browserImage := os.Getenv("BROWSER_IMAGE")
+	if browserImage == "" {
+		browserImage = k8s.DefaultBrowserImage()
+	}
+	officeImage := os.Getenv("OFFICE_IMAGE")
+	if officeImage == "" {
+		officeImage = k8s.DefaultOfficeImage()
+	}
+	logrus.Infof("Using browser image: %s", browserImage)
+	logrus.Infof("Using office image: %s", officeImage)
+
 	tunnelStore = guac2.NewActiveTunnelStore()
 
 	// Initialize Kubernetes client with fallback for local development
@@ -391,12 +404,12 @@ func main() {
 	{
 		// New route for deploying and connecting to office pod with RDP credentials
 		testRoutes.POST("/deploy-office", func(c *gin.Context) {
-			api.DeployOffice(c, k8sClient, k8sNamespace, redisClient, tunnelStore)
+			api.DeployOffice(c, k8sClient, k8sNamespace, redisClient, tunnelStore, officeImage)
 		})
 
 		// New route for deploying and connecting to browser pod with RDP credentials
 		testRoutes.POST("/deploy-browser", func(c *gin.Context) {
-			api.DeployBrowser(c, k8sClient, k8sNamespace, redisClient, tunnelStore)
+			api.DeployBrowser(c, k8sClient, k8sNamespace, redisClient, tunnelStore, browserImage)
 		})
 
 		// New endpoint to handle websocket connections using stored parameters
@@ -411,12 +424,12 @@ func main() {
 
 		// Test route to create a browser sandbox pod
 		testRoutes.POST("/browser-pod", func(c *gin.Context) {
-			api.HandlerBrowserPod(c, tunnelStore, k8sClient, k8sNamespace)
+			api.HandlerBrowserPod(c, tunnelStore, k8sClient, k8sNamespace, browserImage)
 		})
 
 		// Test route to create an office sandbox pod
 		testRoutes.POST("/office-pod", func(c *gin.Context) {
-			api.HandlerOfficePod(c, tunnelStore, k8sClient, k8sNamespace)
+			api.HandlerOfficePod(c, tunnelStore, k8sClient, k8sNamespace, officeImage)
 		})
 	}
 

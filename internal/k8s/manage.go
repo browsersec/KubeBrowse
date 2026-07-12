@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"runtime"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -71,8 +72,8 @@ func NewManager() (*KubeBrowseManager, error) {
 			GuacdHost:        getEnv("GUACD_HOST", "localhost"),
 			GuacdPort:        getEnv("GUACD_PORT", "4822"),
 			K8sNamespace:     getEnv("KUBERNETES_NAMESPACE", "browser-sandbox"),
-			BrowserImage:     getEnv("BROWSER_IMAGE", "ghcr.io/browsersec/rdp-chromium:latest"),
-			OfficeImage:      getEnv("OFFICE_IMAGE", "ghcr.io/browsersec/rdp-onlyoffice:latest"),
+			BrowserImage:     getEnv("BROWSER_IMAGE", DefaultBrowserImage()),
+			OfficeImage:      getEnv("OFFICE_IMAGE", DefaultOfficeImage()),
 			SessionTimeout:   getDurationEnv("SESSION_TIMEOUT", 10*time.Minute),
 		},
 	}
@@ -274,9 +275,9 @@ func (m *KubeBrowseManager) CreateSession(c *gin.Context) {
 
 	// Create the appropriate pod based on session type
 	if sessionRequest.Type == "browser" {
-		pod, err = CreateBrowserSandboxPod(m.K8sClient, m.Config.K8sNamespace, userID)
+		pod, err = CreateBrowserSandboxPod(m.K8sClient, m.Config.K8sNamespace, userID, m.Config.BrowserImage)
 	} else {
-		pod, err = CreateOfficeSandboxPod(m.K8sClient, m.Config.K8sNamespace, userID)
+		pod, err = CreateOfficeSandboxPod(m.K8sClient, m.Config.K8sNamespace, userID, m.Config.OfficeImage)
 	}
 
 	if err != nil {
@@ -420,4 +421,16 @@ func getDurationEnv(key string, fallback time.Duration) time.Duration {
 		}
 	}
 	return fallback
+}
+
+// DefaultBrowserImage returns the default browser sandbox image for the
+// current runtime architecture (latest-amd64 or latest-arm64).
+func DefaultBrowserImage() string {
+	return fmt.Sprintf("ghcr.io/browsersec/rdp-chromium:latest-%s", runtime.GOARCH)
+}
+
+// DefaultOfficeImage returns the default office sandbox image for the
+// current runtime architecture (latest-amd64 or latest-arm64).
+func DefaultOfficeImage() string {
+	return fmt.Sprintf("ghcr.io/browsersec/rdp-onlyoffice-lxde:latest-%s", runtime.GOARCH)
 }

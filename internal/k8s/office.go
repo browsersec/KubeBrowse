@@ -17,7 +17,7 @@ import (
 )
 
 // CreateSandboxPod creates a new pod with the rdp container
-func CreateOfficeSandboxPod(clientset *kubernetes.Clientset, namespace, userID string) (*corev1.Pod, error) {
+func CreateOfficeSandboxPod(clientset *kubernetes.Clientset, namespace, userID, image string) (*corev1.Pod, error) {
 	podName := fmt.Sprintf("browser-sandbox-%s-%s", userID, time.Now().Format("20060102150405"))
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -65,7 +65,7 @@ func CreateOfficeSandboxPod(clientset *kubernetes.Clientset, namespace, userID s
 			Containers: []corev1.Container{
 				{
 					Name:  "rdp-onlyoffice",
-					Image: "ghcr.io/browsersec/rdp-onlyoffice-lxde:latest",
+					Image: image,
 					Ports: []corev1.ContainerPort{
 						{
 							Name:          "rdp",

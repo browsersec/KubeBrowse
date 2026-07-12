@@ -39,7 +39,7 @@ type DeploySessionRequest struct {
 // @Failure 503 {object} gin.H{"error":string}
 // @Failure 500 {object} gin.H{"error":string}
 // @Router /test/deploy-office [post]
-func DeployOffice(c *gin.Context, k8sClient *kubernetes.Clientset, k8sNamespace string, redisClient *redis.Client, tunnelStore *guac.ActiveTunnelStore) {
+func DeployOffice(c *gin.Context, k8sClient *kubernetes.Clientset, k8sNamespace string, redisClient *redis.Client, tunnelStore *guac.ActiveTunnelStore, officeImage string) {
 
 	if k8sClient == nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{
@@ -59,7 +59,7 @@ func DeployOffice(c *gin.Context, k8sClient *kubernetes.Clientset, k8sNamespace 
 	podName := "office-" + uuid.New().String()[0:8]
 
 	// Create an office sandbox pod
-	pod, err := k8s2.CreateOfficeSandboxPod(k8sClient, k8sNamespace, podName)
+	pod, err := k8s2.CreateOfficeSandboxPod(k8sClient, k8sNamespace, podName, officeImage)
 	if err != nil {
 		logrus.Errorf("Failed to create office pod: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -155,7 +155,7 @@ func DeployOffice(c *gin.Context, k8sClient *kubernetes.Clientset, k8sNamespace 
 // @Failure 503 {object} gin.H{"error":string}
 // @Failure 500 {object} gin.H{"error":string}
 // @Router /test/deploy-browser [post]
-func DeployBrowser(c *gin.Context, k8sClient *kubernetes.Clientset, k8sNamespace string, redisClient *redis.Client, tunnelStore *guac.ActiveTunnelStore) {
+func DeployBrowser(c *gin.Context, k8sClient *kubernetes.Clientset, k8sNamespace string, redisClient *redis.Client, tunnelStore *guac.ActiveTunnelStore, browserImage string) {
 
 	if k8sClient == nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{
@@ -175,7 +175,7 @@ func DeployBrowser(c *gin.Context, k8sClient *kubernetes.Clientset, k8sNamespace
 	podName := "browser-" + uuid.New().String()[0:8]
 
 	// Create an office sandbox pod
-	pod, err := k8s2.CreateBrowserSandboxPod(k8sClient, k8sNamespace, podName)
+	pod, err := k8s2.CreateBrowserSandboxPod(k8sClient, k8sNamespace, podName, browserImage)
 	if err != nil {
 		logrus.Errorf("Failed to create office pod: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -388,7 +388,7 @@ func HandlerShareSession(c *gin.Context, tunnelStore *guac.ActiveTunnelStore, re
 	})
 }
 
-func HandlerBrowserPod(c *gin.Context, tunnelStore *guac.ActiveTunnelStore, k8sClient *kubernetes.Clientset, k8sNamespace string) {
+func HandlerBrowserPod(c *gin.Context, tunnelStore *guac.ActiveTunnelStore, k8sClient *kubernetes.Clientset, k8sNamespace, browserImage string) {
 	if k8sClient == nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{
 			"error": "Kubernetes client not initialized",
@@ -400,7 +400,7 @@ func HandlerBrowserPod(c *gin.Context, tunnelStore *guac.ActiveTunnelStore, k8sC
 	userID := "test-" + uuid.New().String()[0:8]
 
 	// Create a browser sandbox pod
-	pod, err := k8s2.CreateBrowserSandboxPod(k8sClient, k8sNamespace, userID+"-browser")
+	pod, err := k8s2.CreateBrowserSandboxPod(k8sClient, k8sNamespace, userID+"-browser", browserImage)
 	if err != nil {
 		logrus.Errorf("Failed to create browser pod: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -422,7 +422,7 @@ func HandlerBrowserPod(c *gin.Context, tunnelStore *guac.ActiveTunnelStore, k8sC
 	})
 }
 
-func HandlerOfficePod(c *gin.Context, tunnelStore *guac.ActiveTunnelStore, k8sClient *kubernetes.Clientset, k8sNamespace string) {
+func HandlerOfficePod(c *gin.Context, tunnelStore *guac.ActiveTunnelStore, k8sClient *kubernetes.Clientset, k8sNamespace, officeImage string) {
 	if k8sClient == nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{
 			"error": "Kubernetes client not initialized",
@@ -434,7 +434,7 @@ func HandlerOfficePod(c *gin.Context, tunnelStore *guac.ActiveTunnelStore, k8sCl
 	userID := "test-" + uuid.New().String()[0:8]
 
 	// Create an office sandbox pod
-	pod, err := k8s2.CreateOfficeSandboxPod(k8sClient, k8sNamespace, userID+"-office")
+	pod, err := k8s2.CreateOfficeSandboxPod(k8sClient, k8sNamespace, userID+"-office", officeImage)
 	if err != nil {
 		logrus.Errorf("Failed to create office pod: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
