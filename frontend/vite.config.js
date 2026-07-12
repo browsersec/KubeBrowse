@@ -3,11 +3,13 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
 
+import { cloudflare } from "@cloudflare/vite-plugin";
+
 const guacClient = process.env.GUAC_CLIENT_URL || "https://localhost:4567";
 console.log(`Using Guacamole client URL: ${guacClient}`);
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), cloudflare()],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
