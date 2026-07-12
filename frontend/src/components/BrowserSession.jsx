@@ -4,11 +4,7 @@ import SessionReconnectStatus from "./SessionReconnectStatus";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-
-// const API_BASE = import.meta.env.VITE_GUAC_CLIENT_URL || `${isSecure ? 'https' : 'http'}://${location.host}`;
-// const API_BASE = 'https://152.53.244.80:30006'
-// const API_BASE = 'http://localhost:4567'
-const API_BASE = ""; // Use relative URLs to leverage Vite's proxy
+import { API_BASE } from "../config";
 
 // Session persistence keys
 const SESSION_STORAGE_KEY = "kubeBrowse_browserSession";

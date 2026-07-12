@@ -8,8 +8,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Copy, Share2, Users, ExternalLink, Check } from "lucide-react";
-
-const API_BASE = ""; // Use relative URLs to leverage Vite's proxy
+import { API_BASE } from "../config";
 
 // Session persistence keys
 const SESSION_STORAGE_KEY = "kubeBrowse_officeSession";

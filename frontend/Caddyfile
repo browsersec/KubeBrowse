@@ -17,10 +17,6 @@
     # Authentication endpoints - proxy to backend API
     handle /auth/* {
         reverse_proxy {$CADDY_GUAC_CLIENT_URL} {
-            transport http {
-                tls
-                tls_insecure_skip_verify
-            }
             header_up Host {http.reverse_proxy.upstream.hostport}
             header_up Connection {header.Connection}
             header_up Upgrade {header.Upgrade}
@@ -34,10 +30,6 @@
     # Session management endpoints
     handle /sessions/* {
         reverse_proxy {$CADDY_GUAC_CLIENT_URL} {
-            transport http {
-                tls
-                tls_insecure_skip_verify
-            }
             header_up Host {http.reverse_proxy.upstream.hostport}
             header_up Connection {header.Connection}
             header_up Upgrade {header.Upgrade}
@@ -51,10 +43,6 @@
     # API v1 endpoints
     handle /api/v1/* {
         reverse_proxy {$CADDY_GUAC_CLIENT_URL} {
-            transport http {
-                tls
-                tls_insecure_skip_verify
-            }
             header_up Host {http.reverse_proxy.upstream.hostport}
             header_up Connection {header.Connection}
             header_up Upgrade {header.Upgrade}
@@ -68,10 +56,6 @@
     # Tunnel endpoints
     handle /tunnel* {
         reverse_proxy {$CADDY_GUAC_CLIENT_URL} {
-            transport http {
-                tls
-                tls_insecure_skip_verify
-            }
             header_up Host {http.reverse_proxy.upstream.hostport}
             header_up Connection {header.Connection}
             header_up Upgrade {header.Upgrade}
@@ -85,10 +69,6 @@
     # WebSocket tunnel endpoints
     handle /websocket-tunnel* {
         reverse_proxy {$CADDY_GUAC_CLIENT_URL} {
-            transport http {
-                tls
-                tls_insecure_skip_verify
-            }
             header_up Host {http.reverse_proxy.upstream.hostport}
             header_up Connection {header.Connection}
             header_up Upgrade {header.Upgrade}

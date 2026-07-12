@@ -21,6 +21,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import WebSocketMetricsDisplay from "./WebSocketMetricsDisplay";
+import { API_BASE } from "../config";
 
 /**
  * A collapsible control panel for WebSocket connection management
@@ -132,7 +133,7 @@ function WebSocketControl({
       const formData = new FormData();
       formData.append("file", file);
       const xhr = new window.XMLHttpRequest();
-      xhr.open("POST", `/sessions/${connectionId}/upload`, true);
+      xhr.open("POST", `${API_BASE}/sessions/${connectionId}/upload`, true);
       xhr.withCredentials = false;
       xhr.upload.onprogress = (event) => {
         if (event.lengthComputable) {

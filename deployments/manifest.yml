@@ -255,7 +255,7 @@ spec:
       serviceAccountName: browser-sandbox-sa
       containers:
         - name: api
-          image:  ghcr.io/browsersec/kubebrowse:sha-09dfa1f
+          image: ghcr.io/browsersec/kubebrowse:sha-09dfa1f
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 4567
@@ -397,7 +397,6 @@ roleRef:
   name: pod-manager
   apiGroup: rbac.authorization.k8s.io
 ---
-
 # ---
 # Cron Job to cleanup idle sessions
 # apiVersion: batch/v1
@@ -490,11 +489,11 @@ spec:
               cpu: "200m"
           env:
             - name: VITE_GUAC_CLIENT_URL
-              value: "https://browser-sandbox-api.browser-sandbox.svc.cluster.local:4567"
+              value: "http://browser-sandbox-api.browser-sandbox.svc.cluster.local:4567"
             - name: GUAC_CLIENT_URL
-              value: "https://browser-sandbox-api.browser-sandbox.svc.cluster.local:4567"
+              value: "http://browser-sandbox-api.browser-sandbox.svc.cluster.local:4567"
             - name: CADDY_GUAC_CLIENT_URL
-              value: "https://browser-sandbox-api.browser-sandbox.svc.cluster.local:4567"
+              value: "http://browser-sandbox-api.browser-sandbox.svc.cluster.local:4567"
 ---
 # Frontend Service
 apiVersion: v1
@@ -509,7 +508,7 @@ spec:
   ports:
     - port: 80
       targetPort: 80
-     # nodePort: 30007
+      # nodePort: 30007
   selector:
     app: "browser-sandbox-frontend"
 ---
