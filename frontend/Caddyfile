@@ -24,7 +24,7 @@
             header_up Host {http.reverse_proxy.upstream.hostport}
             header_up Connection {header.Connection}
             header_up Upgrade {header.Upgrade}
-            
+
             # Cookie handling for session management
             header_down Set-Cookie "Domain=localhost"
             header_down Set-Cookie "Path=/"
@@ -41,15 +41,15 @@
             header_up Host {http.reverse_proxy.upstream.hostport}
             header_up Connection {header.Connection}
             header_up Upgrade {header.Upgrade}
-            
+
             # Cookie handling for session management
             header_down Set-Cookie "Domain=localhost"
             header_down Set-Cookie "Path=/"
         }
     }
 
-    # Test endpoints
-    handle /test/* {
+    # API v1 endpoints
+    handle /api/v1/* {
         reverse_proxy {$CADDY_GUAC_CLIENT_URL} {
             transport http {
                 tls
@@ -58,7 +58,7 @@
             header_up Host {http.reverse_proxy.upstream.hostport}
             header_up Connection {header.Connection}
             header_up Upgrade {header.Upgrade}
-            
+
             # Cookie handling for session management
             header_down Set-Cookie "Domain=localhost"
             header_down Set-Cookie "Path=/"
@@ -67,7 +67,7 @@
 
     # Tunnel endpoints
     handle /tunnel* {
-        reverse_proxy {$CADDY_GUAC_CLIENT_URL} { 
+        reverse_proxy {$CADDY_GUAC_CLIENT_URL} {
             transport http {
                 tls
                 tls_insecure_skip_verify
@@ -75,7 +75,7 @@
             header_up Host {http.reverse_proxy.upstream.hostport}
             header_up Connection {header.Connection}
             header_up Upgrade {header.Upgrade}
-            
+
             # Cookie handling for session management
             header_down Set-Cookie "Domain=localhost"
             header_down Set-Cookie "Path=/"
@@ -92,7 +92,7 @@
             header_up Host {http.reverse_proxy.upstream.hostport}
             header_up Connection {header.Connection}
             header_up Upgrade {header.Upgrade}
-            
+
             # Cookie handling for session management
             header_down Set-Cookie "Domain=localhost"
             header_down Set-Cookie "Path=/"
@@ -124,4 +124,4 @@
         output stdout
         format console
     }
-} 
+}

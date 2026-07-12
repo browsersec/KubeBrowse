@@ -36,7 +36,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-// @BasePath /test
+// @BasePath /
 
 var (
 	certPath     string
@@ -399,36 +399,36 @@ func main() {
 
 	})
 
-	// Add test routes for pod creation
-	testRoutes := router.Group("/test")
+	// API v1 routes for session and pod management
+	apiRoutes := router.Group("/api/v1")
 	{
-		// New route for deploying and connecting to office pod with RDP credentials
-		testRoutes.POST("/deploy-office", func(c *gin.Context) {
+		// Deploy an office session and generate connection parameters
+		apiRoutes.POST("/sessions/office", func(c *gin.Context) {
 			api.DeployOffice(c, k8sClient, k8sNamespace, redisClient, tunnelStore, officeImage)
 		})
 
-		// New route for deploying and connecting to browser pod with RDP credentials
-		testRoutes.POST("/deploy-browser", func(c *gin.Context) {
+		// Deploy a browser session and generate connection parameters
+		apiRoutes.POST("/sessions/browser", func(c *gin.Context) {
 			api.DeployBrowser(c, k8sClient, k8sNamespace, redisClient, tunnelStore, browserImage)
 		})
 
-		// New endpoint to handle websocket connections using stored parameters
-		testRoutes.GET("/connect/:connectionID", func(c *gin.Context) {
+		// Get WebSocket connection info for a session
+		apiRoutes.GET("/sessions/:connectionID/connect", func(c *gin.Context) {
 			api.HandlerConnectionID(c, tunnelStore, redisClient)
 		})
 
-		// Share session route
-		testRoutes.GET("/share/:connectionID", func(c *gin.Context) {
+		// Enable sharing for a session
+		apiRoutes.GET("/sessions/:connectionID/share", func(c *gin.Context) {
 			api.HandlerShareSession(c, tunnelStore, redisClient)
 		})
 
-		// Test route to create a browser sandbox pod
-		testRoutes.POST("/browser-pod", func(c *gin.Context) {
+		// Create a raw browser sandbox pod
+		apiRoutes.POST("/pods/browser", func(c *gin.Context) {
 			api.HandlerBrowserPod(c, tunnelStore, k8sClient, k8sNamespace, browserImage)
 		})
 
-		// Test route to create an office sandbox pod
-		testRoutes.POST("/office-pod", func(c *gin.Context) {
+		// Create a raw office sandbox pod
+		apiRoutes.POST("/pods/office", func(c *gin.Context) {
 			api.HandlerOfficePod(c, tunnelStore, k8sClient, k8sNamespace, officeImage)
 		})
 	}

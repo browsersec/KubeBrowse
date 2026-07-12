@@ -52,14 +52,14 @@ type ErrorResponse struct {
 // @Summary New route for deploying and connecting to office pod with RDP credentials
 // @Schemes
 // @Description New route for deploying and connecting to office pod with RDP credentials
-// @Tags test
+// @Tags sessions
 // @Accept  json
 // @Produce  json
 // @Param request body DeploySessionRequest true "Session Deployment Request"
 // @Success 201 {object} DeploySessionResponse
 // @Failure 503 {object} ErrorResponse
 // @Failure 500 {object} ErrorResponse
-// @Router /test/deploy-office [post]
+// @Router /api/v1/sessions/office [post]
 func DeployOffice(c *gin.Context, k8sClient *kubernetes.Clientset, k8sNamespace string, redisClient *redis.Client, tunnelStore *guac.ActiveTunnelStore, officeImage string) {
 
 	if k8sClient == nil {
@@ -178,14 +178,14 @@ func DeployOffice(c *gin.Context, k8sClient *kubernetes.Clientset, k8sNamespace 
 // @Summary New route for deploying and connecting to browser pod with RDP credentials
 // @Schemes
 // @Description New route for deploying and connecting to browser pod with RDP credentials
-// @Tags test
+// @Tags sessions
 // @Accept  json
 // @Produce  json
 // @Param request body DeploySessionRequest true "Session Deployment Request"
 // @Success 201 {object} DeploySessionResponse
 // @Failure 503 {object} ErrorResponse
 // @Failure 500 {object} ErrorResponse
-// @Router /test/deploy-browser [post]
+// @Router /api/v1/sessions/browser [post]
 func DeployBrowser(c *gin.Context, k8sClient *kubernetes.Clientset, k8sNamespace string, redisClient *redis.Client, tunnelStore *guac.ActiveTunnelStore, browserImage string) {
 
 	if k8sClient == nil {
@@ -302,14 +302,14 @@ func DeployBrowser(c *gin.Context, k8sClient *kubernetes.Clientset, k8sNamespace
 // HandlerConnectionID godoc
 // @Summary Get WebSocket connection info for a session
 // @Description Returns the websocket URL and status for a given connection ID
-// @Tags test
+// @Tags sessions
 // @Produce json
 // @Param connectionID path string true "Connection ID"
 // @Success 200 {object} ConnectionResponse
 // @Failure 400 {object} ErrorResponse
 // @Failure 404 {object} ErrorResponse
 // @Failure 500 {object} ErrorResponse
-// @Router /test/connect/{connectionID} [get]
+// @Router /api/v1/sessions/{connectionID}/connect [get]
 func HandlerConnectionID(c *gin.Context, tunnelStore *guac.ActiveTunnelStore, redisClient *redis.Client) {
 
 	connectionID := c.Param("connectionID")
@@ -347,6 +347,17 @@ func HandlerConnectionID(c *gin.Context, tunnelStore *guac.ActiveTunnelStore, re
 	})
 }
 
+// HandlerShareSession godoc
+// @Summary Enable sharing for a session
+// @Description Enables sharing for the given connection ID and returns the shared websocket URL
+// @Tags sessions
+// @Produce json
+// @Param connectionID path string true "Connection ID"
+// @Success 200 {object} ConnectionResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Router /api/v1/sessions/{connectionID}/share [get]
 func HandlerShareSession(c *gin.Context, tunnelStore *guac.ActiveTunnelStore, redisClient *redis.Client) {
 	connectionID := c.Param("connectionID")
 	if connectionID == "" {
@@ -444,6 +455,16 @@ func HandlerShareSession(c *gin.Context, tunnelStore *guac.ActiveTunnelStore, re
 	})
 }
 
+// HandlerBrowserPod godoc
+// @Summary Create a raw browser sandbox pod
+// @Description Creates a browser sandbox pod directly without generating session connection parameters
+// @Tags pods
+// @Accept json
+// @Produce json
+// @Success 201 {object} map[string]interface{}
+// @Failure 503 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Router /api/v1/pods/browser [post]
 func HandlerBrowserPod(c *gin.Context, tunnelStore *guac.ActiveTunnelStore, k8sClient *kubernetes.Clientset, k8sNamespace, browserImage string) {
 	if k8sClient == nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{
@@ -478,6 +499,16 @@ func HandlerBrowserPod(c *gin.Context, tunnelStore *guac.ActiveTunnelStore, k8sC
 	})
 }
 
+// HandlerOfficePod godoc
+// @Summary Create a raw office sandbox pod
+// @Description Creates an office sandbox pod directly without generating session connection parameters
+// @Tags pods
+// @Accept json
+// @Produce json
+// @Success 201 {object} map[string]interface{}
+// @Failure 503 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Router /api/v1/pods/office [post]
 func HandlerOfficePod(c *gin.Context, tunnelStore *guac.ActiveTunnelStore, k8sClient *kubernetes.Clientset, k8sNamespace, officeImage string) {
 	if k8sClient == nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{

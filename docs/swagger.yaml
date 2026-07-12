@@ -1,4 +1,4 @@
-basePath: /test
+basePath: /
 definitions:
   api.ConnectionResponse:
     properties:
@@ -116,6 +116,180 @@ definitions:
 info:
   contact: {}
 paths:
+  /api/v1/pods/browser:
+    post:
+      consumes:
+      - application/json
+      description: Creates a browser sandbox pod directly without generating session
+        connection parameters
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      summary: Create a raw browser sandbox pod
+      tags:
+      - pods
+  /api/v1/pods/office:
+    post:
+      consumes:
+      - application/json
+      description: Creates an office sandbox pod directly without generating session
+        connection parameters
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      summary: Create a raw office sandbox pod
+      tags:
+      - pods
+  /api/v1/sessions/{connectionID}/connect:
+    get:
+      description: Returns the websocket URL and status for a given connection ID
+      parameters:
+      - description: Connection ID
+        in: path
+        name: connectionID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.ConnectionResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      summary: Get WebSocket connection info for a session
+      tags:
+      - sessions
+  /api/v1/sessions/{connectionID}/share:
+    get:
+      description: Enables sharing for the given connection ID and returns the shared
+        websocket URL
+      parameters:
+      - description: Connection ID
+        in: path
+        name: connectionID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.ConnectionResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      summary: Enable sharing for a session
+      tags:
+      - sessions
+  /api/v1/sessions/browser:
+    post:
+      consumes:
+      - application/json
+      description: New route for deploying and connecting to browser pod with RDP
+        credentials
+      parameters:
+      - description: Session Deployment Request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.DeploySessionRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/api.DeploySessionResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      summary: New route for deploying and connecting to browser pod with RDP credentials
+      tags:
+      - sessions
+  /api/v1/sessions/office:
+    post:
+      consumes:
+      - application/json
+      description: New route for deploying and connecting to office pod with RDP credentials
+      parameters:
+      - description: Session Deployment Request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.DeploySessionRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/api.DeploySessionResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      summary: New route for deploying and connecting to office pod with RDP credentials
+      tags:
+      - sessions
   /metrics/websocket:
     get:
       description: Retrieve WebSocket metrics for all active sessions (for benchmarking)
@@ -222,96 +396,4 @@ paths:
       summary: Get WebSocket metrics history for a session
       tags:
       - metrics
-  /test/connect/{connectionID}:
-    get:
-      description: Returns the websocket URL and status for a given connection ID
-      parameters:
-      - description: Connection ID
-        in: path
-        name: connectionID
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/api.ConnectionResponse'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/api.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/api.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/api.ErrorResponse'
-      summary: Get WebSocket connection info for a session
-      tags:
-      - test
-  /test/deploy-browser:
-    post:
-      consumes:
-      - application/json
-      description: New route for deploying and connecting to browser pod with RDP
-        credentials
-      parameters:
-      - description: Session Deployment Request
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/api.DeploySessionRequest'
-      produces:
-      - application/json
-      responses:
-        "201":
-          description: Created
-          schema:
-            $ref: '#/definitions/api.DeploySessionResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/api.ErrorResponse'
-        "503":
-          description: Service Unavailable
-          schema:
-            $ref: '#/definitions/api.ErrorResponse'
-      summary: New route for deploying and connecting to browser pod with RDP credentials
-      tags:
-      - test
-  /test/deploy-office:
-    post:
-      consumes:
-      - application/json
-      description: New route for deploying and connecting to office pod with RDP credentials
-      parameters:
-      - description: Session Deployment Request
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/api.DeploySessionRequest'
-      produces:
-      - application/json
-      responses:
-        "201":
-          description: Created
-          schema:
-            $ref: '#/definitions/api.DeploySessionResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/api.ErrorResponse'
-        "503":
-          description: Service Unavailable
-          schema:
-            $ref: '#/definitions/api.ErrorResponse'
-      summary: New route for deploying and connecting to office pod with RDP credentials
-      tags:
-      - test
 swagger: "2.0"
