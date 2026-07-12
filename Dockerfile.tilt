@@ -1,27 +1,8 @@
-FROM alpine:3.20
-
-# Install runtime dependencies only
-RUN apk --no-cache add ca-certificates openssl bash
-
+FROM gcr.io/distroless/static:debug-nonroot
 WORKDIR /app
-
-# Copy pre-compiled binary from local build
-COPY .tilt/guac /app/guac
-RUN chmod +x /app/guac
-
-# Copy templates
-COPY templates/ /app/templates/
-
-# Generate self-signed certificates
-RUN mkdir -p /app/certs && \
-    openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-      -keyout /app/certs/private.key \
-      -out /app/certs/certificate.crt \
-      -subj "/C=US/ST=California/L=San Francisco/O=My Company/CN=mydomain.com"
-
-ENV CERT_PATH=/app/certs/certificate.crt
-ENV CERT_KEY_PATH=/app/certs/private.key
+COPY --chmod=755 --chown=nonroot:nonroot .tilt/guac /app/guac
+COPY --chown=nonroot:nonroot templates/ /app/templates/
 ENV GUACD_ADDRESS=guacd:4822
-
 EXPOSE 4567
+USER nonroot:nonroot
 CMD ["/app/guac"]

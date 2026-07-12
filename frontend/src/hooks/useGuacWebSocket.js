@@ -4,6 +4,7 @@ import Guacamole from "guacamole-common-js";
 import states from "../lib/states";
 import sessionDuplicator from "../lib/websocketSessionDuplicator";
 import useWebSocketMetrics from "./useWebSocketMetrics";
+import { API_BASE } from "../config";
 
 // Session persistence keys
 const SESSION_STORAGE_KEY = "kubeBrowse_sessionConnection";
@@ -120,7 +121,7 @@ const useGuacWebSocket = (
         if (!isSharedSession) {
           try {
             console.log(`Cleaning up session ${sessionUUID} after failed reconnection attempts`);
-            await fetch(`/sessions/${sessionUUID}/stop`, {
+            await fetch(`${API_BASE}/sessions/${sessionUUID}/stop`, {
               method: "DELETE",
             });
             console.log(`Session ${sessionUUID} cleanup request sent`);
@@ -180,7 +181,7 @@ const useGuacWebSocket = (
                   console.log(
                     `Cleaning up session ${sessionUUID} after failed reconnection attempts`,
                   );
-                  fetch(`/sessions/${sessionUUID}/stop`, {
+                  fetch(`${API_BASE}/sessions/${sessionUUID}/stop`, {
                     method: "DELETE",
                   }).catch((err) => console.error("Failed to cleanup session on backend:", err));
                 } else {

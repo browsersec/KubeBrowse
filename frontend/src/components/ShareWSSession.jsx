@@ -1,35 +1,33 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import GuacClient from './GuacClient';
-import SessionReconnectStatus from './SessionReconnectStatus';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, AlertTriangle } from 'lucide-react';
-
-const API_BASE = '' // Use relative URLs to leverage Vite's proxy
+import { useState, useEffect, useCallback, useRef } from "react";
+import GuacClient from "./GuacClient";
+import SessionReconnectStatus from "./SessionReconnectStatus";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Loader2, AlertTriangle } from "lucide-react";
 
 // Session persistence keys
-const SESSION_STORAGE_KEY = 'kubeBrowse_sharedSession';
+const SESSION_STORAGE_KEY = "kubeBrowse_sharedSession";
 const SESSION_TIMEOUT = 24 * 60 * 60 * 1000; // 24 hours
 
 const ShareWSSession = () => {
   const [sessionState, setSessionState] = useState({
     connectionId: null,
-    status: 'idle',
+    status: "idle",
     error: null,
-    name: ''
+    name: "",
   });
-  const [inputUuid, setInputUuid] = useState('');
-  const [sessionName, setSessionName] = useState('');
+  const [inputUuid, setInputUuid] = useState("");
+  const [sessionName, setSessionName] = useState("");
   const hasRestored = useRef(false);
 
   const [reconnectStatus, setReconnectStatus] = useState({
     isReconnecting: false,
     attempts: 0,
-    connectionState: 'IDLE'
+    connectionState: "IDLE",
   });
 
   // Session persistence functions
@@ -37,7 +35,7 @@ const ShareWSSession = () => {
     const sessionInfo = {
       ...sessionData,
       timestamp: Date.now(),
-      expiresAt: Date.now() + SESSION_TIMEOUT
+      expiresAt: Date.now() + SESSION_TIMEOUT,
     };
     localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(sessionInfo));
   }, []);
@@ -48,7 +46,7 @@ const ShareWSSession = () => {
       if (!stored) return null;
 
       const sessionInfo = JSON.parse(stored);
-      
+
       if (Date.now() > sessionInfo.expiresAt) {
         localStorage.removeItem(SESSION_STORAGE_KEY);
         return null;
@@ -56,7 +54,7 @@ const ShareWSSession = () => {
 
       return sessionInfo;
     } catch (error) {
-      console.error('Error loading session from storage:', error);
+      console.error("Error loading session from storage:", error);
       localStorage.removeItem(SESSION_STORAGE_KEY);
       return null;
     }
@@ -72,18 +70,18 @@ const ShareWSSession = () => {
     hasRestored.current = true;
 
     const urlParams = new URLSearchParams(window.location.search);
-    const uuidFromUrl = urlParams.get('uuid');
+    const uuidFromUrl = urlParams.get("uuid");
 
     const restoreSession = (sessionData) => {
       if (sessionState.connectionId !== sessionData.connectionId) {
         const newUrl = new URL(window.location);
-        newUrl.searchParams.set('uuid', sessionData.connectionId);
-        window.history.replaceState({}, '', newUrl);
+        newUrl.searchParams.set("uuid", sessionData.connectionId);
+        window.history.replaceState({}, "", newUrl);
         setSessionState({
           connectionId: sessionData.connectionId,
           name: sessionData.name || `Shared Session: ${sessionData.connectionId.substring(0, 8)}`,
-          status: 'ready',
-          error: null
+          status: "ready",
+          error: null,
         });
       }
     };
@@ -91,7 +89,8 @@ const ShareWSSession = () => {
     if (uuidFromUrl) {
       const storedSession = loadSessionFromStorage();
       // Restore from URL, use stored name if available for the same session
-      const name = (storedSession && storedSession.connectionId === uuidFromUrl) ? storedSession.name : '';
+      const name =
+        storedSession && storedSession.connectionId === uuidFromUrl ? storedSession.name : "";
       restoreSession({ connectionId: uuidFromUrl, name });
     } else {
       const storedSession = loadSessionFromStorage();
@@ -104,27 +103,26 @@ const ShareWSSession = () => {
 
   // Save session to storage when it becomes ready
   useEffect(() => {
-    if (sessionState.status === 'ready' && sessionState.connectionId) {
+    if (sessionState.status === "ready" && sessionState.connectionId) {
       saveSessionToStorage(sessionState);
     }
   }, [sessionState, saveSessionToStorage]);
 
-
   const handleDisconnect = useCallback(() => {
     clearSessionFromStorage();
     const newUrl = new URL(window.location);
-    newUrl.searchParams.delete('uuid');
-    window.history.replaceState({}, '', newUrl);
+    newUrl.searchParams.delete("uuid");
+    window.history.replaceState({}, "", newUrl);
 
     console.log("Disconnected from shared session");
     setSessionState({
       connectionId: null,
-      status: 'idle',
+      status: "idle",
       error: null,
-      name: ''
+      name: "",
     });
-    setInputUuid('');
-    setSessionName('');
+    setInputUuid("");
+    setSessionName("");
   }, [clearSessionFromStorage]);
 
   const handleInputChange = (e) => {
@@ -138,36 +136,36 @@ const ShareWSSession = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      setSessionState(prev => ({ ...prev, status: 'creating', error: null }));
-      
+      setSessionState((prev) => ({ ...prev, status: "creating", error: null }));
+
       // Just take the UUID directly, no parsing
       const uuid = inputUuid.trim();
-      
+
       // Validate UUID format
       if (!uuid.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
-        throw new Error('Invalid UUID format. Please enter a valid connection ID.');
+        throw new Error("Invalid UUID format. Please enter a valid connection ID.");
       }
-      
+
       const newSessionName = sessionName || `Shared Session: ${uuid.substring(0, 8)}`;
       // Set the connection state with the UUID
       setSessionState({
         connectionId: uuid,
-        status: 'ready',
+        status: "ready",
         error: null,
-        name: newSessionName
+        name: newSessionName,
       });
 
       // Update URL
       const newUrl = new URL(window.location);
-      newUrl.searchParams.set('uuid', uuid);
-      window.history.replaceState({}, '', newUrl);
+      newUrl.searchParams.set("uuid", uuid);
+      window.history.replaceState({}, "", newUrl);
 
       console.log("Ready to connect with UUID:", uuid);
     } catch (error) {
-      setSessionState(prev => ({
+      setSessionState((prev) => ({
         ...prev,
-        status: 'error',
-        error: error.message
+        status: "error",
+        error: error.message,
       }));
     }
   };
@@ -175,8 +173,8 @@ const ShareWSSession = () => {
   const handleConnectionStateChange = useCallback((state, attempts) => {
     setReconnectStatus({
       connectionState: state,
-      isReconnecting: state === 'CONNECTING' && attempts > 0,
-      attempts: attempts || 0
+      isReconnecting: state === "CONNECTING" && attempts > 0,
+      attempts: attempts || 0,
     });
   }, []);
 
@@ -192,8 +190,8 @@ const ShareWSSession = () => {
           Enter the connection ID to join an existing session.
         </p>
       </div>
-      
-      {sessionState.status === 'idle' && (
+
+      {sessionState.status === "idle" && (
         <Card className="w-full max-w-md">
           <CardContent className="p-6">
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -211,7 +209,7 @@ const ShareWSSession = () => {
                   Enter the UUID of the shared session
                 </p>
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="sessionName">Session Name (optional)</Label>
                 <Input
@@ -222,7 +220,7 @@ const ShareWSSession = () => {
                   placeholder="My Shared Session"
                 />
               </div>
-              
+
               <Button type="submit" className="w-full">
                 Connect
               </Button>
@@ -230,27 +228,27 @@ const ShareWSSession = () => {
           </CardContent>
         </Card>
       )}
-      
-      {sessionState.status === 'creating' && (
+
+      {sessionState.status === "creating" && (
         <div className="flex items-center gap-2 text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" />
           Connecting to shared session...
         </div>
       )}
-      
-      {sessionState.status === 'error' && (
+
+      {sessionState.status === "error" && (
         <Alert variant="destructive" className="w-full max-w-md">
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
             <div className="space-y-2">
               <p>{sessionState.error}</p>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 size="sm"
                 onClick={() => {
-                  setSessionState({ connectionId: null, status: 'idle', error: null, name: '' });
-                  setInputUuid('');
-                  setSessionName('');
+                  setSessionState({ connectionId: null, status: "idle", error: null, name: "" });
+                  setInputUuid("");
+                  setSessionName("");
                 }}
               >
                 Try again
@@ -259,23 +257,15 @@ const ShareWSSession = () => {
           </AlertDescription>
         </Alert>
       )}
-      
-      {sessionState.status === 'ready' && sessionState.connectionId && (
+
+      {sessionState.status === "ready" && sessionState.connectionId && (
         <div className="w-full">
           <div className="flex justify-between items-center mb-4">
             <div className="flex items-center gap-2">
-              <Badge variant="default">
-                {sessionState.name || 'Shared Session'}
-              </Badge>
-              <p className="text-xs text-muted-foreground">
-                ID: {sessionState.connectionId}
-              </p>
+              <Badge variant="default">{sessionState.name || "Shared Session"}</Badge>
+              <p className="text-xs text-muted-foreground">ID: {sessionState.connectionId}</p>
             </div>
-            <Button
-              onClick={handleDisconnect}
-              variant="destructive"
-              size="sm"
-            >
+            <Button onClick={handleDisconnect} variant="destructive" size="sm">
               Disconnect
             </Button>
           </div>
@@ -296,7 +286,7 @@ const ShareWSSession = () => {
                   query={{
                     uuid: sessionState.connectionId,
                     width: Math.round(window.innerWidth * (window.devicePixelRatio || 1)),
-                    height: Math.round(window.innerHeight * (window.devicePixelRatio || 1))
+                    height: Math.round(window.innerHeight * (window.devicePixelRatio || 1)),
                   }}
                   connectionId={sessionState.connectionId}
                   onDisconnect={handleDisconnect}
