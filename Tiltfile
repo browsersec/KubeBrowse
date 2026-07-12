@@ -26,8 +26,7 @@ docker_build_with_restart(
         sync('./.tilt/guac', '/app/guac'),
         sync('./templates', '/app/templates'),
         run('chmod +x /app/guac')
-    ],
-    resource_deps=['go-build']
+    ]
 )
 
 # Clean up dangling images and build cache periodically
@@ -74,7 +73,8 @@ k8s_resource(
     'browser-sandbox-api',
     port_forwards=['4567:4567'],
     pod_readiness='wait',
-    labels=["api"]
+    labels=["api"],
+    resource_deps=['go-build']
 )
 
 # Infrastructure resources - simplified to avoid object reference issues
