@@ -1,0 +1,399 @@
+basePath: /
+definitions:
+  api.ConnectionResponse:
+    properties:
+      message:
+        type: string
+      status:
+        type: string
+      websocket_url:
+        type: string
+    type: object
+  api.DeploySessionRequest:
+    properties:
+      height:
+        type: string
+      share:
+        description: Added optional share field
+        type: boolean
+      width:
+        type: string
+    type: object
+  api.DeploySessionResponse:
+    properties:
+      connection_id:
+        type: string
+      fqdn:
+        type: string
+      message:
+        type: string
+      podName:
+        type: string
+      status:
+        type: string
+    type: object
+  api.ErrorResponse:
+    properties:
+      error:
+        type: string
+    type: object
+  api.WebSocketMetrics:
+    properties:
+      errors:
+        type: integer
+      rtt:
+        description: RTT statistics in milliseconds
+        properties:
+          avg:
+            type: number
+          max:
+            type: number
+          min:
+            type: number
+          p50:
+            type: number
+          p95:
+            type: number
+          p99:
+            type: number
+          samples:
+            type: integer
+        type: object
+      session_id:
+        type: string
+      timestamp:
+        type: string
+      timing:
+        description: Timing information
+        properties:
+          connection_duration_ms:
+            type: integer
+          connection_start_time:
+            type: integer
+          last_message_time:
+            type: integer
+        type: object
+      traffic:
+        description: Traffic statistics
+        properties:
+          bytes_received:
+            type: integer
+          bytes_sent:
+            type: integer
+          messages_received:
+            type: integer
+          messages_sent:
+            type: integer
+          total_bytes:
+            type: integer
+        type: object
+    type: object
+  api.WebSocketMetricsSummary:
+    properties:
+      avg_rtt_ms:
+        type: number
+      max_rtt_ms:
+        type: number
+      min_rtt_ms:
+        type: number
+      p95_rtt_ms:
+        type: number
+      timestamp:
+        type: string
+      total_bytes_received:
+        type: integer
+      total_bytes_sent:
+        type: integer
+      total_messages_received:
+        type: integer
+      total_messages_sent:
+        type: integer
+      total_rtt_samples:
+        type: integer
+      total_sessions:
+        type: integer
+    type: object
+info:
+  contact: {}
+paths:
+  /api/v1/pods/browser:
+    post:
+      consumes:
+      - application/json
+      description: Creates a browser sandbox pod directly without generating session
+        connection parameters
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      summary: Create a raw browser sandbox pod
+      tags:
+      - pods
+  /api/v1/pods/office:
+    post:
+      consumes:
+      - application/json
+      description: Creates an office sandbox pod directly without generating session
+        connection parameters
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      summary: Create a raw office sandbox pod
+      tags:
+      - pods
+  /api/v1/sessions/{connectionID}/connect:
+    get:
+      description: Returns the websocket URL and status for a given connection ID
+      parameters:
+      - description: Connection ID
+        in: path
+        name: connectionID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.ConnectionResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      summary: Get WebSocket connection info for a session
+      tags:
+      - sessions
+  /api/v1/sessions/{connectionID}/share:
+    get:
+      description: Enables sharing for the given connection ID and returns the shared
+        websocket URL
+      parameters:
+      - description: Connection ID
+        in: path
+        name: connectionID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.ConnectionResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      summary: Enable sharing for a session
+      tags:
+      - sessions
+  /api/v1/sessions/browser:
+    post:
+      consumes:
+      - application/json
+      description: New route for deploying and connecting to browser pod with RDP
+        credentials
+      parameters:
+      - description: Session Deployment Request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.DeploySessionRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/api.DeploySessionResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      summary: New route for deploying and connecting to browser pod with RDP credentials
+      tags:
+      - sessions
+  /api/v1/sessions/office:
+    post:
+      consumes:
+      - application/json
+      description: New route for deploying and connecting to office pod with RDP credentials
+      parameters:
+      - description: Session Deployment Request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.DeploySessionRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/api.DeploySessionResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      summary: New route for deploying and connecting to office pod with RDP credentials
+      tags:
+      - sessions
+  /metrics/websocket:
+    get:
+      description: Retrieve WebSocket metrics for all active sessions (for benchmarking)
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              $ref: '#/definitions/api.WebSocketMetrics'
+            type: object
+      summary: Get all WebSocket metrics
+      tags:
+      - metrics
+  /metrics/websocket/summary:
+    get:
+      description: Retrieve aggregated WebSocket metrics across all sessions
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.WebSocketMetricsSummary'
+      summary: Get WebSocket metrics summary
+      tags:
+      - metrics
+  /sessions/{connectionID}/metrics:
+    get:
+      description: Retrieve WebSocket RTT and traffic metrics for a session
+      parameters:
+      - description: Connection/Session ID
+        in: path
+        name: connectionID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.WebSocketMetrics'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      summary: Get WebSocket metrics for a session
+      tags:
+      - metrics
+    post:
+      consumes:
+      - application/json
+      description: Frontend clients report WebSocket RTT and traffic metrics
+      parameters:
+      - description: Connection/Session ID
+        in: path
+        name: connectionID
+        required: true
+        type: string
+      - description: WebSocket Metrics
+        in: body
+        name: metrics
+        required: true
+        schema:
+          $ref: '#/definitions/api.WebSocketMetrics'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      summary: Report WebSocket metrics for a session
+      tags:
+      - metrics
+  /sessions/{connectionID}/metrics/history:
+    get:
+      description: Retrieve historical WebSocket RTT and traffic metrics snapshots
+      parameters:
+      - description: Connection/Session ID
+        in: path
+        name: connectionID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/api.WebSocketMetrics'
+            type: array
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      summary: Get WebSocket metrics history for a session
+      tags:
+      - metrics
+swagger: "2.0"
