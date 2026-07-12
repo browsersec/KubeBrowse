@@ -60,12 +60,31 @@ func InitRedis() *redis.Client {
 		DB:       0,  // use default DB
 	})
 
-	// Ping the Redis server to check the connection
-	_, err := client.Ping(context.Background()).Result()
-	if err != nil {
-		logrus.Errorf("Could not connect to Redis: %v", err)
-		// Depending on your application's requirements, you might want to panic here
-		// panic(err)
+	// Ping the Redis server to check the connection, retrying with exponential
+	// backoff for up to 30 seconds before failing fatally.
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	backoff := 1 * time.Second
+	var err error
+	for {
+		_, err = client.Ping(ctx).Result()
+		if err == nil {
+			break
+		}
+
+		logrus.Warnf("Could not connect to Redis: %v, retrying in %v", err, backoff)
+
+		select {
+		case <-time.After(backoff):
+		case <-ctx.Done():
+			logrus.Fatalf("Could not connect to Redis after 30s: %v", err)
+		}
+
+		backoff *= 2
+		if backoff > 8*time.Second {
+			backoff = 8 * time.Second
+		}
 	}
 
 	logrus.Infof("Connected to Redis at %s", redisAddr)

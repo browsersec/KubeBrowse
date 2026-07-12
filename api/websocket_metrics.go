@@ -127,8 +127,8 @@ var GlobalMetricsStore = NewMetricsStore()
 // @Produce json
 // @Param connectionID path string true "Connection/Session ID"
 // @Param metrics body WebSocketMetrics true "WebSocket Metrics"
-// @Success 200 {object} gin.H{"message":string,"session_id":string}
-// @Failure 400 {object} gin.H{"error":string}
+// @Success 200 {object} ErrorResponse
+// @Failure 400 {object} ErrorResponse
 // @Router /sessions/{connectionID}/metrics [post]
 func HandlerReportWebSocketMetrics(c *gin.Context, redisClient *redis.Client) {
 	connectionID := c.Param("connectionID")
@@ -179,7 +179,7 @@ func HandlerReportWebSocketMetrics(c *gin.Context, redisClient *redis.Client) {
 // @Produce json
 // @Param connectionID path string true "Connection/Session ID"
 // @Success 200 {object} WebSocketMetrics
-// @Failure 404 {object} gin.H{"error":string}
+// @Failure 404 {object} ErrorResponse
 // @Router /sessions/{connectionID}/metrics [get]
 func HandlerGetWebSocketMetrics(c *gin.Context, redisClient *redis.Client) {
 	connectionID := c.Param("connectionID")
@@ -219,7 +219,7 @@ func HandlerGetWebSocketMetrics(c *gin.Context, redisClient *redis.Client) {
 // @Produce json
 // @Param connectionID path string true "Connection/Session ID"
 // @Success 200 {array} WebSocketMetrics
-// @Failure 404 {object} gin.H{"error":string}
+// @Failure 404 {object} ErrorResponse
 // @Router /sessions/{connectionID}/metrics/history [get]
 func HandlerGetWebSocketMetricsHistory(c *gin.Context) {
 	connectionID := c.Param("connectionID")

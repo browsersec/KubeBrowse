@@ -27,6 +27,27 @@ type DeploySessionRequest struct {
 	Share  bool   `json:"share,omitempty"` // Added optional share field
 }
 
+// DeploySessionResponse is returned when a browser/office session is deployed.
+type DeploySessionResponse struct {
+	PodName      string `json:"podName"`
+	FQDN         string `json:"fqdn"`
+	ConnectionID string `json:"connection_id"`
+	Status       string `json:"status"`
+	Message      string `json:"message"`
+}
+
+// ConnectionResponse is returned for the connect endpoint.
+type ConnectionResponse struct {
+	WebsocketURL string `json:"websocket_url"`
+	Status       string `json:"status"`
+	Message      string `json:"message"`
+}
+
+// ErrorResponse represents a generic JSON error response.
+type ErrorResponse struct {
+	Error string `json:"error"`
+}
+
 // DeployOffice godoc
 // @Summary New route for deploying and connecting to office pod with RDP credentials
 // @Schemes
@@ -35,9 +56,9 @@ type DeploySessionRequest struct {
 // @Accept  json
 // @Produce  json
 // @Param request body DeploySessionRequest true "Session Deployment Request"
-// @Success 201 {object} gin.H{"podName":string,"fqdn":string,"connection_id":string,"status":string,"message":string}
-// @Failure 503 {object} gin.H{"error":string}
-// @Failure 500 {object} gin.H{"error":string}
+// @Success 201 {object} DeploySessionResponse
+// @Failure 503 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
 // @Router /test/deploy-office [post]
 func DeployOffice(c *gin.Context, k8sClient *kubernetes.Clientset, k8sNamespace string, redisClient *redis.Client, tunnelStore *guac.ActiveTunnelStore, officeImage string) {
 
@@ -130,8 +151,18 @@ func DeployOffice(c *gin.Context, k8sClient *kubernetes.Clientset, k8sNamespace 
 		},
 		Share: reqBody.Share, // Include the share value
 	}
-	data, _ := json.Marshal(session)
-	redisClient.Set(context.Background(), "session:"+connectionID, data, 0)
+	data, err := json.Marshal(session)
+	if err != nil {
+		logrus.Errorf("Failed to marshal session data: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to marshal session data"})
+		return
+	}
+	err = redisClient.Set(context.Background(), "session:"+connectionID, data, 0).Err()
+	if err != nil {
+		logrus.Errorf("Failed to store session in Redis: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to store session in Redis"})
+		return
+	}
 
 	// Return only the connection ID to the client
 	c.JSON(http.StatusCreated, gin.H{
@@ -151,9 +182,9 @@ func DeployOffice(c *gin.Context, k8sClient *kubernetes.Clientset, k8sNamespace 
 // @Accept  json
 // @Produce  json
 // @Param request body DeploySessionRequest true "Session Deployment Request"
-// @Success 201 {object} gin.H{"podName":string,"fqdn":string,"connection_id":string,"status":string,"message":string}
-// @Failure 503 {object} gin.H{"error":string}
-// @Failure 500 {object} gin.H{"error":string}
+// @Success 201 {object} DeploySessionResponse
+// @Failure 503 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
 // @Router /test/deploy-browser [post]
 func DeployBrowser(c *gin.Context, k8sClient *kubernetes.Clientset, k8sNamespace string, redisClient *redis.Client, tunnelStore *guac.ActiveTunnelStore, browserImage string) {
 
@@ -245,8 +276,18 @@ func DeployBrowser(c *gin.Context, k8sClient *kubernetes.Clientset, k8sNamespace
 		},
 		Share: reqBody.Share, // Include the share value
 	}
-	data, _ := json.Marshal(session)
-	redisClient.Set(context.Background(), "session:"+connectionID, data, 0)
+	data, err := json.Marshal(session)
+	if err != nil {
+		logrus.Errorf("Failed to marshal session data: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to marshal session data"})
+		return
+	}
+	err = redisClient.Set(context.Background(), "session:"+connectionID, data, 0).Err()
+	if err != nil {
+		logrus.Errorf("Failed to store session in Redis: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to store session in Redis"})
+		return
+	}
 
 	// Return only the connection ID to the client
 	c.JSON(http.StatusCreated, gin.H{
@@ -258,6 +299,17 @@ func DeployBrowser(c *gin.Context, k8sClient *kubernetes.Clientset, k8sNamespace
 	})
 }
 
+// HandlerConnectionID godoc
+// @Summary Get WebSocket connection info for a session
+// @Description Returns the websocket URL and status for a given connection ID
+// @Tags test
+// @Produce json
+// @Param connectionID path string true "Connection ID"
+// @Success 200 {object} ConnectionResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Router /test/connect/{connectionID} [get]
 func HandlerConnectionID(c *gin.Context, tunnelStore *guac.ActiveTunnelStore, redisClient *redis.Client) {
 
 	connectionID := c.Param("connectionID")
@@ -269,7 +321,11 @@ func HandlerConnectionID(c *gin.Context, tunnelStore *guac.ActiveTunnelStore, re
 
 	// Check if the connectionID is valid in redis
 	_, err := redisClient.Get(context.Background(), "session:"+connectionID).Result()
-	if err != nil {
+	if err == redis.Nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Session not found"})
+		return
+	} else if err != nil {
+		logrus.Errorf("Failed to get session data for %s: %v", connectionID, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get session data"})
 		return
 	}

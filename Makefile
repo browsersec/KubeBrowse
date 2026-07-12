@@ -24,6 +24,10 @@ endif
 deps:
 	go mod tidy
 
+# Generate Swagger/OpenAPI docs
+swag:
+	swag init -g main.go -d ./cmd/guac,./api
+
 # Install git hooks using lefthook
 hooks:
 	@echo "Installing git hooks using lefthook..."
