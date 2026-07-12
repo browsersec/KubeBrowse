@@ -96,13 +96,16 @@ KIND_CLUSTER ?= kubebrowse-cluster
 ARCH := $(shell uname -m)
 ifeq ($(ARCH),x86_64)
   PLATFORM := linux/amd64
+  TAG_SUFFIX := amd64
 else ifeq ($(ARCH),arm64)
   PLATFORM := linux/arm64
+  TAG_SUFFIX := arm64
 else
   PLATFORM := linux/$(ARCH)
+  TAG_SUFFIX := $(ARCH)
 endif
-CHROMIUM_IMAGE := ghcr.io/browsersec/rdp-chromium:latest
-OFFICE_IMAGE := ghcr.io/browsersec/rdp-onlyoffice-lxde:latest
+CHROMIUM_IMAGE := ghcr.io/browsersec/rdp-chromium:latest-$(TAG_SUFFIX)
+OFFICE_IMAGE := ghcr.io/browsersec/rdp-onlyoffice-lxde:latest-$(TAG_SUFFIX)
 
 # Load chromium image into KIND
 load-chromium:
