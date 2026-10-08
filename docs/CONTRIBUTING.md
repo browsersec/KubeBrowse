@@ -6,7 +6,7 @@ order: 800
 
 # Contributing to KubeBrowse
 
-Thank you for your interest in contributing to GUAC! This document provides guidelines and instructions for contributing to this project.
+Thank you for your interest in contributing to KubeBrowse! This document provides guidelines and instructions for contributing to this project.
 
 ## Table of Contents
 
@@ -251,5 +251,4 @@ If Lefthook is not found, you'll be prompted to install it. Lefthook hooks are a
 5. Tag the release with the version number
 6. Update documentation with release notes
 
-Thank you for contributing to GUAC!
-*
+Thank you for contributing to KubeBrowse!
