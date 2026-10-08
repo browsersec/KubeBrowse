@@ -29,7 +29,7 @@ This policy applies to project repositories, issues, pull requests, discussions,
 
 Sai Sanjay ([@sanjay7178](https://github.com/sanjay7178)), the lead maintainer, is responsible for receiving and reviewing reports.
 
-**Private reporting contact: pending maintainer confirmation.**
+Report concerns privately to **[sanjay@nullvijayawada.org](mailto:sanjay@nullvijayawada.org)**.
 
 Reports should describe what happened, when and where it happened, and any relevant links or evidence. Include how you would like to be contacted and any immediate concerns. Share only information needed to review the incident. Do not post sensitive reports or personal information in public issues.
 
