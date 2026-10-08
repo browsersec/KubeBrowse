@@ -15,4 +15,4 @@ Secure browser-in-browser isolation platform powered by Kubernetes. KubeBrowse p
 
 #### Community
 
-Please follow our [Code of Conduct](CODE_OF_CONDUCT.md) when participating in KubeBrowse. See the [contribution guide](docs/CONTRIBUTING.md) to get started.
+Please follow our [Code of Conduct](CODE_OF_CONDUCT.md) when participating in KubeBrowse. See the [contribution guide](CONTRIBUTING.md) to get started. Report vulnerabilities using our [security policy](SECURITY.md).
