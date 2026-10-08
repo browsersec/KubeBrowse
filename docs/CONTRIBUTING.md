@@ -6,7 +6,7 @@ order: 800
 
 # Contributing to KubeBrowse
 
-Thank you for your interest in contributing to GUAC! This document provides guidelines and instructions for contributing to this project.
+Thank you for your interest in contributing to KubeBrowse! This document provides guidelines and instructions for contributing to this project.
 
 ## Table of Contents
 
@@ -32,7 +32,7 @@ Thank you for your interest in contributing to GUAC! This document provides guid
 
 ## Code of Conduct
 
-We are committed to fostering a welcoming community. Please read and adhere to our [Code of Conduct](CODE_OF_CONDUCT.md) in all interactions.
+We are committed to fostering a welcoming community. Please read and adhere to our [Code of Conduct](../CODE_OF_CONDUCT.md) in all interactions.
 
 ## Getting Started
 
@@ -251,5 +251,5 @@ If Lefthook is not found, you'll be prompted to install it. Lefthook hooks are a
 5. Tag the release with the version number
 6. Update documentation with release notes
 
-Thank you for contributing to GUAC!
+Thank you for contributing to KubeBrowse!
 *
