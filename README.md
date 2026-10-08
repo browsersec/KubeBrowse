@@ -12,3 +12,7 @@ Secure browser-in-browser isolation platform powered by Kubernetes. KubeBrowse p
 - Redis for caching session metadata and PostgreSQL for persistent user and session records
 - Chrome Extension support to launch isolated browser or office-file sessions and import attachments directly from Gmail, WhatsApp, or Telegram with automatic threat analysis
 - Distributed architecture with multi-region support
+
+#### Community
+
+Please follow our [Code of Conduct](CODE_OF_CONDUCT.md) when participating in KubeBrowse. See the [contribution guide](docs/CONTRIBUTING.md) to get started.

@@ -32,7 +32,7 @@ Thank you for your interest in contributing to GUAC! This document provides guid
 
 ## Code of Conduct
 
-We are committed to fostering a welcoming community. Please read and adhere to our [Code of Conduct](CODE_OF_CONDUCT.md) in all interactions.
+We are committed to a welcoming community. Please read and follow our [Code of Conduct](../CODE_OF_CONDUCT.md) in all project interactions. It explains expected behavior, reporting concerns, and how reports are reviewed.
 
 ## Getting Started
 
