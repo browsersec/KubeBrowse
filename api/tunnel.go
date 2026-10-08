@@ -157,8 +157,6 @@ func DemoDoConnect(request *http.Request, tunnelStore *guac2.ActiveTunnelStore, 
 	if query.Get("height") != "" {
 		config.OptimalScreenHeight, err = strconv.Atoi(query.Get("height"))
 		if err != nil || config.OptimalScreenHeight == 0 {
-
-			// InitRedis initializes the Redis client
 			logrus.Errorf("Invalid height value '%s': %v", query.Get("height"), err)
 			config.OptimalScreenHeight = 600
 		}
@@ -192,16 +190,13 @@ func DemoDoConnect(request *http.Request, tunnelStore *guac2.ActiveTunnelStore, 
 	}
 
 	sanitisedCfg := config
-	// deep-copy Parameters to avoid mutating the original
-	paramsCopy := make(map[string]string, len(config.Parameters))
+	sanitisedCfg.Parameters = make(map[string]string, len(config.Parameters))
 	for k, v := range config.Parameters {
-		paramsCopy[k] = v
+		sanitisedCfg.Parameters[k] = v
 	}
-	sanitisedCfg.Parameters = paramsCopy
+
 	if session.Share {
-		if _, ok := sanitisedCfg.Parameters["password"]; ok {
-			sanitisedCfg.Parameters["password"] = "********"
-		}
+		sanitisedCfg.Parameters["password"] = "********"
 	} else {
 		sanitisedCfg.ConnectionID = ""
 	}

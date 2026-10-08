@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -11,12 +10,11 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+
+	// "strings"
 	"time"
 
-	sqlc "github.com/browsersec/KubeBrowse/db/sqlc"
-	"github.com/browsersec/KubeBrowse/internal/auth"
 	"github.com/browsersec/KubeBrowse/internal/cleanup"
-	"github.com/browsersec/KubeBrowse/internal/email"
 	guac2 "github.com/browsersec/KubeBrowse/internal/guac"
 	"github.com/browsersec/KubeBrowse/internal/k8s"
 	"github.com/browsersec/KubeBrowse/internal/logging"
@@ -30,7 +28,6 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis/v8"
-	_ "github.com/lib/pq"
 	"github.com/sirupsen/logrus"
 	swaggerfiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
@@ -39,7 +36,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-// @BasePath /test
+// @BasePath /
 
 var (
 	certPath     string
@@ -53,9 +50,6 @@ var (
 
 var tunnelStore *guac2.ActiveTunnelStore
 var redisClient *redis.Client
-var dbConn *sql.DB
-var queries *sqlc.Queries
-var emailService *email.Service
 
 type MinioConfig struct {
 	bucketName string
@@ -88,63 +82,7 @@ func main() {
 
 	redisClient = redis2.InitRedis()
 
-	// Initialize database connection
-	dbURL := os.Getenv("DATABASE_URL")
-	if dbURL == "" {
-		dbURL = "postgres://postgres:password@localhost:5432/kubebrowse?sslmode=disable"
-		logrus.Warn("DATABASE_URL not set, using default connection string")
-	}
-
 	var err error
-	dbConn, err = sql.Open("postgres", dbURL)
-	if err != nil {
-		logrus.Errorf("Failed to connect to database: %v", err)
-		logrus.Warn("Continuing without database - authentication will not work")
-	} else {
-		// Test connection
-		if err = dbConn.Ping(); err != nil {
-			logrus.Errorf("Failed to ping database: %v", err)
-			logrus.Warn("Database connection failed - authentication will not work")
-			dbConn = nil
-		} else {
-			logrus.Info("Successfully connected to database")
-			queries = sqlc.New(dbConn)
-		}
-	}
-
-	// Initialize email service
-	emailService = email.NewService()
-
-	// Test email configuration at startup
-	if emailService.IsConfigured() {
-		logrus.Info("Email service configured successfully")
-		logrus.Infof("SMTP Host: %s", os.Getenv("SMTP_HOST"))
-		logrus.Infof("SMTP Port: %s", os.Getenv("SMTP_PORT"))
-		logrus.Infof("SMTP Username: %s", os.Getenv("SMTP_USERNAME"))
-		logrus.Infof("From Email: %s", os.Getenv("FROM_EMAIL"))
-		logrus.Infof("Base URL: %s", os.Getenv("BASE_URL"))
-
-		// Test SMTP connection (optional - uncomment for testing)
-		// testEmailConnection()
-	} else {
-		logrus.Warn("Email service not configured - email verification will not work")
-		logrus.Warn("Missing SMTP configuration. Please set the following environment variables:")
-		if os.Getenv("SMTP_HOST") == "" {
-			logrus.Warn("  - SMTP_HOST")
-		}
-		if os.Getenv("SMTP_USERNAME") == "" {
-			logrus.Warn("  - SMTP_USERNAME")
-		}
-		if os.Getenv("SMTP_PASSWORD") == "" {
-			logrus.Warn("  - SMTP_PASSWORD")
-		}
-		if os.Getenv("FROM_EMAIL") == "" {
-			logrus.Warn("  - FROM_EMAIL")
-		}
-	}
-
-	// Initialize Goth OAuth providers
-	auth.InitializeGoth()
 
 	minioConfig := &MinioConfig{
 		bucketName: os.Getenv("MINIO_BUCKET"),
@@ -240,6 +178,19 @@ func main() {
 		k8sNamespace = os.Getenv("KUBERNETES_NAMESPACE")
 	}
 
+	// Determine sandbox images. Defaults are selected by runtime architecture
+	// (latest-amd64 or latest-arm64) to match the images loaded by make.
+	browserImage := os.Getenv("BROWSER_IMAGE")
+	if browserImage == "" {
+		browserImage = k8s.DefaultBrowserImage()
+	}
+	officeImage := os.Getenv("OFFICE_IMAGE")
+	if officeImage == "" {
+		officeImage = k8s.DefaultOfficeImage()
+	}
+	logrus.Infof("Using browser image: %s", browserImage)
+	logrus.Infof("Using office image: %s", officeImage)
+
 	tunnelStore = guac2.NewActiveTunnelStore()
 
 	// Initialize Kubernetes client with fallback for local development
@@ -297,16 +248,13 @@ func main() {
 	docs.SwaggerInfo.Version = "1.0"
 	docs.SwaggerInfo.Host = "localhost:4567"
 	docs.SwaggerInfo.Schemes = []string{"http", "https"}
-	cfg := cors.DefaultConfig()
-	cfg.AllowCredentials = true
-	if origin := os.Getenv("FRONTEND_URL"); origin != "" {
-		cfg.AllowOrigins = []string{origin}
-	} else {
-		cfg.AllowOrigins = []string{"http://localhost:5173"}
-	}
-	cfg.AllowMethods = []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"}
-	cfg.AllowHeaders = []string{"Origin", "Content-Length", "Content-Type", "Authorization"}
-	router.Use(cors.New(cfg))
+	coors := cors.DefaultConfig()
+	// coors.AllowOrigins = strings.Split(os.Getenv("FRONTEND_URL"), ",")
+	coors.AllowAllOrigins = true
+	coors.AllowMethods = []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"}
+	coors.AllowHeaders = []string{"Origin", "Content-Length", "Content-Type", "Authorization"}
+	coors.AllowCredentials = true
+	router.Use(cors.New(coors))
 	router.Use(gin.Recovery())
 	router.Use(gin.Logger())
 
@@ -391,11 +339,13 @@ func main() {
 
 		// Schedule pod termination after grace period if no reconnection
 		go func() {
-			// Create a new context for the goroutine
-			bgCtx := context.Background()
-
 			// Wait for reconnection window (120 seconds)
 			time.Sleep(120 * time.Second)
+
+			// Cleanup must outlive the disconnected request, but Redis operations
+			// still need a deadline so they cannot hold this goroutine indefinitely.
+			bgCtx, cancel := context.WithTimeout(context.WithoutCancel(req.Context()), 30*time.Second)
+			defer cancel()
 
 			// Check if reconnection happened by verifying if reconnect key still exists
 			exists, err := redisClient.Exists(bgCtx, reconnectKey).Result()
@@ -451,37 +401,37 @@ func main() {
 
 	})
 
-	// Add test routes for pod creation
-	testRoutes := router.Group("/test")
+	// API v1 routes for session and pod management
+	apiRoutes := router.Group("/api/v1")
 	{
-		// New route for deploying and connecting to office pod with RDP credentials
-		testRoutes.POST("/deploy-office", func(c *gin.Context) {
-			api.DeployOffice(c, k8sClient, k8sNamespace, redisClient, tunnelStore)
+		// Deploy an office session and generate connection parameters
+		apiRoutes.POST("/sessions/office", func(c *gin.Context) {
+			api.DeployOffice(c, k8sClient, k8sNamespace, redisClient, tunnelStore, officeImage)
 		})
 
-		// New route for deploying and connecting to browser pod with RDP credentials
-		testRoutes.POST("/deploy-browser", func(c *gin.Context) {
-			api.DeployBrowser(c, k8sClient, k8sNamespace, redisClient, tunnelStore)
+		// Deploy a browser session and generate connection parameters
+		apiRoutes.POST("/sessions/browser", func(c *gin.Context) {
+			api.DeployBrowser(c, k8sClient, k8sNamespace, redisClient, tunnelStore, browserImage)
 		})
 
-		// New endpoint to handle websocket connections using stored parameters
-		testRoutes.GET("/connect/:connectionID", func(c *gin.Context) {
+		// Get WebSocket connection info for a session
+		apiRoutes.GET("/sessions/:connectionID/connect", func(c *gin.Context) {
 			api.HandlerConnectionID(c, tunnelStore, redisClient)
 		})
 
-		// Share session route
-		testRoutes.GET("/share/:connectionID", func(c *gin.Context) {
+		// Enable sharing for a session
+		apiRoutes.GET("/sessions/:connectionID/share", func(c *gin.Context) {
 			api.HandlerShareSession(c, tunnelStore, redisClient)
 		})
 
-		// Test route to create a browser sandbox pod
-		testRoutes.POST("/browser-pod", func(c *gin.Context) {
-			api.HandlerBrowserPod(c, tunnelStore, k8sClient, k8sNamespace)
+		// Create a raw browser sandbox pod
+		apiRoutes.POST("/pods/browser", func(c *gin.Context) {
+			api.HandlerBrowserPod(c, tunnelStore, k8sClient, k8sNamespace, browserImage)
 		})
 
-		// Test route to create an office sandbox pod
-		testRoutes.POST("/office-pod", func(c *gin.Context) {
-			api.HandlerOfficePod(c, tunnelStore, k8sClient, k8sNamespace)
+		// Create a raw office sandbox pod
+		apiRoutes.POST("/pods/office", func(c *gin.Context) {
+			api.HandlerOfficePod(c, tunnelStore, k8sClient, k8sNamespace, officeImage)
 		})
 	}
 
@@ -503,6 +453,17 @@ func main() {
 			api.HandlerGetSessionTimeLeft(c, redisClient)
 		})
 
+		// WebSocket metrics endpoints (for RTT tracking and benchmarking)
+		sessionRoutes.POST("/:connectionID/metrics", func(c *gin.Context) {
+			api.HandlerReportWebSocketMetrics(c, redisClient)
+		})
+		sessionRoutes.GET("/:connectionID/metrics", func(c *gin.Context) {
+			api.HandlerGetWebSocketMetrics(c, redisClient)
+		})
+		sessionRoutes.GET("/:connectionID/metrics/history", func(c *gin.Context) {
+			api.HandlerGetWebSocketMetricsHistory(c)
+		})
+
 		// Tunnel a Pod Rest API to Upload a file to a pod
 		sessionRoutes.POST("/:connectionID/upload", func(c *gin.Context) {
 			// Check if minioClient is nil before passing it to the handler
@@ -514,69 +475,15 @@ func main() {
 		})
 	}
 
-	// Initialize authentication service and handlers
-	var authService *auth.Service
-	var authHandler *auth.Handler
-	if dbConn != nil && queries != nil {
-		authService = auth.NewService(queries, dbConn)
-		authHandler = auth.NewHandlerWithRedis(authService, redisClient)
-
-		// Start background cleanup of expired database sessions
-		go func() {
-			ticker := time.NewTicker(1 * time.Hour) // Clean up every hour
-			defer ticker.Stop()
-
-			for range ticker.C {
-				if err := authService.CleanupExpiredSessions(); err != nil {
-					logrus.Warnf("Failed to cleanup expired sessions: %v", err)
-				} else {
-					logrus.Debug("Successfully cleaned up expired sessions")
-				}
-			}
-		}()
-
-		// Add authentication routes
-		authRoutes := router.Group("/auth")
-		{
-			// Email authentication
-			authRoutes.POST("/register", authHandler.RegisterWithEmail)
-			authRoutes.POST("/login", authHandler.LoginWithEmail)
-			authRoutes.POST("/logout", authHandler.Logout)
-
-			// Email verification
-			authRoutes.GET("/verify-email", authHandler.VerifyEmail)
-			authRoutes.POST("/verify-email", authHandler.VerifyEmail)
-			authRoutes.POST("/resend-verification", authHandler.ResendVerificationEmail)
-
-			// OAuth authentication
-			authRoutes.GET("/oauth/:provider", authHandler.BeginOAuth)
-			authRoutes.GET("/oauth/:provider/callback", authHandler.CallbackOAuth)
-
-			// OAuth success page - redirect to frontend
-			authRoutes.GET("/success", func(c *gin.Context) {
-				// Get frontend URL from environment variable
-				frontendURL := os.Getenv("FRONTEND_URL")
-				if frontendURL == "" {
-					frontendURL = "http://localhost:5173"
-				}
-
-				// Redirect to frontend home page
-				c.Redirect(http.StatusTemporaryRedirect, frontendURL)
-			})
-
-			// User info
-			authRoutes.GET("/me", auth.AuthMiddleware(authService), authHandler.GetCurrentUser)
-
-			// Profile and settings management
-			authRoutes.GET("/profile", auth.AuthMiddleware(authService), authHandler.GetUserProfile)
-			authRoutes.PUT("/profile", auth.AuthMiddleware(authService), authHandler.UpdateProfile)
-			authRoutes.PUT("/password", auth.AuthMiddleware(authService), authHandler.UpdatePassword)
-		}
-
-		// Apply optional auth middleware to all routes for user context
-		router.Use(auth.OptionalAuthMiddleware(authService))
-	} else {
-		logrus.Warn("Authentication routes disabled - database connection required")
+	// Global metrics routes (for benchmarking tools)
+	metricsRoutes := router.Group("/metrics")
+	{
+		metricsRoutes.GET("/websocket", func(c *gin.Context) {
+			api.HandlerGetAllWebSocketMetrics(c)
+		})
+		metricsRoutes.GET("/websocket/summary", func(c *gin.Context) {
+			api.HandlerGetWebSocketMetricsSummary(c)
+		})
 	}
 
 	// Add Swagger documentation route
@@ -584,14 +491,20 @@ func main() {
 		swaggerfiles.Handler))
 
 	// Start server with appropriate TLS configuration
+	// Start server with appropriate TLS configuration
 	addr := "0.0.0.0:4567"
-	if certPath != "" {
+	useHttps := os.Getenv("USE_HTTPS")
+
+	if useHttps == "true" && certPath != "" {
 		logrus.Println("Serving on https://", addr)
 		err := router.RunTLS(addr, certPath, certKeyPath)
 		if err != nil {
 			logrus.Fatal(err)
 		}
 	} else {
+		if useHttps == "true" && certPath == "" {
+			logrus.Warn("USE_HTTPS is true but CERT_PATH is not set, falling back to HTTP")
+		}
 		logrus.Println("Serving on http://", addr)
 		err := router.Run(addr)
 		if err != nil {

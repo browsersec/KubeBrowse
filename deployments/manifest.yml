@@ -255,7 +255,7 @@ spec:
       serviceAccountName: browser-sandbox-sa
       containers:
         - name: api
-          image:  ghcr.io/browsersec/kubebrowse:sha-09dfa1f
+          image: ghcr.io/browsersec/kubebrowse:sha-6fd68b6
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 4567
@@ -328,7 +328,7 @@ spec:
             - name: SESSION_SECRET
               value: "McX0xoYlJYpO0EGdUZC6aJxVh2rKYrXZM7SPMpVREeXMXoMBI20v90PICD-LfEn7jr07c5vH2CWcKzjl8hoNvQ"
             - name: FRONTEND_URL
-              value: "http://localhost:5173"
+              value: "http://localhost:8080,http://localhost:3000,http://localhost:5173"
             - name: ENVIRONMENT
               value: "development"
             - name: SMTP_HOST
@@ -341,6 +341,8 @@ spec:
               value: "ulagdeliigobhdgr"
             - name: FROM_EMAIL
               value: "sanjay.obsidian@gmail.com"
+            - name: USE_HTTPS
+              value: "true"
             # - name: CERT_PATH
             #   value: ""
             # - name: CERT_KEY_PATH
@@ -395,7 +397,6 @@ roleRef:
   name: pod-manager
   apiGroup: rbac.authorization.k8s.io
 ---
-
 # ---
 # Cron Job to cleanup idle sessions
 # apiVersion: batch/v1
@@ -454,62 +455,62 @@ type: Opaque
 data:
   access-key: bWluaW9hY2Nlc3NrZXk= # base64 encoded "minioaccesskey"
   secret-key: bWluaW9zZWNyZXRrZXk= # base64 encoded "miniosecretkey"
----
-# Frontend Deployment
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: browser-sandbox-frontend
-  namespace: browser-sandbox
-  annotations:
-    "tilt.dev/resource": "ignore"
-spec:
-  replicas: 2
-  selector:
-    matchLabels:
-      app: "browser-sandbox-frontend"
-  template:
-    metadata:
-      labels:
-        app: "browser-sandbox-frontend"
-    spec:
-      containers:
-        - name: frontend
-          image: ghcr.io/browsersec/kubebrowse-frontend:chore-improve-back
-          imagePullPolicy: IfNotPresent
-          ports:
-            - containerPort: 80
-          resources:
-            requests:
-              memory: "128Mi"
-              cpu: "100m"
-            limits:
-              memory: "256Mi"
-              cpu: "200m"
-          env:
-            - name: VITE_GUAC_CLIENT_URL
-              value: "https://browser-sandbox-api.browser-sandbox.svc.cluster.local:4567"
-            - name: GUAC_CLIENT_URL
-              value: "https://browser-sandbox-api.browser-sandbox.svc.cluster.local:4567"
-            - name: CADDY_GUAC_CLIENT_URL
-              value: "https://browser-sandbox-api.browser-sandbox.svc.cluster.local:4567"
----
-# Frontend Service
-apiVersion: v1
-kind: Service
-metadata:
-  name: browser-sandbox-frontend
-  namespace: browser-sandbox
-  annotations:
-    "tilt.dev/resource": "ignore"
-spec:
-  type: LoadBalancer
-  ports:
-    - port: 80
-      targetPort: 80
-     # nodePort: 30007
-  selector:
-    app: "browser-sandbox-frontend"
+# ---
+# # Frontend Deployment
+# apiVersion: apps/v1
+# kind: Deployment
+# metadata:
+#   name: browser-sandbox-frontend
+#   namespace: browser-sandbox
+#   annotations:
+#     "tilt.dev/resource": "ignore"
+# spec:
+#   replicas: 2
+#   selector:
+#     matchLabels:
+#       app: "browser-sandbox-frontend"
+#   template:
+#     metadata:
+#       labels:
+#         app: "browser-sandbox-frontend"
+#     spec:
+#       containers:
+#         - name: frontend
+#           image: ghcr.io/browsersec/kubebrowse-frontend:sha-c3aa644289d7981a88d104131ac034556185ac22
+#           imagePullPolicy: IfNotPresent
+#           ports:
+#             - containerPort: 80
+#           resources:
+#             requests:
+#               memory: "128Mi"
+#               cpu: "100m"
+#             limits:
+#               memory: "256Mi"
+#               cpu: "200m"
+#           env:
+#             - name: VITE_GUAC_CLIENT_URL
+#               value: "http://browser-sandbox-api.browser-sandbox.svc.cluster.local:4567"
+#             - name: GUAC_CLIENT_URL
+#               value: "http://browser-sandbox-api.browser-sandbox.svc.cluster.local:4567"
+#             - name: CADDY_GUAC_CLIENT_URL
+#               value: "http://browser-sandbox-api.browser-sandbox.svc.cluster.local:4567"
+# ---
+# # Frontend Service
+# apiVersion: v1
+# kind: Service
+# metadata:
+#   name: browser-sandbox-frontend
+#   namespace: browser-sandbox
+#   annotations:
+#     "tilt.dev/resource": "ignore"
+# spec:
+#   type: LoadBalancer
+#   ports:
+#     - port: 80
+#       targetPort: 80
+#       # nodePort: 30007
+#   selector:
+#     app: "browser-sandbox-frontend"
 ---
 # Headless Service for individual sandbox pod discovery (browser and office)
 apiVersion: v1

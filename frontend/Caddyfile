@@ -17,70 +17,65 @@
     # Authentication endpoints - proxy to backend API
     handle /auth/* {
         reverse_proxy {$CADDY_GUAC_CLIENT_URL} {
-            transport http {
-                tls
-            }
             header_up Host {http.reverse_proxy.upstream.hostport}
             header_up Connection {header.Connection}
             header_up Upgrade {header.Upgrade}
-            
+
             # Cookie handling for session management
+            header_down Set-Cookie "Domain=localhost"
+            header_down Set-Cookie "Path=/"
         }
     }
 
     # Session management endpoints
     handle /sessions/* {
         reverse_proxy {$CADDY_GUAC_CLIENT_URL} {
-            transport http {
-                tls
-            }
             header_up Host {http.reverse_proxy.upstream.hostport}
             header_up Connection {header.Connection}
             header_up Upgrade {header.Upgrade}
-            
+
             # Cookie handling for session management
+            header_down Set-Cookie "Domain=localhost"
+            header_down Set-Cookie "Path=/"
         }
     }
 
-    # Test endpoints
-    handle /test/* {
+    # API v1 endpoints
+    handle /api/v1/* {
         reverse_proxy {$CADDY_GUAC_CLIENT_URL} {
-            transport http {
-                tls
-            }
             header_up Host {http.reverse_proxy.upstream.hostport}
             header_up Connection {header.Connection}
             header_up Upgrade {header.Upgrade}
-            
+
             # Cookie handling for session management
+            header_down Set-Cookie "Domain=localhost"
+            header_down Set-Cookie "Path=/"
         }
     }
 
     # Tunnel endpoints
     handle /tunnel* {
-        reverse_proxy {$CADDY_GUAC_CLIENT_URL} { 
-            transport http {
-                tls
-            }
+        reverse_proxy {$CADDY_GUAC_CLIENT_URL} {
             header_up Host {http.reverse_proxy.upstream.hostport}
             header_up Connection {header.Connection}
             header_up Upgrade {header.Upgrade}
-            
+
             # Cookie handling for session management
+            header_down Set-Cookie "Domain=localhost"
+            header_down Set-Cookie "Path=/"
         }
     }
 
     # WebSocket tunnel endpoints
     handle /websocket-tunnel* {
         reverse_proxy {$CADDY_GUAC_CLIENT_URL} {
-            transport http {
-                tls
-            }
             header_up Host {http.reverse_proxy.upstream.hostport}
             header_up Connection {header.Connection}
             header_up Upgrade {header.Upgrade}
-            
+
             # Cookie handling for session management
+            header_down Set-Cookie "Domain=localhost"
+            header_down Set-Cookie "Path=/"
         }
     }
 
@@ -109,4 +104,4 @@
         output stdout
         format console
     }
-} 
+}

@@ -4,12 +4,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"mime/multipart"
 	"net/http"
-	"net/url"
 	"sync"
 	"time"
 
@@ -20,6 +18,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/kubernetes"
 )
+
+const maxUploadBytes = int64(100 << 20) // 100 MiB
 
 // UploadResult represents the result of each upload operation
 type UploadResult struct {
@@ -46,24 +46,19 @@ type FileBuffer struct {
 func getFQDNURL(connectionID string, redisClient *redis.Client) (string, error) {
 	val, err := redisClient.Get(context.Background(), "session:"+connectionID).Result()
 	if err != nil {
-		if errors.Is(err, redis.Nil) {
-			return "", fmt.Errorf("session not found")
-		}
-		return "", fmt.Errorf("redis get session: %w", err)
+		return "", fmt.Errorf("session not found")
 	}
 
 	var session redis2.SessionData
-	if err := json.Unmarshal([]byte(val), &session); err != nil {
+	err = json.Unmarshal([]byte(val), &session)
+	if err != nil {
 		return "", fmt.Errorf("failed to unmarshal session data")
 	}
 
-	u := url.URL{
-		Scheme: "http", // TODO: make configurable
-		Host:   fmt.Sprintf("%s:%d", session.FQDN, 8080),
-		Path:   "upload",
-	}
-	logrus.Debugf("Resolved upload URL for %s", connectionID)
-	return u.String(), nil
+	fqdn := session.FQDN
+	url := fmt.Sprintf("http://%s:%d/%s", fqdn, 8080, "upload")
+	logrus.Infof("File URL: %s", url)
+	return url, nil
 }
 
 // HandlerUploadFile handles file uploads to multiple destinations concurrently
@@ -89,7 +84,6 @@ func HandlerUploadFile(c *gin.Context, redisClient *redis.Client, k8sClient *kub
 		return
 	}
 
-	const maxUploadBytes = int64(100 << 20) // 100 MiB; make configurable
 	if fileHeader.Size <= 0 || fileHeader.Size > maxUploadBytes {
 		c.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": "file too large"})
 		return
@@ -180,7 +174,6 @@ func HandlerUploadFileWithoutMinio(c *gin.Context, redisClient *redis.Client, k8
 		return
 	}
 
-	const maxUploadBytes = int64(100 << 20) // 100 MiB; make configurable
 	if fileHeader.Size <= 0 || fileHeader.Size > maxUploadBytes {
 		c.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": "file too large"})
 		return

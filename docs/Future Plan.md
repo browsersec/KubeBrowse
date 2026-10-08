@@ -1,6 +1,6 @@
 ---
 label: Future Plan 
-icon: rocket
+icon: material/rocket
 order: 900
 ---
 

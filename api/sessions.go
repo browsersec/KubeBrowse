@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"errors"
 
 	"encoding/json"
 	"net/http"
@@ -24,12 +23,7 @@ func HandlerStopWSSession(c *gin.Context, redisClient *redis.Client, k8sClient *
 
 	if err := stopWSSession(connectionID, redisClient, k8sClient, server); err != nil {
 		logrus.Errorf("Failed to stop WebSocket session: %v", err)
-		// c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		if errors.Is(err, redis.Nil) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "session not found"})
-		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": fmt.Sprintf("Session %s stopped and pod deleted.", connectionID)})
@@ -47,9 +41,6 @@ func stopWSSession(connectionID string, redisClient *redis.Client, k8sClient *ku
 	}
 	val, err := redisClient.Get(context.Background(), "session:"+connectionID).Result()
 	if err != nil {
-		if errors.Is(err, redis.Nil) {
-			return err
-		}
 		return fmt.Errorf("session not found: %w", err)
 	}
 	var session redis2.SessionData
@@ -73,14 +64,13 @@ func stopWSSession(connectionID string, redisClient *redis.Client, k8sClient *ku
 	}
 
 	// Delete the pod
-	if err = k8s.DeletePod(k8sClient, session.PodName); err != nil {
+	err = k8s.DeletePod(k8sClient, session.PodName)
+	if err != nil {
 		logrus.Errorf("Failed to delete pod: %v", err)
 	}
 
 	// Delete session from Redis
-	if err := redisClient.Del(context.Background(), "session:"+connectionID).Err(); err != nil {
-		logrus.Warnf("Failed to delete session key from Redis for %s:  %v", connectionID, err)
-	}
+	redisClient.Del(context.Background(), "session:"+connectionID)
 	return nil
 
 }

@@ -1,28 +1,12 @@
 all: run
 
-# check if the certs directory exists and .key and .crt files exist
-ifneq ("$(wildcard certs)","")
-	ifneq ("$(wildcard certs/private.key)","")
-		ifneq ("$(wildcard certs/certificate.crt)","")
-			CERTS_EXIST := true
-		endif
-	endif
-endif
-# if certs exist, set the cert path and key path
-ifeq ($(CERTS_EXIST), true)
-	CERT_PATH := "$(shell pwd)/certs/certificate.crt"
-	CERT_KEY_PATH := "$(shell pwd)/certs/private.key"
-else
-	CERT_PATH := "$(shell pwd)/certs/certificate.crt"
-	CERT_KEY_PATH := "$(shell pwd)/certs/private.key"
-	bash ./certs/generate.sh
-endif
-
-
-
 # Install dependencies
 deps:
 	go mod tidy
+
+# Generate Swagger/OpenAPI docs
+swag:
+	swag init -g main.go -d ./cmd/guac,./api
 
 # Install git hooks using lefthook
 hooks:
@@ -45,18 +29,17 @@ lint:
 	@echo "Running pre-commit checks on staged files using lefthook..."
 	@lefthook run pre-commit --files $(git diff --name-only --cached)
 
-# run the server 
+# run the server
 run: deps
 	@echo "Running server..."
-	@echo "Using certs from $(CERT_PATH) and $(CERT_KEY_PATH)"
 	@echo "Starting server..."
-	CERT_PATH=./certs/certificate.crt CERT_KEY_PATH=./certs/private.key go run cmd/guac/main.go
+	go run cmd/guac/main.go
 
 run_frontend:
 	@echo "Running frontend..."
 	@echo "Starting frontend..."
-	pnpm --dir frontend run dev 
-	
+	bun --cwd frontend run dev
+
 generate:
 	bash ./certs/generate.sh
 
@@ -78,63 +61,57 @@ test_coverage:
 build: deps
 	go build -v -o guac cmd/guac/main.go
 
+# MkDocs documentation targets
+docs-setup:
+	pip install mkdocs mkdocs-material
+
+docs-serve:
+	mkdocs serve
+
+docs-build:
+	mkdocs build
+
 # Setup development environment
 setup: deps hooks
 	@echo "Development environment setup complete"
 
-# Database migration targets using golang-migrate
-migrate:
-	@echo "Running database migrations using golang-migrate..."
-	@if [ -z "$(DATABASE_URL)" ]; then \
-		echo "❌ DATABASE_URL environment variable is not set"; \
-		echo "Please set DATABASE_URL with your database connection string"; \
-		echo "Example: export DATABASE_URL='postgres://username:password@localhost:5432/dbname?sslmode=disable'"; \
-		exit 1; \
-	fi
-	@./scripts/migrate.sh
+KIND_CLUSTER ?= kubebrowse-cluster
+ARCH := $(shell uname -m)
+ifeq ($(ARCH),x86_64)
+  PLATFORM := linux/amd64
+  TAG_SUFFIX := amd64
+else ifneq ($(filter $(ARCH),arm64 aarch64),)
+  PLATFORM := linux/arm64
+  TAG_SUFFIX := arm64
+else
+  PLATFORM := linux/$(ARCH)
+  TAG_SUFFIX := $(ARCH)
+endif
+CHROMIUM_IMAGE := ghcr.io/browsersec/rdp-chromium:latest-$(TAG_SUFFIX)
+OFFICE_IMAGE := ghcr.io/browsersec/rdp-onlyoffice-lxde:latest-$(TAG_SUFFIX)
 
-migrate-status:
-	@echo "Checking migration status..."
-	@if [ -z "$(DATABASE_URL)" ]; then \
-		echo "❌ DATABASE_URL environment variable is not set"; \
-		echo "Please set DATABASE_URL with your database connection string"; \
-		exit 1; \
-	fi
-	@migrate -path ./db/migrations -database "$(DATABASE_URL)" version
+# Load chromium image into KIND
+load-chromium:
+	@echo "Pulling $(CHROMIUM_IMAGE)..."
+	docker pull --platform $(PLATFORM) $(CHROMIUM_IMAGE)
+	@echo "Loading $(CHROMIUM_IMAGE) into KIND cluster $(KIND_CLUSTER)..."
+	docker save $(CHROMIUM_IMAGE) -o /tmp/chromium.tar
+	kind load image-archive /tmp/chromium.tar --name $(KIND_CLUSTER)
+	@rm -f /tmp/chromium.tar
+	@echo "Chromium image loaded."
 
-migrate-create:
-	@echo "Creating new migration..."
-	@if [ -z "$(NAME)" ]; then \
-		echo "❌ Migration name not specified"; \
-		echo "Usage: make migrate-create NAME=migration_name"; \
-		exit 1; \
-	fi
-	@migrate create -ext sql -dir ./db/migrations -seq $(NAME)
+# Load onlyoffice image into KIND
+load-office:
+	@echo "Pulling $(OFFICE_IMAGE)..."
+	docker pull --platform $(PLATFORM) $(OFFICE_IMAGE)
+	@echo "Loading $(OFFICE_IMAGE) into KIND cluster $(KIND_CLUSTER)..."
+	docker save $(OFFICE_IMAGE) -o /tmp/onlyoffice.tar
+	kind load image-archive /tmp/onlyoffice.tar --name $(KIND_CLUSTER)
+	@rm -f /tmp/onlyoffice.tar
+	@echo "Onlyoffice image loaded."
 
-migrate-up:
-	@echo "Running migrations up..."
-	@if [ -z "$(DATABASE_URL)" ]; then \
-		echo "❌ DATABASE_URL environment variable is not set"; \
-		exit 1; \
-	fi
-	@migrate -path ./db/migrations -database "$(DATABASE_URL)" up
-
-migrate-down:
-	@echo "Rolling back migrations..."
-	@if [ -z "$(DATABASE_URL)" ]; then \
-		echo "❌ DATABASE_URL environment variable is not set"; \
-		exit 1; \
-	fi
-	@migrate -path ./db/migrations -database "$(DATABASE_URL)" down
-
-migrate-force:
-	@echo "Forcing migration version..."
-	@if [ -z "$(DATABASE_URL)" ] || [ -z "$(VERSION)" ]; then \
-		echo "❌ DATABASE_URL and VERSION environment variables must be set"; \
-		echo "Usage: make migrate-force DATABASE_URL='...' VERSION=1"; \
-		exit 1; \
-	fi
-	@migrate -path ./db/migrations -database "$(DATABASE_URL)" force $(VERSION)
+# Load all sandbox images into KIND
+load-images: load-chromium load-office
 
 help:
 	go run cmd/guac/main.go -h
@@ -147,18 +124,11 @@ help:
 	@echo "  lint-all     - Run lefthook pre-commit checks on all files"
 	@echo "  test         - Run tests"
 	@echo "  build        - Build the project"
+	@echo "  docs-setup   - Install MkDocs and Material theme via pip"
+	@echo "  docs-serve   - Serve documentation locally"
+	@echo "  docs-build   - Build documentation into static files"
+	@echo "  load-images  - Pull all sandbox images from GHCR and load into KIND"
+	@echo "  load-chromium - Pull and load chromium image into KIND"
+	@echo "  load-office  - Pull and load onlyoffice image into KIND"
 	@echo "  generate     - Generate self-signed certificates"
 	@echo "  generate_prod - Generate Let's Encrypt certificates"
-	@echo ""
-	@echo "Database Migration Commands (using golang-migrate):"
-	@echo "  migrate      - Run all pending migrations"
-	@echo "  migrate-status - Check current migration version"
-	@echo "  migrate-create - Create new migration (NAME=migration_name)"
-	@echo "  migrate-up   - Run migrations up"
-	@echo "  migrate-down - Rollback migrations"
-	@echo "  migrate-force - Force migration version (VERSION=1)"
-	@echo ""
-	@echo "Migration Examples:"
-	@echo "  export DATABASE_URL='postgres://user:pass@localhost:5432/db?sslmode=disable'"
-	@echo "  make migrate"
-	@echo "  make migrate-create NAME=add_user_preferences"

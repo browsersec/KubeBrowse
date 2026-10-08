@@ -13,4 +13,6 @@ Secure browser-in-browser isolation platform powered by Kubernetes. KubeBrowse p
 - Chrome Extension support to launch isolated browser or office-file sessions and import attachments directly from Gmail, WhatsApp, or Telegram with automatic threat analysis
 - Distributed architecture with multi-region support
 
+#### Community
 
+Please follow our [Code of Conduct](CODE_OF_CONDUCT.md) when participating in KubeBrowse. See the [contribution guide](CONTRIBUTING.md) to get started. Report vulnerabilities using our [security policy](SECURITY.md).

@@ -8,13 +8,11 @@
       "name": "Create Office Session",
       "request": {
         "method": "POST",
-        "header": [
-          { "key": "Content-Type", "value": "application/json" }
-        ],
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
         "url": {
-          "raw": "{{baseUrl}}/test/deploy-office",
+          "raw": "{{baseUrl}}/api/v1/sessions/office",
           "host": ["{{baseUrl}}"],
-          "path": ["test", "deploy-office"]
+          "path": ["api", "v1", "sessions", "office"]
         }
       }
     },
@@ -23,9 +21,9 @@
       "request": {
         "method": "GET",
         "url": {
-          "raw": "{{baseUrl}}/test/connect/:connection_id",
+          "raw": "{{baseUrl}}/api/v1/sessions/:connection_id/connect",
           "host": ["{{baseUrl}}"],
-          "path": ["test", "connect", ":connection_id"]
+          "path": ["api", "v1", "sessions", ":connection_id", "connect"]
         }
       }
     },
@@ -55,13 +53,11 @@
       "name": "Create Browser Pod",
       "request": {
         "method": "POST",
-        "header": [
-          { "key": "Content-Type", "value": "application/json" }
-        ],
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
         "url": {
-          "raw": "{{baseUrl}}/test/browser-pod",
+          "raw": "{{baseUrl}}/api/v1/pods/browser",
           "host": ["{{baseUrl}}"],
-          "path": ["test", "browser-pod"]
+          "path": ["api", "v1", "pods", "browser"]
         }
       }
     },
@@ -69,13 +65,11 @@
       "name": "Create Office Pod (alternate)",
       "request": {
         "method": "POST",
-        "header": [
-          { "key": "Content-Type", "value": "application/json" }
-        ],
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
         "url": {
-          "raw": "{{baseUrl}}/test/office-pod",
+          "raw": "{{baseUrl}}/api/v1/pods/office",
           "host": ["{{baseUrl}}"],
-          "path": ["test", "office-pod"]
+          "path": ["api", "v1", "pods", "office"]
         }
       }
     }
@@ -86,4 +80,4 @@
       "value": "http://localhost:4567"
     }
   ]
-} 
+}

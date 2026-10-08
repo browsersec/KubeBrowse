@@ -2,7 +2,7 @@ name: Go
 
 on:
   push:
-    branches: [ main , "chore/improve-back" ]
+    branches: [ main , "chore/improve-back" , "chore/without-oauth" ]
     tags:
       - 'v*'
     paths-ignore:

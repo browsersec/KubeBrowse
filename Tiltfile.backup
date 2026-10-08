@@ -3,29 +3,49 @@ load('ext://restart_process', 'docker_build_with_restart')
 allow_k8s_contexts("default")
 print("Tilt starting up...")
 
-# Local Go compilation 
-local_resource(
-    'go-build',
-    cmd='CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o .tilt/guac cmd/guac/main.go',
-    deps=['./cmd', './internal', './api', './go.mod', './go.sum'],
-    auto_init=True
-)
+# Local compilation for backend Go app
+# local_resource(
+#   'kubebrowse-compile',
+#   '''
+#   # Build Go binary
+#   mkdir -p ./.tilt
+#   CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o ./.tilt/guac cmd/guac/main.go
+#   chmod +x ./.tilt/guac
+#   ''',
+#   deps=[
+#     './api',
+#     './cmd',
+#     './internal',
+#     './docs',
+#     './go.mod',
+#     './go.sum'
+#   ],
+#   dir='.'
+# )
 
-# Backend API (Go) - uses pre-compiled binary
+# Backend API (Go) with restart support - include all necessary files
 docker_build_with_restart(
     'ghcr.io/browsersec/kubebrowse',
     '.',
-    dockerfile='Dockerfile.tilt',
+    dockerfile='Dockerfile',
     entrypoint='/app/guac',
     only=[
         './.tilt/guac',
         './templates',
         './certs',
+        './go.mod',
+        './go.sum',
+        './api',
+        './cmd',
+        './internal',
+        './docs',
+        './db',
+        './sqlc.yaml'
     ],
     live_update=[
         sync('./.tilt/guac', '/app/guac'),
         sync('./templates', '/app/templates'),
-        run('chmod +x /app/guac')
+        run('chmod +x /app/guac')  # Ensure binary is executable
     ]
 )
 
@@ -60,19 +80,51 @@ k8s_resource(
     auto_init=False
 )
 
+# Database migration job for local development
+# k8s_resource(
+#     'db-migrate',
+#     labels=["database"],
+#     auto_init=False,
+#     resource_deps=['browser-sandbox-api']
+# )
+
 # Define Kubernetes resources - simplified to avoid object reference errors
 k8s_resource(
     'browser-sandbox-api',
     port_forwards=['4567:4567'],
     pod_readiness='wait',
-    labels=["api"],
-    resource_deps=['go-build']
+    labels=["api"]
 )
 
-# Infrastructure resources - simplified to avoid object reference issues
+# # Frontend Docker build (missing from current Tiltfile)
+# docker_build(
+#     'ghcr.io/browsersec/kubebrowse-frontend',
+#     './frontend',
+#     dockerfile='./frontend/Dockerfile',
+#     live_update=[
+#         sync('./frontend/src', '/app/src'),
+#         sync('./frontend/public', '/app/public'),
+#         run('cd /app && npm run build', trigger=['./frontend/src/**/*'])
+#     ]
+# )
+
+# # Define Kubernetes resources for frontend
+# k8s_resource(
+#     'browser-sandbox-frontend',
+#     port_forwards=['3000:80'],
+#     auto_init=False,
+#     labels=["frontend"],
+#     env=[
+#         'CADDY_GUAC_CLIENT_URL=https://browser-sandbox-api.browser-sandbox.svc.cluster.local:4567'
+#     ]
+# )
+
+# Update infrastructure resources to match what's available in the cluster
 k8s_resource(
     objects=[
         'browser-sandbox:Namespace:default',
+        'postgres:StatefulSet:browser-sandbox',
+        'redis:Deployment:browser-sandbox',
         'minio-pvc:PersistentVolumeClaim:browser-sandbox',
         'sandbox-instances:Service:browser-sandbox'
     ],

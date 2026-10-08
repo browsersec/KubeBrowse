@@ -22,11 +22,7 @@ class WebSocketSessionDuplicator {
     if (queuedMessages.length > 0) {
       queuedMessages.forEach(message => {
         try {
-          if (websocket && websocket.readyState === WebSocket.OPEN) {
-            websocket.send(message);
-          } else {
-            console.warn('Skipped queued send; socket not OPEN');
-          }
+          websocket.send(message);
         } catch (error) {
           console.warn('Failed to send queued message to new connection:', error);
         }
@@ -67,14 +63,8 @@ class WebSocketSessionDuplicator {
     sessionConnections.forEach((websocket, connectionId) => {
       if (connectionId !== excludeConnectionId) {
         try {
-          if (websocket && websocket.readyState === WebSocket.OPEN) {
-            websocket.send(message);
-            sentCount++;
-          } else {
-            // Socket not open—drop quietly and record failure
-            failedConnections.push(connectionId);
-            return;
-          }
+          websocket.send(message);
+          sentCount++;
         } catch (error) {
           console.warn(`Failed to send message to connection ${connectionId}:`, error);
           failedConnections.push(connectionId);

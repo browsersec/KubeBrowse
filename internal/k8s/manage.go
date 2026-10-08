@@ -7,13 +7,14 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"runtime"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis/v8"
 	"github.com/google/uuid"
 	"github.com/lib/pq"
-	"golang.org/x/crypto/bcrypt"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -71,8 +72,8 @@ func NewManager() (*KubeBrowseManager, error) {
 			GuacdHost:        getEnv("GUACD_HOST", "localhost"),
 			GuacdPort:        getEnv("GUACD_PORT", "4822"),
 			K8sNamespace:     getEnv("KUBERNETES_NAMESPACE", "browser-sandbox"),
-			BrowserImage:     getEnv("BROWSER_IMAGE", "ghcr.io/browsersec/rdp-chromium:latest"),
-			OfficeImage:      getEnv("OFFICE_IMAGE", "ghcr.io/browsersec/rdp-onlyoffice:latest"),
+			BrowserImage:     getEnv("BROWSER_IMAGE", DefaultBrowserImage()),
+			OfficeImage:      getEnv("OFFICE_IMAGE", DefaultOfficeImage()),
 			SessionTimeout:   getDurationEnv("SESSION_TIMEOUT", 10*time.Minute),
 		},
 	}
@@ -180,17 +181,16 @@ func (m *KubeBrowseManager) RegisterUser(c *gin.Context) {
 	}
 
 	// Hash password (in a real app, use bcrypt)
-	passwordHash, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash password"})
-		return
-	}
+	// passwordHash := hashPassword(user.Password)
+
+	// For simplicity, we're not hashing the password in this example
+	passwordHash := user.Password
 
 	// Generate UUID for user
 	userID := uuid.New().String()
 
 	// Insert user into database
-	_, err = m.DB.Exec(
+	_, err := m.DB.Exec(
 		"INSERT INTO users (id, username, password_hash, email) VALUES ($1, $2, $3, $4)",
 		userID, user.Username, passwordHash, user.Email,
 	)
@@ -244,8 +244,8 @@ func (m *KubeBrowseManager) LoginUser(c *gin.Context) {
 		return
 	}
 
-	// Generate a random token
-	token := uuid.NewString()
+	// Generate JWT token (in a real app)
+	token := "dummy-token-" + user.ID
 
 	c.JSON(http.StatusOK, gin.H{"token": token, "user_id": user.ID})
 }
@@ -275,9 +275,9 @@ func (m *KubeBrowseManager) CreateSession(c *gin.Context) {
 
 	// Create the appropriate pod based on session type
 	if sessionRequest.Type == "browser" {
-		pod, err = CreateBrowserSandboxPod(m.K8sClient, m.Config.K8sNamespace, userID)
+		pod, err = CreateBrowserSandboxPod(m.K8sClient, m.Config.K8sNamespace, userID, m.Config.BrowserImage)
 	} else {
-		pod, err = CreateOfficeSandboxPod(m.K8sClient, m.Config.K8sNamespace, userID)
+		pod, err = CreateOfficeSandboxPod(m.K8sClient, m.Config.K8sNamespace, userID, m.Config.OfficeImage)
 	}
 
 	if err != nil {
@@ -421,4 +421,16 @@ func getDurationEnv(key string, fallback time.Duration) time.Duration {
 		}
 	}
 	return fallback
+}
+
+// DefaultBrowserImage returns the default browser sandbox image for the
+// current runtime architecture (latest-amd64 or latest-arm64).
+func DefaultBrowserImage() string {
+	return fmt.Sprintf("ghcr.io/browsersec/rdp-chromium:latest-%s", runtime.GOARCH)
+}
+
+// DefaultOfficeImage returns the default office sandbox image for the
+// current runtime architecture (latest-amd64 or latest-arm64).
+func DefaultOfficeImage() string {
+	return fmt.Sprintf("ghcr.io/browsersec/rdp-onlyoffice-lxde:latest-%s", runtime.GOARCH)
 }

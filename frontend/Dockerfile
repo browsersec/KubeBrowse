@@ -1,33 +1,28 @@
 # Build stage
-FROM node:20-alpine AS builder
+FROM node:22-alpine as builder
 
 WORKDIR /app
 
-# Copy package files and lock file
-COPY package.json pnpm-lock.yaml ./
-
-# Install pnpm
-RUN npm install -g pnpm
+# Copy package files
+COPY package*.json ./
 
 # Install dependencies
-RUN pnpm install --frozen-lockfile
+RUN npm ci
 
-# Copy source code (excluding node_modules via .dockerignore)
+# Copy source code
 COPY . .
 
 # Build the application
-RUN pnpm run build
+RUN npm run build
 
 # Production stage
 FROM caddy:alpine
-
-ARG CADDYFILE=Caddyfile
 
 # Copy built application
 COPY --from=builder /app/dist /srv
 
 # Copy Caddyfile
-COPY ${CADDYFILE} /etc/caddy/Caddyfile
+COPY Caddyfile /etc/caddy/Caddyfile
 
 # Expose port 80
 EXPOSE 80

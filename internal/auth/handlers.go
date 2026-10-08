@@ -1,21 +1,11 @@
 package auth
 
 import (
-	"context"
-	"crypto/rand"
-	"encoding/base64"
 	"net/http"
-	"net/url"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/go-redis/redis/v8"
-	"github.com/gorilla/sessions"
-	"github.com/markbates/goth"
-	"github.com/markbates/goth/gothic"
-	"github.com/markbates/goth/providers/github"
 	"github.com/sirupsen/logrus"
 )
 
@@ -25,65 +15,13 @@ const (
 )
 
 type Handler struct {
-	service     *Service
-	redisClient *redis.Client
+	service *Service
 }
 
 func NewHandler(service *Service) *Handler {
 	return &Handler{
 		service: service,
 	}
-}
-
-func NewHandlerWithRedis(service *Service, redisClient *redis.Client) *Handler {
-	return &Handler{
-		service:     service,
-		redisClient: redisClient,
-	}
-}
-
-// InitializeGoth initializes the Goth OAuth providers
-func InitializeGoth() {
-	// Configure session store for Gothic
-	sessionSecret := os.Getenv("SESSION_SECRET")
-	env := os.Getenv("GIN_MODE")
-	if env == "" {
-		env = os.Getenv("ENV")
-	}
-	isProduction := env == "release" || env == "production"
-
-	if sessionSecret == "" {
-		if isProduction {
-			logrus.Fatal("SESSION_SECRET must be set in production environments. Refusing to start.")
-			os.Exit(1)
-		} else {
-			sessionSecret = "default-secret-change-this-in-development"
-			logrus.Warn("SESSION_SECRET not set, using default secret - this is insecure for production. Only allowed in development.")
-		}
-	}
-
-	// Create session store with more permissive settings for development
-	store := sessions.NewCookieStore([]byte(sessionSecret))
-	store.MaxAge(3600) // 1 hour (shorter for OAuth state)
-	store.Options.Path = "/"
-	store.Options.HttpOnly = false // Allow JavaScript access for debugging
-	store.Options.Secure = false   // Allow HTTP cookies (important for development)
-	store.Options.Domain = ""      // Use default domain
-
-	// Set the store globally for Gothic
-	gothic.Store = store
-
-	logrus.Infof("Configured OAuth session store with secret length: %d", len(sessionSecret))
-
-	goth.UseProviders(
-		github.New(
-			os.Getenv("GITHUB_CLIENT_ID"),
-			os.Getenv("GITHUB_CLIENT_SECRET"),
-			os.Getenv("GITHUB_CALLBACK_URL"),
-		),
-	)
-
-	logrus.Infof("Initialized GitHub OAuth with callback URL: %s", os.Getenv("GITHUB_CALLBACK_URL"))
 }
 
 // RegisterRequest represents the request body for email registration
@@ -163,240 +101,6 @@ func (h *Handler) LoginWithEmail(c *gin.Context) {
 		User:    user,
 		Message: "Login successful",
 	})
-}
-
-// generateStateToken generates a random state token
-func (h *Handler) generateStateToken() (string, error) {
-	b := make([]byte, 32)
-	_, err := rand.Read(b)
-	if err != nil {
-		return "", err
-	}
-	return base64.URLEncoding.EncodeToString(b), nil
-}
-
-// BeginOAuth starts the OAuth flow with Redis-based state management
-func (h *Handler) BeginOAuth(c *gin.Context) {
-	provider := c.Param("provider")
-	if provider == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Provider is required"})
-		return
-	}
-
-	logrus.Infof("Starting OAuth flow for provider: %s", provider)
-
-	// If Redis is available, use custom state management
-	if h.redisClient != nil {
-		h.beginOAuthWithRedis(c, provider)
-		return
-	}
-
-	// Fallback to Gothic's session-based approach
-	c.Request.URL.RawQuery = "provider=" + provider
-	logrus.Debugf("Request URL: %s", c.Request.URL.String())
-	gothic.BeginAuthHandler(c.Writer, c.Request)
-}
-
-// beginOAuthWithRedis implements OAuth flow with Redis state storage
-func (h *Handler) beginOAuthWithRedis(c *gin.Context, provider string) {
-	// Generate state token
-	state, err := h.generateStateToken()
-	if err != nil {
-		logrus.Errorf("Failed to generate state token: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate state token"})
-		return
-	}
-
-	// Store state in Redis with 10-minute expiration
-	stateKey := "oauth_state:" + state
-	ctx := context.Background()
-	err = h.redisClient.Set(ctx, stateKey, provider, 10*time.Minute).Err()
-	if err != nil {
-		logrus.Errorf("Failed to store state in Redis: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to store OAuth state"})
-		return
-	}
-
-	logrus.Infof("Stored OAuth state in Redis: %s for provider: %s", state, provider)
-
-	// Get GitHub provider and build authorization URL
-	githubProvider, err := goth.GetProvider("github")
-	if err != nil {
-		logrus.Errorf("Failed to get GitHub provider: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "OAuth provider not configured"})
-		return
-	}
-	sess, err := githubProvider.BeginAuth(state)
-	if err != nil {
-		logrus.Errorf("Failed to begin auth: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to begin OAuth"})
-		return
-	}
-
-	authURL, err := sess.GetAuthURL()
-	if err != nil {
-		logrus.Errorf("Failed to get auth URL: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get authorization URL"})
-		return
-	}
-
-	logrus.Infof("Redirecting to GitHub OAuth: %s", authURL)
-	c.Redirect(http.StatusTemporaryRedirect, authURL)
-}
-
-// CallbackOAuth handles the OAuth callback
-func (h *Handler) CallbackOAuth(c *gin.Context) {
-	provider := c.Param("provider")
-	if provider == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Provider is required"})
-		return
-	}
-
-	logrus.Infof("Processing OAuth callback for provider: %s", provider)
-
-	// Get state and code from query parameters
-	stateParam := c.Request.URL.Query().Get("state")
-	codeParam := c.Request.URL.Query().Get("code")
-
-	logrus.Infof("OAuth callback - State: %s", stateParam)
-	if len(codeParam) > 10 {
-		logrus.Infof("OAuth callback - Code: %s...", codeParam[:10])
-	} else {
-		logrus.Infof("OAuth callback - Code: %s", codeParam)
-	}
-
-	// If Redis is available, use custom state validation
-	if h.redisClient != nil {
-		h.callbackOAuthWithRedis(c, provider, stateParam, codeParam)
-		return
-	}
-
-	// Fallback to Gothic's session-based approach
-	c.Request.URL.RawQuery = "provider=" + provider
-	logrus.Debugf("Callback URL: %s", c.Request.URL.String())
-
-	gothUser, err := gothic.CompleteUserAuth(c.Writer, c.Request)
-	if err != nil {
-		logrus.Errorf("OAuth callback error: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "OAuth authentication failed",
-			"details": err.Error(),
-		})
-		return
-	}
-
-	h.processOAuthUser(c, gothUser)
-}
-
-// callbackOAuthWithRedis handles OAuth callback with Redis state validation
-func (h *Handler) callbackOAuthWithRedis(c *gin.Context, provider, state, code string) {
-	if state == "" || code == "" {
-		logrus.Error("Missing state or code parameter")
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing required parameters"})
-		return
-	}
-
-	// Validate state token from Redis
-	stateKey := "oauth_state:" + state
-	ctx := context.Background()
-
-	storedProvider, err := h.redisClient.Get(ctx, stateKey).Result()
-	if err == redis.Nil {
-		logrus.Errorf("State token not found in Redis: %s", state)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid or expired state token"})
-		return
-	} else if err != nil {
-		logrus.Errorf("Failed to get state from Redis: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to validate state"})
-		return
-	}
-
-	if storedProvider != provider {
-		logrus.Errorf("Provider mismatch: expected %s, got %s", storedProvider, provider)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Provider mismatch"})
-		return
-	}
-
-	logrus.Infof("State token validated successfully for provider: %s", provider)
-
-	// Clean up the state token
-	h.redisClient.Del(ctx, stateKey)
-
-	// Get the provider and complete authentication
-	githubProvider, err := goth.GetProvider("github")
-	if err != nil {
-		logrus.Errorf("Failed to get GitHub provider: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "OAuth provider not configured"})
-		return
-	}
-	sess, err := githubProvider.BeginAuth(state)
-	if err != nil {
-		logrus.Errorf("Failed to begin auth for callback: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to process callback"})
-		return
-	}
-
-	// Complete the authentication with the authorization code
-	// Use url.Values which implements the goth.Params interface
-	params := make(url.Values)
-	params.Set("code", code)
-	params.Set("state", state)
-
-	_, err = sess.Authorize(githubProvider, params)
-	if err != nil {
-		logrus.Errorf("Failed to authorize: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to complete OAuth authorization"})
-		return
-	}
-
-	user, err := githubProvider.FetchUser(sess)
-	if err != nil {
-		logrus.Errorf("Failed to fetch user: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch user information"})
-		return
-	}
-
-	logrus.Infof("Successfully authenticated user: %s (%s)", user.Email, user.Provider)
-	h.processOAuthUser(c, user)
-}
-
-// processOAuthUser processes the authenticated OAuth user
-func (h *Handler) processOAuthUser(c *gin.Context, gothUser goth.User) {
-
-	// Create or update user
-	user, err := h.service.CreateOrUpdateOAuthUser(
-		gothUser.Email,
-		gothUser.Provider,
-		gothUser.UserID,
-		gothUser.AvatarURL,
-		gothUser.Name,
-		gothUser.NickName,
-	)
-	if err != nil {
-		logrus.Errorf("Failed to create/update OAuth user: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to process OAuth user"})
-		return
-	}
-
-	// Create session
-	session, err := h.service.CreateSession(user.ID)
-	if err != nil {
-		logrus.Errorf("Failed to create session: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create session"})
-		return
-	}
-
-	// Set session cookie
-	h.setSessionCookie(c, session.SessionToken)
-	logrus.Infof("Session cookie set for user %s with token: %s", user.Email, session.SessionToken)
-
-	// Redirect to frontend success page
-	frontendURL := os.Getenv("FRONTEND_URL")
-	if frontendURL == "" {
-		frontendURL = "http://localhost:5173"
-	}
-
-	c.Redirect(http.StatusTemporaryRedirect, frontendURL+"/auth/success")
 }
 
 // Logout handles user logout
