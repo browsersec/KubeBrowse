@@ -36,8 +36,9 @@ pre-commit:
       run: go test -short ./...
 
     gosec:
-      glob: "*.{go}"
-      run: gosec  ./..
+      glob: "*.go"
+      exclude: "vendor/**"
+      run: gosec -exclude-generated ./...
     
 commit-msg:
   commands:

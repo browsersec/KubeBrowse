@@ -161,6 +161,7 @@ func (s *Server) doRead(response http.ResponseWriter, request *http.Request, tun
 	// buffer 1024 bytes before starting a normal stream if we use
 	// anything but application/octet-stream.
 	response.Header().Set("Content-Type", "application/octet-stream")
+	response.Header().Set("X-Content-Type-Options", "nosniff")
 	response.Header().Set("Cache-Control", "no-cache")
 
 	if v, ok := response.(http.Flusher); ok {
@@ -216,7 +217,9 @@ func (s *Server) writeSome(response http.ResponseWriter, guacd InstructionReader
 			return
 		}
 
-		_, e := response.Write(message)
+		// Guacamole instructions are a raw binary protocol, served as
+		// application/octet-stream with nosniff by doRead; HTML escaping corrupts it.
+		_, e := response.Write(message) // #nosec G705 -- Binary protocol response, not HTML.
 		if e != nil {
 			err = ErrOther.NewError(e.Error())
 			return
@@ -256,6 +259,7 @@ func (s *Server) doWrite(response http.ResponseWriter, request *http.Request, tu
 	// attempt to parse the result, even though the JavaScript client
 	// does not explicitly request such parsing.
 	response.Header().Set("Content-Type", "application/octet-stream")
+	response.Header().Set("X-Content-Type-Options", "nosniff")
 	response.Header().Set("Cache-Control", "no-cache")
 	response.Header().Set("Content-Length", "0")
 

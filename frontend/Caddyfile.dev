@@ -1,0 +1,118 @@
+{
+    http_port 80
+    # Optional: enable debug logging for Caddy if needed
+    # debug
+}
+
+:80 {
+    root * /srv
+    file_server
+
+    # Handle OAuth callback redirects
+    handle /auth/success {
+        file_server
+        header Cache-Control "no-cache, no-store, must-revalidate"
+    }
+
+    # Authentication endpoints - proxy to backend API
+    handle /auth/* {
+        reverse_proxy {$CADDY_GUAC_CLIENT_URL} {
+            transport http {
+                tls
+                tls_insecure_skip_verify
+            }
+            header_up Host {http.reverse_proxy.upstream.hostport}
+            header_up Connection {header.Connection}
+            header_up Upgrade {header.Upgrade}
+            
+            # Cookie handling for session management
+        }
+    }
+
+    # Session management endpoints
+    handle /sessions/* {
+        reverse_proxy {$CADDY_GUAC_CLIENT_URL} {
+            transport http {
+                tls
+                tls_insecure_skip_verify
+            }
+            header_up Host {http.reverse_proxy.upstream.hostport}
+            header_up Connection {header.Connection}
+            header_up Upgrade {header.Upgrade}
+            
+            # Cookie handling for session management
+        }
+    }
+
+    # Test endpoints
+    handle /test/* {
+        reverse_proxy {$CADDY_GUAC_CLIENT_URL} {
+            transport http {
+                tls
+                tls_insecure_skip_verify
+            }
+            header_up Host {http.reverse_proxy.upstream.hostport}
+            header_up Connection {header.Connection}
+            header_up Upgrade {header.Upgrade}
+            
+            # Cookie handling for session management
+        }
+    }
+
+    # Tunnel endpoints
+    handle /tunnel* {
+        reverse_proxy {$CADDY_GUAC_CLIENT_URL} { 
+            transport http {
+                tls
+                tls_insecure_skip_verify
+            }
+            header_up Host {http.reverse_proxy.upstream.hostport}
+            header_up Connection {header.Connection}
+            header_up Upgrade {header.Upgrade}
+            
+            # Cookie handling for session management
+        }
+    }
+
+    # WebSocket tunnel endpoints
+    handle /websocket-tunnel* {
+        reverse_proxy {$CADDY_GUAC_CLIENT_URL} {
+            transport http {
+                tls
+                tls_insecure_skip_verify
+            }
+            header_up Host {http.reverse_proxy.upstream.hostport}
+            header_up Connection {header.Connection}
+            header_up Upgrade {header.Upgrade}
+            
+            # Cookie handling for session management
+        }
+    }
+
+    # Health check endpoint
+    handle /health {
+        respond "healthy" 200
+        header Content-Type "text/plain"
+        header Cache-Control "no-cache"
+    }
+
+    # SPA routing - fallback to index.html for all other routes
+    handle /* {
+        try_files {path} /index.html
+        header Cache-Control "no-cache, no-store, must-revalidate"
+    }
+
+    # Security headers
+    header {
+        X-Frame-Options "SAMEORIGIN"
+        X-Content-Type-Options "nosniff"
+        X-XSS-Protection "1; mode=block"
+        Referrer-Policy "strict-origin-when-cross-origin"
+    }
+
+    log {
+        output stdout
+        format console
+    }
+}
+

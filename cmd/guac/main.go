@@ -339,11 +339,13 @@ func main() {
 
 		// Schedule pod termination after grace period if no reconnection
 		go func() {
-			// Create a new context for the goroutine
-			bgCtx := context.Background()
-
 			// Wait for reconnection window (120 seconds)
 			time.Sleep(120 * time.Second)
+
+			// Cleanup must outlive the disconnected request, but Redis operations
+			// still need a deadline so they cannot hold this goroutine indefinitely.
+			bgCtx, cancel := context.WithTimeout(context.WithoutCancel(req.Context()), 30*time.Second)
+			defer cancel()
 
 			// Check if reconnection happened by verifying if reconnect key still exists
 			exists, err := redisClient.Exists(bgCtx, reconnectKey).Result()
