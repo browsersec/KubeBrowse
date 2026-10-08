@@ -34,6 +34,7 @@ export default function NewConnectionRoute() {
   const [error, setError] = useState(null);
 
   const handleSubmit = (e) => {
+    e.preventDefault();
     setIsSubmitting(true);
     setError(null);
 

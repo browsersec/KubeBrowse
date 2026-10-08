@@ -38,7 +38,7 @@ run: deps
 run_frontend:
 	@echo "Running frontend..."
 	@echo "Starting frontend..."
-	bun --dir frontend run dev
+	bun --cwd frontend run dev
 
 generate:
 	bash ./certs/generate.sh
@@ -80,7 +80,7 @@ ARCH := $(shell uname -m)
 ifeq ($(ARCH),x86_64)
   PLATFORM := linux/amd64
   TAG_SUFFIX := amd64
-else ifeq ($(ARCH),arm64)
+else ifneq ($(filter $(ARCH),arm64 aarch64),)
   PLATFORM := linux/arm64
   TAG_SUFFIX := arm64
 else

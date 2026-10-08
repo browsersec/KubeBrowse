@@ -19,6 +19,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
+const maxUploadBytes = int64(100 << 20) // 100 MiB
+
 // UploadResult represents the result of each upload operation
 type UploadResult struct {
 	Service string      `json:"service"`
@@ -79,6 +81,11 @@ func HandlerUploadFile(c *gin.Context, redisClient *redis.Client, k8sClient *kub
 	fileHeader, err := c.FormFile("file")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "file is required"})
+		return
+	}
+
+	if fileHeader.Size <= 0 || fileHeader.Size > maxUploadBytes {
+		c.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": "file too large"})
 		return
 	}
 
@@ -164,6 +171,11 @@ func HandlerUploadFileWithoutMinio(c *gin.Context, redisClient *redis.Client, k8
 	fileHeader, err := c.FormFile("file")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "file is required"})
+		return
+	}
+
+	if fileHeader.Size <= 0 || fileHeader.Size > maxUploadBytes {
+		c.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": "file too large"})
 		return
 	}
 

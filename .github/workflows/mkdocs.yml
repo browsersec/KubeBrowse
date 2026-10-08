@@ -5,7 +5,6 @@ on:
   push:
     branches:
       - main
-      - chore/without-oauth
 
 permissions:
   contents: write
